@@ -16,3 +16,7 @@ make123/android/app/src/main/assets/*
 !make123/android/app/src/main/assets/.gitkeep
 novelwiki/android/app/src/main/assets/www/*
 !novelwiki/android/app/src/main/assets/www/.gitkeep
+hwaseong/web/node_modules/
+hwaseong/web/dist/
+hwaseong/android/app/src/main/assets/www/*
+!hwaseong/android/app/src/main/assets/www/.gitkeep
