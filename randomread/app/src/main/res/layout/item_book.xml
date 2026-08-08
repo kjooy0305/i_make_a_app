@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="16dp"
+    android:paddingVertical="11dp"
+    android:background="?attr/selectableItemBackground">
+
+    <TextView
+        android:id="@+id/tvIndex"
+        android:layout_width="32dp"
+        android:layout_height="wrap_content"
+        android:textSize="11sp"
+        android:textColor="#444460"
+        android:fontFamily="monospace"
+        android:gravity="end"
+        android:paddingEnd="10dp"/>
+
+    <TextView
+        android:id="@+id/tvName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="14sp"
+        android:textColor="#D0CDE8"
+        android:lineSpacingMultiplier="1.2"/>
+
+</LinearLayout>

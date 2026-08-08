@@ -13,6 +13,7 @@ i_make_a_app/
 │   ├── web/        ← 웹 원본 소스 (수정은 여기서)
 │   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
 ├── repeatalarm/    ← 네이티브 Android 앱
+├── randomread/     ← 네이티브 Android 앱
 ├── shortkey/       ← Windows 앱 소스
 └── README.md
 ```
@@ -28,6 +29,7 @@ i_make_a_app/
 | 📜 스크립트 TRPG 작성 앱 | Android | .apk | [다운로드](../../releases?q=make123) |
 | 📖 소설 창작 위키 | Android | .apk | [다운로드](../../releases?q=novelwiki) |
 | ⏰ 반복 알림 앱 | Android | .apk | [다운로드](../../releases?q=repeatalarm) |
+| 📚 RandomRead | Android | .apk | [다운로드](../../releases?q=randomread) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---
@@ -103,6 +105,27 @@ TRPG(테이블탑 롤플레잉 게임) 시나리오를 직접 쓰고, 그 자리
 
 ---
 
+## 📚 RandomRead
+
+> **설치 가능 기기:** Android 스마트폰 · 태블릿 (Android 8.0 이상)
+> **파일 형식:** `.apk`
+
+epub / txt 파일을 모아두고 랜덤으로 한 권을 뽑아주는 독서 도우미 앱입니다.
+
+### 기능
+- **파일 추가** — epub / txt 파일 여러 개 동시 추가
+- **랜덤 뽑기** — 목록 중 무작위로 한 권 선택
+- **가나다순 정렬** — EPUB 먼저, 그 다음 TXT (한국어 정렬)
+- **목록 내보내기** — 전체 목록을 txt 파일로 저장
+- 오프라인 완전 동작 / 목록 영구 저장
+
+### 설치 방법
+1. [Releases](../../releases?q=randomread)에서 `RandomRead-vX.X.X.apk` 다운로드
+2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+3. APK 파일 실행 후 설치
+
+---
+
 ## ⌨️ ShortKey
 
 > **설치 가능 기기:** Windows 10 · 11 PC
@@ -136,6 +159,9 @@ git tag novelwiki-v1.0.1 && git push origin novelwiki-v1.0.1
 
 # 반복 알림 앱 새 버전
 git tag repeatalarm-v1.0.1 && git push origin repeatalarm-v1.0.1
+
+# RandomRead 새 버전
+git tag randomread-v1.0.1 && git push origin randomread-v1.0.1
 
 # ShortKey 새 버전
 git tag shortkey-v1.0.1 && git push origin shortkey-v1.0.1

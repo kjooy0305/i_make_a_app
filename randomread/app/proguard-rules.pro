@@ -1,0 +1,1 @@
+-keep class com.kjooy0305.randomread.** { *; }
