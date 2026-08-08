@@ -441,6 +441,7 @@ window.Pages.races = {
 
       await DB.put('races', record);
       await AppStore.updateStreak();
+      await AppStore.recordActivity('races', !isEdit);
       Utils.toast(isEdit ? '저장됨' : '추가됨', 'success');
       self._currentId = record.id;
       const all = await DB.getAll('races', wid);

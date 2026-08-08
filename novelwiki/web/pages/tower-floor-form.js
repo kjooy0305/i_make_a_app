@@ -28,7 +28,7 @@ Object.assign(window.Pages.tower, {
       for (const s of window.Pages.statDefs.DEFAULT_STATS) {
         const rec = { id: DB.genId(), worldId: wid, name: s.name, shortName: s.shortName || '', category: s.category, description: '', createdAt: Date.now() };
         allStatDefs.push(rec);
-        DB.put('statDefs', rec);
+        await DB.put('statDefs', rec);
       }
     }
 

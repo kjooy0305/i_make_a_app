@@ -121,6 +121,7 @@ window.Pages.eventGraph = {
       resizeCanvas();
     };
 
+    this._fixHeight = fixHeight;
     requestAnimationFrame(()=>{ fixHeight(); resizeCanvas(); });
     window.addEventListener('resize', fixHeight);
     this._resizeObs = new ResizeObserver(()=>{ fixHeight(); resizeCanvas(); });

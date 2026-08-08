@@ -22,7 +22,7 @@ Object.assign(window.Pages.gates, {
       for (const s of window.Pages.statDefs.DEFAULT_STATS) {
         const rec = { id: DB.genId(), worldId: wid, name: s.name, shortName: s.shortName || '', category: s.category, description: '', createdAt: Date.now() };
         allStatDefs.push(rec);
-        DB.put('statDefs', rec);
+        await DB.put('statDefs', rec);
       }
     }
 
@@ -1204,6 +1204,8 @@ Object.assign(window.Pages.gates, {
         updatedAt: Date.now(),
       };
       await DB.put('gates', data);
+      await AppStore.updateStreak();
+      await AppStore.recordActivity('gates', !isEdit);
       // 양방향 연동: 퀘스트의 linkedGates 자동 반영
       const allQuestsSync = await DB.getAll('quests', wid);
       const newLinkedQuestIds = new Set((data.linkedQuests || []).map(lq => lq.id));

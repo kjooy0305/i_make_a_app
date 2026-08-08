@@ -222,6 +222,7 @@ window.Pages.familyTree = {
       resizeCanvas();
     };
 
+    this._fixHeight = fixHeight;
     requestAnimationFrame(() => { fixHeight(); resizeCanvas(); });
     window.addEventListener('resize', fixHeight);
     this._resizeObs = new ResizeObserver(() => { fixHeight(); resizeCanvas(); });
@@ -657,7 +658,7 @@ window.Pages.familyTree = {
 
   destroy: function() {
     if (this._resizeObs) this._resizeObs.disconnect();
-    window.removeEventListener('resize', () => {});
+    if (this._fixHeight) window.removeEventListener('resize', this._fixHeight);
     this._canvas = null;
     this._ctx = null;
   }

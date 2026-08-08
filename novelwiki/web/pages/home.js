@@ -374,6 +374,7 @@ window.Pages.home = {
         const newBm = chips.map(c => c.dataset.pg);
         while (newBm.length < 5) newBm.push('');
         await DB.setSetting('homeBookmarks', newBm.slice(0,5));
+        await this.init(container);
         return true;
       }, '저장');
       setTimeout(() => {

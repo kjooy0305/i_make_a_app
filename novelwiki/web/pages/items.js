@@ -118,7 +118,7 @@ window.Pages.items = {
         btn.style.background = btn.dataset.grade ? Utils.gradeColor(btn.dataset.grade) : 'var(--color-primary)';
         btn.style.color = '#000';
         activeGrade = btn.dataset.grade;
-        this._applyFilter(container, document.getElementById('itemFilter')?.value || '', activeGrade, activeType, activeTower);
+        this._applyFilter(container, document.getElementById('itemFilter')?.value || '', activeGrade, activeType, activeOrigin);
       });
     });
 

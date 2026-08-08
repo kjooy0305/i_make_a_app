@@ -124,6 +124,8 @@ Object.assign(window.Pages.organizations, {
       };
 
       await DB.put('organizations', item);
+      await AppStore.updateStreak();
+      await AppStore.recordActivity('organizations', !isEdit);
       Utils.toast(isEdit ? '저장됨' : '추가됨', 'success');
       this._currentId = item.id;
       const updatedOrgs = await DB.getAll('organizations', wid);

@@ -401,6 +401,7 @@ window.Pages.gods = {
 
       await DB.put('gods', record);
       await AppStore.updateStreak();
+      await AppStore.recordActivity('gods', !isEdit);
       Utils.toast(isEdit ? '저장됨' : '추가됨', 'success');
       self._currentId = record.id;
       const updated = await DB.get('gods', record.id);
@@ -617,6 +618,7 @@ window.Pages.gods = {
       updatedOrg.updatedAt = Date.now();
       await DB.put('gods', updatedOrg);
       await AppStore.updateStreak();
+      await AppStore.recordActivity('gods', !isEdit);
       Utils.toast(isEdit ? '저장됨' : '추가됨', 'success');
       self._renderDetail(container, updatedOrg, wid);
       return true;

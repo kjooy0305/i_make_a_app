@@ -636,7 +636,7 @@ window.Pages.settings = {
         </div>`;
       Utils.openModal('질문 추가', body, async () => {
         const val = document.getElementById('fNewQ')?.value.trim();
-        if (!val) { Utils.fieldError('fEditQ'); return false; }
+        if (!val) { Utils.fieldError('fNewQ'); return false; }
         await saveAndRefreshQuestions([...questions, val]);
         Utils.toast('추가됨', 'success');
         return true;

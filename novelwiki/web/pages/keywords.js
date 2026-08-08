@@ -572,6 +572,7 @@ window.Pages.keywords = {
         createdAt: k.createdAt || Date.now(),
       };
       await DB.put('keywords', record);
+      await AppStore.updateStreak();
       await AppStore.recordActivity('keywords', !isEdit);
       Utils.toast(isEdit ? '저장됨' : '키워드 추가됨', 'success');
       this._currentKeywordId = record.id;
