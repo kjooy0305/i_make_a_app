@@ -188,6 +188,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun syncReminders(json: String) {
+            ReminderScheduler.saveAndScheduleAll(applicationContext, json)
+        }
+
+        @JavascriptInterface
+        fun syncWritingReminder(json: String) {
+            ReminderScheduler.saveAndScheduleWriting(applicationContext, json)
+        }
+
+        @JavascriptInterface
+        fun updateWritingStatus(hasWritten: Boolean, date: String) {
+            applicationContext.getSharedPreferences("novelwiki_reminders", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("written_today", hasWritten)
+                .putString("written_date", date)
+                .apply()
+        }
+
+        @JavascriptInterface
         fun showNotification(title: String, body: String, icon: String) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                 ActivityCompat.checkSelfPermission(

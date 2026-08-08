@@ -287,7 +287,12 @@ window.ReminderEngine = window.ReminderEngine || (function() {
     try {
       const today = new Date().toDateString();
       const ta = await DB.getSetting('todayActivity', null);
-      if (ta && ta.date === today && ta.questDone) return;
+      const questDone = !!(ta && ta.date === today && ta.questDone);
+      // 네이티브에 오늘 글쓰기 완료 여부 전달 (앱 꺼진 상태에서도 판단 가능하게)
+      if (window.AndroidNotifBridge && typeof window.AndroidNotifBridge.updateWritingStatus === 'function') {
+        try { window.AndroidNotifBridge.updateWritingStatus(questDone, new Date().toISOString().slice(0, 10)); } catch(e) {}
+      }
+      if (questDone) return;
     } catch(e) {}
 
     const gS = _parseTime(settings.gentleStart);
@@ -326,6 +331,11 @@ window.ReminderEngine = window.ReminderEngine || (function() {
     _clearTimers();
     const reminders = await _loadReminders();
 
+    // 네이티브 AlarmManager에 리마인더 동기화 (앱 백그라운드 알림)
+    if (window.AndroidNotifBridge && typeof window.AndroidNotifBridge.syncReminders === 'function') {
+      try { window.AndroidNotifBridge.syncReminders(JSON.stringify(reminders)); } catch(e) {}
+    }
+
     reminders.forEach(reminder => {
       if (!reminder.enabled) return;
       const intervalMs = (parseInt(reminder.interval) || 60) * 60000;
@@ -350,6 +360,12 @@ window.ReminderEngine = window.ReminderEngine || (function() {
 
     // Writing reminder timer — check every minute, fire based on rate-limit
     const writeSettings = await _getWriteSettings();
+
+    // 네이티브 AlarmManager에 글쓰기 리마인더 동기화
+    if (window.AndroidNotifBridge && typeof window.AndroidNotifBridge.syncWritingReminder === 'function') {
+      try { window.AndroidNotifBridge.syncWritingReminder(JSON.stringify(writeSettings)); } catch(e) {}
+    }
+
     if (writeSettings.enabled) {
       await _checkWritingReminder(); // Immediate check
       const wIntervalMs = (writeSettings.interval || 60) * 60000;
