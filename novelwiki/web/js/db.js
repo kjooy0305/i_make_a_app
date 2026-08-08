@@ -145,7 +145,7 @@ const DB = (function() {
             items.forEach(item => {
               const r = store.put(item);
               r.onsuccess = () => { if (++done === items.length) resolve(); };
-              r.onerror = e => reject(e.target.error);
+              r.onerror = e => { store.transaction.abort(); reject(e.target.error); };
             });
           };
           req.onerror = e => reject(e.target.error);

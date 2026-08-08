@@ -215,20 +215,7 @@ window.ReminderEngine = window.ReminderEngine || (function() {
     const msg = reminder.message || '알림';
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.ready.then(reg => {
-            reg.showNotification('소설 창작위키', {
-              body: msg,
-              icon: './icons/icon-192.png',
-              badge: './icons/badge.png',
-              tag: 'reminder-' + reminder.id,
-              renotify: true,
-              vibrate: [200, 100, 200],
-            });
-          });
-        } else {
-          new Notification('소설 창작위키', { body: msg, icon: './icons/icon-192.png' });
-        }
+        new Notification('소설 창작위키', { body: msg, icon: './icons/icon-192.png' });
       } catch(e) {}
     }
     if (window.Utils && Utils.toast) {
@@ -239,20 +226,7 @@ window.ReminderEngine = window.ReminderEngine || (function() {
   function _fireWritingMsg(msg) {
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.ready.then(reg => {
-            reg.showNotification('소설 창작위키', {
-              body: msg,
-              icon: './icons/icon-192.png',
-              badge: './icons/badge.png',
-              tag: 'writing-reminder',
-              renotify: true,
-              vibrate: [200, 100, 200],
-            });
-          });
-        } else {
-          new Notification('소설 창작위키', { body: msg, icon: './icons/icon-192.png' });
-        }
+        new Notification('소설 창작위키', { body: msg, icon: './icons/icon-192.png' });
       } catch(e) {}
     }
     if (window.Utils && Utils.toast) {
@@ -360,10 +334,14 @@ window.ReminderEngine = window.ReminderEngine || (function() {
       const startMin = _toMinutes(startP.h, startP.m);
       const endMin = _toMinutes(endP.h, endP.m);
 
+      const DAY_LABELS = ['일','월','화','수','목','금','토'];
       const t = setInterval(() => {
         const n = _now();
         const nowMin = _toMinutes(n.h, n.m);
-        if (nowMin >= startMin && nowMin < endMin) {
+        const todayLabel = DAY_LABELS[new Date().getDay()];
+        const dayOk = !reminder.days || reminder.days.length === 0
+                      || reminder.days.includes(todayLabel);
+        if (dayOk && nowMin >= startMin && nowMin < endMin) {
           _fireNotification(reminder);
         }
       }, intervalMs);
@@ -388,7 +366,7 @@ window.ReminderEngine = window.ReminderEngine || (function() {
 
   async function save(reminders) {
     await DB.setSetting('reminders', reminders);
-    start();
+    await start();
   }
 
   async function saveWriteSettings(settings) {
@@ -396,7 +374,7 @@ window.ReminderEngine = window.ReminderEngine || (function() {
     // Reset rate-limit state so new settings take effect immediately
     _ws.lastGentleMs = 0;
     _ws.lastUrgentMs = 0;
-    start();
+    await start();
   }
 
   async function init() {
@@ -747,7 +725,7 @@ window.Pages.reminders = {
       const startTime = document.getElementById('fStart')?.value || '10:00';
       const endTime = document.getElementById('fEnd')?.value || '15:00';
       const interval = parseInt(document.getElementById('fInterval')?.value) || 20;
-      if (startTime >= endTime) { Utils.fieldError('fStart', 'fEnd'); return false; }
+      if (startTime >= endTime) { Utils.toast('종료 시각이 시작 시각보다 늦어야 합니다.', 'warning', 3000); return false; }
       if (interval < 1) { Utils.fieldError('fInterval'); return false; }
       const days = Array.from(document.querySelectorAll('.day-opt.btn-primary')).map(b => b.dataset.day);
       const payload = {

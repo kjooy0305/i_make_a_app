@@ -116,6 +116,10 @@ class MainActivity : AppCompatActivity() {
                             configurable: true,
                             writable: true
                         });
+                        // 폴리필 주입 후 ReminderEngine 재기동 (부트 타이밍 누락 복구)
+                        if (window.ReminderEngine) {
+                            window.ReminderEngine.start();
+                        }
                     })();
                 """.trimIndent(), null)
             }
@@ -163,10 +167,15 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun getPermission(): String {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return "granted"
-            return if (ActivityCompat.checkSelfPermission(
+            return when {
+                ActivityCompat.checkSelfPermission(
                     this@MainActivity, Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED
-            ) "granted" else "default"
+                ) == PackageManager.PERMISSION_GRANTED -> "granted"
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    this@MainActivity, Manifest.permission.POST_NOTIFICATIONS
+                ) -> "default"
+                else -> "denied"
+            }
         }
 
         @JavascriptInterface
@@ -195,7 +204,7 @@ class MainActivity : AppCompatActivity() {
                 .build()
 
             NotificationManagerCompat.from(this@MainActivity)
-                .notify(System.currentTimeMillis().toInt(), notif)
+                .notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notif)
         }
     }
 }
