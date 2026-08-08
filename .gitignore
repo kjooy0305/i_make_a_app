@@ -14,3 +14,5 @@ local.properties
 *.p12
 make123/android/app/src/main/assets/*
 !make123/android/app/src/main/assets/.gitkeep
+novelwiki/android/app/src/main/assets/www/*
+!novelwiki/android/app/src/main/assets/www/.gitkeep

@@ -9,6 +9,9 @@ i_make_a_app/
 ├── make123/
 │   ├── web/        ← 웹 원본 소스 (수정은 여기서)
 │   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
+├── novelwiki/
+│   ├── web/        ← 웹 원본 소스 (수정은 여기서)
+│   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
 ├── shortkey/       ← Windows 앱 소스
 └── README.md
 ```
@@ -22,6 +25,7 @@ i_make_a_app/
 | 앱 | 기기 | 파일 형식 | 최신 릴리즈 |
 |---|---|---|---|
 | 📜 스크립트 TRPG 작성 앱 | Android | .apk | [다운로드](../../releases?q=make123) |
+| 📖 소설 창작 위키 | Android | .apk | [다운로드](../../releases?q=novelwiki) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---
@@ -52,6 +56,30 @@ TRPG(테이블탑 롤플레잉 게임) 시나리오를 직접 쓰고, 그 자리
 
 ---
 
+## 📖 소설 창작 위키 (NovelWiki)
+
+> **설치 가능 기기:** Android 스마트폰 · 태블릿 (Android 8.0 이상)
+> **파일 형식:** `.apk`
+
+웹소설 창작에 필요한 세계관·캐릭터·스토리 데이터를 한 앱에서 관리할 수 있는 창작 위키입니다. 탑 등반물 장르에 특화된 구조를 기본 제공합니다.
+
+### 기능
+- **캐릭터 관리** — 능력치·외형·관계·배경 등 상세 프로필
+- **세계관 관리** — 국가·종족·길드·회사·신·별자리 등
+- **탑 등반물 전용** — 층·부층·게이트·함정·퀘스트 구조화
+- **아이템·스킬·직업** — 게임 판타지 요소 DB화
+- **시각화** — 가계도, 이벤트 그래프, 타임라인 SVG
+- **소설 뷰어** — 집필 내용을 독서 모드로 확인
+- **전체 검색 / 즐겨찾기 / 미리알림**
+- 오프라인 완전 동작 / 데이터 앱 내 영구 저장
+
+### 설치 방법
+1. [Releases](../../releases?q=novelwiki)에서 `NovelWiki-vX.X.X.apk` 다운로드
+2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+3. APK 파일 실행 후 설치
+
+---
+
 ## ⌨️ ShortKey
 
 > **설치 가능 기기:** Windows 10 · 11 PC
@@ -79,6 +107,9 @@ TRPG(테이블탑 롤플레잉 게임) 시나리오를 직접 쓰고, 그 자리
 ```bash
 # TRPG 앱 새 버전
 git tag make123-v1.0.1 && git push origin make123-v1.0.1
+
+# NovelWiki 새 버전
+git tag novelwiki-v1.0.1 && git push origin novelwiki-v1.0.1
 
 # ShortKey 새 버전
 git tag shortkey-v1.0.1 && git push origin shortkey-v1.0.1
