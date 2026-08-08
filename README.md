@@ -12,6 +12,7 @@ i_make_a_app/
 ├── novelwiki/
 │   ├── web/        ← 웹 원본 소스 (수정은 여기서)
 │   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
+├── repeatalarm/    ← 네이티브 Android 앱
 ├── shortkey/       ← Windows 앱 소스
 └── README.md
 ```
@@ -26,6 +27,7 @@ i_make_a_app/
 |---|---|---|---|
 | 📜 스크립트 TRPG 작성 앱 | Android | .apk | [다운로드](../../releases?q=make123) |
 | 📖 소설 창작 위키 | Android | .apk | [다운로드](../../releases?q=novelwiki) |
+| ⏰ 반복 알림 앱 | Android | .apk | [다운로드](../../releases?q=repeatalarm) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---
@@ -80,6 +82,27 @@ TRPG(테이블탑 롤플레잉 게임) 시나리오를 직접 쓰고, 그 자리
 
 ---
 
+## ⏰ 반복 알림 앱 (RepeatAlarm)
+
+> **설치 가능 기기:** Android 스마트폰 · 태블릿 (Android 5.0 이상)
+> **파일 형식:** `.apk`
+
+지정한 시간·요일·간격 조합으로 반복 알림을 설정하고, 그룹으로 묶어 관리할 수 있는 알림 앱입니다.
+
+### 기능
+- **반복 알림** — 요일·시간·간격 조합으로 자유롭게 설정
+- **그룹 관리** — 여러 알림을 그룹으로 묶어 일괄 제어
+- **부팅 후 자동 복구** — 재부팅해도 알림이 그대로 유지
+- **커스텀 알림음** — 원하는 소리 파일로 알림음 지정
+- 오프라인 완전 동작 / Room DB 영구 저장
+
+### 설치 방법
+1. [Releases](../../releases?q=repeatalarm)에서 `RepeatAlarm-vX.X.X.apk` 다운로드
+2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+3. APK 파일 실행 후 설치
+
+---
+
 ## ⌨️ ShortKey
 
 > **설치 가능 기기:** Windows 10 · 11 PC
@@ -110,6 +133,9 @@ git tag make123-v1.0.1 && git push origin make123-v1.0.1
 
 # NovelWiki 새 버전
 git tag novelwiki-v1.0.1 && git push origin novelwiki-v1.0.1
+
+# 반복 알림 앱 새 버전
+git tag repeatalarm-v1.0.1 && git push origin repeatalarm-v1.0.1
 
 # ShortKey 새 버전
 git tag shortkey-v1.0.1 && git push origin shortkey-v1.0.1
