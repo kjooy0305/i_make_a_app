@@ -351,7 +351,11 @@ window.ReminderEngine = window.ReminderEngine || (function() {
         const todayLabel = DAY_LABELS[new Date().getDay()];
         const dayOk = !reminder.days || reminder.days.length === 0
                       || reminder.days.includes(todayLabel);
-        if (dayOk && nowMin >= startMin && nowMin < endMin) {
+        const overnight = startMin > endMin;
+        const inRange = overnight
+          ? (nowMin >= startMin || nowMin < endMin)
+          : (nowMin >= startMin && nowMin < endMin);
+        if (dayOk && inRange) {
           _fireNotification(reminder);
         }
       }, intervalMs);
@@ -665,7 +669,7 @@ window.Pages.reminders = {
           <div style="flex:1;min-width:0;">
             <div style="font-weight:700;font-size:14px;color:var(--color-text);margin-bottom:3px;">"${Utils.escHtml(r.message || '알림')}"</div>
             <div style="font-size:12px;color:var(--color-text-muted);">
-              🕐 ${Utils.escHtml(r.startTime || '00:00')} ~ ${Utils.escHtml(r.endTime || '23:59')}
+              🕐 ${Utils.escHtml(r.startTime || '00:00')} ~ ${Utils.escHtml(r.endTime || '23:59')}${(r.startTime && r.endTime && r.startTime > r.endTime) ? ' <span style="color:var(--color-primary);font-size:11px;">(다음날)</span>' : ''}
               &nbsp;·&nbsp; ⏱ ${Utils.escHtml(String(intervalLabel))}마다
             </div>
           </div>
@@ -704,7 +708,7 @@ window.Pages.reminders = {
             <input class="form-input" id="fStart" type="time" value="${Utils.escHtml(r?.startTime||'10:00')}"/>
           </div>
           <div>
-            <label style="font-size:12px;color:var(--color-text-muted);display:block;margin-bottom:4px;">종료 시각</label>
+            <label style="font-size:12px;color:var(--color-text-muted);display:block;margin-bottom:4px;">종료 시각 <span style="color:var(--color-primary);font-size:11px;">(야간 가능)</span></label>
             <input class="form-input" id="fEnd" type="time" value="${Utils.escHtml(r?.endTime||'15:00')}"/>
           </div>
         </div>
@@ -741,7 +745,6 @@ window.Pages.reminders = {
       const startTime = document.getElementById('fStart')?.value || '10:00';
       const endTime = document.getElementById('fEnd')?.value || '15:00';
       const interval = parseInt(document.getElementById('fInterval')?.value) || 20;
-      if (startTime >= endTime) { Utils.toast('종료 시각이 시작 시각보다 늦어야 합니다.', 'warning', 3000); return false; }
       if (interval < 1) { Utils.fieldError('fInterval'); return false; }
       const days = Array.from(document.querySelectorAll('.day-opt.btn-primary')).map(b => b.dataset.day);
       const payload = {

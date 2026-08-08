@@ -116,10 +116,22 @@ object ReminderScheduler {
         val startMin = sh * 60 + sm
         val endMin = eh * 60 + em
 
-        return when {
-            nowMin < startMin -> calAtTime(sh, sm).timeInMillis
-            nowMin < endMin   -> System.currentTimeMillis() + intervalMin * 60_000L
-            else              -> calAtTime(sh, sm, daysOffset = 1).timeInMillis
+        return if (startMin <= endMin) {
+            // 일반 범위 (예: 10:00~15:00)
+            when {
+                nowMin < startMin -> calAtTime(sh, sm).timeInMillis
+                nowMin < endMin   -> System.currentTimeMillis() + intervalMin * 60_000L
+                else              -> calAtTime(sh, sm, daysOffset = 1).timeInMillis
+            }
+        } else {
+            // 야간 범위 (예: 22:00~04:00, startMin > endMin)
+            if (nowMin >= startMin || nowMin < endMin) {
+                // 현재 범위 안 → interval 후
+                System.currentTimeMillis() + intervalMin * 60_000L
+            } else {
+                // 범위 밖 (04:00~22:00) → 오늘 시작 시각
+                calAtTime(sh, sm).timeInMillis
+            }
         }
     }
 

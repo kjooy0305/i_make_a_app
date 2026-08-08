@@ -41,8 +41,16 @@ class ReminderReceiver : BroadcastReceiver() {
             val nowMin = cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)
             val (sh, sm) = parseParts(r.optString("startTime", "00:00"))
             val (eh, em) = parseParts(r.optString("endTime", "23:59"))
+            val startMin = sh * 60 + sm
+            val endMin = eh * 60 + em
+            val inRange = if (startMin <= endMin) {
+                nowMin >= startMin && nowMin < endMin
+            } else {
+                // 야간 범위 (예: 22:00~04:00)
+                nowMin >= startMin || nowMin < endMin
+            }
 
-            if (dayOk && nowMin >= sh * 60 + sm && nowMin < eh * 60 + em) {
+            if (dayOk && inRange) {
                 notify(context, r.optString("message", "알림"), r.optString("id", "").hashCode())
             }
 
