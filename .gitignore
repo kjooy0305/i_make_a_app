@@ -12,3 +12,5 @@ local.properties
 *.keystore
 *.jks
 *.p12
+make123/android/app/src/main/assets/*
+!make123/android/app/src/main/assets/.gitkeep

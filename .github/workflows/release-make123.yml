@@ -11,13 +11,13 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: make123
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Copy web source to Android assets
+        run: cp -r make123/web/. make123/android/app/src/main/assets/
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -33,9 +33,10 @@ jobs:
           echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $RUNNER_TEMP/release.p12
 
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+        run: chmod +x make123/android/gradlew
 
       - name: Build Release APK
+        working-directory: make123/android
         env:
           SIGNING_KEY_PATH: ${{ runner.temp }}/release.p12
           SIGNING_STORE_PASS: ${{ secrets.SIGNING_STORE_PASS }}
@@ -47,8 +48,8 @@ jobs:
         run: |
           TAG=${{ github.ref_name }}
           VER=${TAG#make123-}
-          mv app/build/outputs/apk/release/app-release.apk \
-             app/build/outputs/apk/release/TRPG-make123-${VER}.apk
+          mv make123/android/app/build/outputs/apk/release/app-release.apk \
+             make123/android/app/build/outputs/apk/release/TRPG-make123-${VER}.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -73,6 +74,6 @@ jobs:
             - 🔍 내장 시나리오: **독스프** (크툴루 TRPG 밀실 탈출, ~71씬)
             - 💕 솔로 플레이 (8명 캐릭터·호감도·히든 루트·4가지 엔딩)
             - 오프라인 완전 동작 / IndexedDB 영구 저장
-          files: make123/app/build/outputs/apk/release/TRPG-make123-*.apk
+          files: make123/android/app/build/outputs/apk/release/TRPG-make123-*.apk
           draft: false
           prerelease: false
