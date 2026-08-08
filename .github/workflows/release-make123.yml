@@ -1,9 +1,9 @@
-name: Build & Release APK
+name: "[make123] Build & Release APK"
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'make123-v*'
 
 permissions:
   contents: write
@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: make123
 
     steps:
       - name: Checkout
@@ -42,28 +45,34 @@ jobs:
 
       - name: Rename APK
         run: |
+          TAG=${{ github.ref_name }}
+          VER=${TAG#make123-}
           mv app/build/outputs/apk/release/app-release.apk \
-             app/build/outputs/apk/release/TRPG-make123-${{ github.ref_name }}.apk
+             app/build/outputs/apk/release/TRPG-make123-${VER}.apk
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: 스크립트 TRPG 작성 앱 ${{ github.ref_name }}
+          name: "📜 스크립트 TRPG 작성 앱 ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
           body: |
-            ## 스크립트 TRPG 작성 앱 ${{ github.ref_name }}
+            ## 📜 스크립트 TRPG 작성 앱 (make123)
+
+            > **설치 기기:** Android 8.0(API 26) 이상 스마트폰·태블릿
 
             ### 설치 방법
-            1. `TRPG-make123-${{ github.ref_name }}.apk` 다운로드
+            1. 아래 `.apk` 파일 다운로드
             2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
             3. APK 파일 실행 후 설치
 
-            ### 기능
-            - 📜 TRPG 시나리오 작성 (씬 카드 에디터)
-            - 🎲 주사위 시스템 (d4~d100)
+            ### 주요 기능
+            - 📝 TRPG 시나리오 씬 카드 에디터
+            - 🎭 플레이어 뷰 (씬 이동·선택지·트리거)
             - 👤 캐릭터 시트 (능력치·신체·커스텀 바)
-            - 🔍 내장 시나리오: 독스프 (크툴루 밀실 탈출 ~71씬)
-            - 💕 솔로 플레이 (8명 캐릭터·호감도·히든 루트)
-            - 오프라인 완전 동작
-          files: app/build/outputs/apk/release/TRPG-make123-${{ github.ref_name }}.apk
+            - 🎲 주사위 (d4 / d6 / d8 / d10 / d12 / d20 / d100)
+            - 🔍 내장 시나리오: **독스프** (크툴루 TRPG 밀실 탈출, ~71씬)
+            - 💕 솔로 플레이 (8명 캐릭터·호감도·히든 루트·4가지 엔딩)
+            - 오프라인 완전 동작 / IndexedDB 영구 저장
+          files: make123/app/build/outputs/apk/release/TRPG-make123-*.apk
           draft: false
           prerelease: false

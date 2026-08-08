@@ -1,0 +1,89 @@
+name: "[ShortKey] Build & Release EXE"
+
+on:
+  push:
+    tags:
+      - 'shortkey-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: shortkey
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install packages
+        run: pip install pyinstaller keyboard pystray Pillow
+
+      - name: Convert icon.png to icon.ico
+        run: |
+          python -c "
+          from PIL import Image
+          import os
+          if os.path.exists('icon.png'):
+              img = Image.open('icon.png').convert('RGBA')
+              img.save('icon.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+              print('icon.ico created')
+          else:
+              print('icon.png not found')
+          "
+
+      - name: Build EXE
+        shell: pwsh
+        run: |
+          $buildArgs = @(
+            '--onefile', '--windowed', '--name', 'ShortKey',
+            '--hidden-import', 'pystray._win32',
+            '--collect-all', 'pystray'
+          )
+          if (Test-Path 'icon.png') { $buildArgs += '--add-data'; $buildArgs += 'icon.png;.' }
+          if (Test-Path 'icon.ico') { $buildArgs += '--icon'; $buildArgs += 'icon.ico' }
+          $buildArgs += 'main.py'
+          & pyinstaller @buildArgs
+
+      - name: Rename EXE
+        shell: bash
+        run: |
+          TAG=${{ github.ref_name }}
+          VER=${TAG#shortkey-}
+          mv dist/ShortKey.exe dist/ShortKey-${VER}.exe
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: "⌨️ ShortKey ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## ⌨️ ShortKey — 단축키로 앱 실행 (Windows)
+
+            > **설치 기기:** Windows 10 / 11 PC
+
+            ### 설치 방법
+            1. 아래 `ShortKey-*.exe` 파일 다운로드
+            2. 파일 실행 → 트레이(우측 하단) 아이콘 생성
+            3. 트레이 아이콘 클릭 → 설정 창에서 단축키 + 앱 경로 등록
+
+            ### 주요 기능
+            - ⌨️ 전역 단축키로 앱 즉시 실행 (Ctrl+Alt+N 등 조합 자유 설정)
+            - 🗂️ .exe, .lnk(바로가기), UWP 앱, ms-settings: URI 모두 지원
+            - 🚀 단축키로 실행한 앱이 항상 최전면으로 올라옴
+            - 🔒 중복 실행 방지 — 이미 실행 중이면 설정 창만 앞으로
+            - ❌ "완전 종료" 버튼으로 백그라운드 프로세스 완전 종료
+            - 윈도우 시작 시 자동 실행 트레이 상주
+          files: shortkey/dist/ShortKey-*.exe
+          draft: false
+          prerelease: false
