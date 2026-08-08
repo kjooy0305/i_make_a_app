@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EpubMaker</string>
+
+    <!-- MainActivity -->
+    <string name="new_epub">New EPUB</string>
+    <string name="untitled">Untitled</string>
+    <string name="create">Create</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="delete_confirm">Delete \'%1$s\'?</string>
+    <string name="deleted">Deleted</string>
+    <string name="parse_error">Cannot open file</string>
+    <string name="empty_list">No EPUB files\nTap + to create one</string>
+    <string name="mode_editor">Editor</string>
+    <string name="mode_viewer">Viewer</string>
+    <string name="open_as_editor">Open in Editor</string>
+    <string name="open_as_viewer">Open in Viewer</string>
+    <string name="language">Language</string>
+    <string name="manual">Manual</string>
+
+    <!-- Book info dialog -->
+    <string name="book_title">Title</string>
+    <string name="book_author">Author</string>
+    <string name="title_hint">Enter book title</string>
+    <string name="author_hint">Enter author name</string>
+
+    <!-- EditorActivity -->
+    <string name="add_chapter">Add Chapter</string>
+    <string name="delete_chapter">Delete Chapter</string>
+    <string name="delete_chapter_confirm">Delete chapter \'%1$s\'?</string>
+    <string name="cannot_delete_last_chapter">Cannot delete the last chapter</string>
+    <string name="chapter_title">Chapter Title</string>
+    <string name="chapter_n">Chapter %1$d</string>
+    <string name="add">Add</string>
+    <string name="select_font">Select Font</string>
+    <string name="manage_fonts">Manage Fonts…</string>
+    <string name="saved">Saved: %1$s</string>
+    <string name="save_error">Error saving file</string>
+    <string name="font_size">Font Size</string>
+    <string name="select_size">Select Size</string>
+
+    <!-- Formatting toolbar -->
+    <string name="bold">Bold</string>
+    <string name="italic">Italic</string>
+    <string name="underline">Underline</string>
+    <string name="align_left">Align Left</string>
+    <string name="align_center">Center</string>
+    <string name="align_justify">Justify</string>
+    <string name="insert_image">Insert Image</string>
+    <string name="font">Font</string>
+    <string name="toc">TOC</string>
+    <string name="save">Save</string>
+    <string name="chapters">Chapters</string>
+
+    <!-- Import / Gallery -->
+    <string name="import_epub">Import EPUB</string>
+    <string name="image_gallery">Image Gallery</string>
+    <string name="no_images">No images</string>
+
+    <!-- FontManagerActivity -->
+    <string name="font_manager">Font Manager</string>
+    <string name="font_name">Font Name</string>
+    <string name="font_added">Font \'%1$s\' added</string>
+    <string name="font_add_error">Cannot add font</string>
+    <string name="delete_font_confirm">Delete font \'%1$s\'?</string>
+    <string name="no_fonts">No fonts registered</string>
+    <string name="select">Select</string>
+
+    <!-- Draft save / chapter edit -->
+    <string name="draft_save">Auto-save</string>
+    <string name="draft_saved">Auto-saved</string>
+    <string name="edit_chapter_title">Rename Chapter</string>
+    <string name="file_too_large">File too large (max 500MB)</string>
+
+    <!-- Viewer -->
+    <string name="viewer">Viewer</string>
+    <string name="viewer_settings">Viewer Settings</string>
+    <string name="bookmark">Bookmark</string>
+    <string name="bookmark_added">Bookmark added</string>
+    <string name="bookmark_list">Bookmarks</string>
+    <string name="no_bookmarks">No bookmarks</string>
+    <string name="bookmark_label_hint">Bookmark name (optional)</string>
+    <string name="search">Search</string>
+    <string name="search_hint">Enter search term</string>
+    <string name="search_scope_current">Current chapter</string>
+    <string name="search_scope_all">All chapters</string>
+    <string name="no_results">No results found</string>
+    <string name="nav_mode">Page Turn Mode</string>
+    <string name="nav_scroll">Scroll</string>
+    <string name="nav_tap_lr">Tap Left/Right</string>
+    <string name="nav_tap_tb">Tap Top/Bottom</string>
+    <string name="nav_swipe_lr">Swipe Left/Right</string>
+    <string name="nav_swipe_tb">Swipe Up/Down</string>
+    <string name="reverse_nav">Reverse direction (Up→Next, Down→Prev / Left→Next, Right→Prev)</string>
+    <string name="prevent_image_clip">Prevent image clipping</string>
+    <string name="bg_color">Background Color</string>
+    <string name="text_color">Text Color</string>
+    <string name="theme_color">Theme Color</string>
+    <string name="prev_chapter">Prev Chapter</string>
+    <string name="next_chapter">Next Chapter</string>
+    <string name="chapter_of">%1$d / %2$d chapters</string>
+    <string name="opening_file">Opening file…</string>
+</resources>

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            height: 100%;
+            background: #ffffff;
+        }
+        body {
+            font-family: serif;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #1a1a1a;
+        }
+        #editor {
+            min-height: 100vh;
+            padding: 20px;
+            outline: none;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        #editor:empty::before {
+            content: attr(data-placeholder);
+            color: #aaaaaa;
+            pointer-events: none;
+            display: block;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 8px 0;
+        }
+        p {
+            margin: 0 0 0.8em 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor"
+         contenteditable="true"
+         data-placeholder="내용을 입력하세요..."
+         spellcheck="false">
+    </div>
+
+    <script>
+        'use strict';
+
+        var editor = document.getElementById('editor');
+        var isAndroid = (typeof Android !== 'undefined');
+
+        // ── Selection change → update toolbar state ──────────────────────────
+        document.addEventListener('selectionchange', function () {
+            try {
+                var bold = document.queryCommandState('bold');
+                var italic = document.queryCommandState('italic');
+                var underline = document.queryCommandState('underline');
+                if (isAndroid) Android.onSelectionChanged(bold, italic, underline);
+            } catch (e) {}
+        });
+
+        // ── Input → notify Kotlin ────────────────────────────────────────────
+        editor.addEventListener('input', function () {
+            try {
+                if (isAndroid) Android.onContentChanged(editor.innerHTML);
+            } catch (e) {}
+        });
+
+        // ── Formatting commands ──────────────────────────────────────────────
+        function bold()          { document.execCommand('bold',         false, null); editor.focus(); }
+        function italic()        { document.execCommand('italic',       false, null); editor.focus(); }
+        function underline()     { document.execCommand('underline',    false, null); editor.focus(); }
+        function alignLeft()     { document.execCommand('justifyLeft',  false, null); editor.focus(); }
+        function alignCenter()   { document.execCommand('justifyCenter',false, null); editor.focus(); }
+        function alignRight()    { document.execCommand('justifyRight',  false, null); editor.focus(); }
+
+        // ── 선택 텍스트 색상 ──────────────────────────────────────────
+        function setTextColor(color) {
+            editor.focus();
+            document.execCommand('styleWithCSS', false, true);
+            document.execCommand('foreColor', false, color);
+            document.execCommand('styleWithCSS', false, false); // reset so fontSize still uses <font> tags
+            try { if (isAndroid) Android.onContentChanged(editor.innerHTML); } catch(e) {}
+        }
+
+        // ── Font (전체 편집기에 CSS로 적용 — 내용 HTML에는 저장되지 않음) ─────
+        var currentFontName = '';
+
+        function setFontName(name) {
+            currentFontName = name;
+            editor.style.fontFamily = name ? '"' + name + '", serif' : '';
+        }
+
+        function getCurrentFont() {
+            return currentFontName;
+        }
+
+        function setFontSize(size) {
+            editor.focus();
+            document.execCommand('fontSize', false, size);
+        }
+
+        // ── 선택 텍스트 크기 (px) ────────────────────────────────────
+        function setSelectionFontSize(sizePx) {
+            editor.focus();
+            var sel = window.getSelection();
+            if (!sel || sel.isCollapsed) return;
+            document.execCommand('styleWithCSS', false, false); // must be false so fontSize produces <font size="7">
+            document.execCommand('fontSize', false, '7');
+            var fonts = editor.querySelectorAll('font[size="7"]');
+            fonts.forEach(function(el) {
+                el.removeAttribute('size');
+                el.style.fontSize = sizePx + 'px';
+            });
+            try { if (isAndroid) Android.onContentChanged(editor.innerHTML); } catch(e) {}
+        }
+
+        // ── Content get / set ────────────────────────────────────────────────
+        function getContent() {
+            return editor.innerHTML;
+        }
+
+        function setContent(html) {
+            editor.innerHTML = (html === null || html === undefined) ? '' : html;
+            moveCursorToEnd();
+        }
+
+        // Accepts UTF-8 text encoded as base64
+        function setContentBase64(base64) {
+            try {
+                var binary = atob(base64);
+                var bytes = new Uint8Array(binary.length);
+                for (var i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                var decoded = new TextDecoder('utf-8').decode(bytes);
+                editor.innerHTML = decoded;
+                moveCursorToEnd();
+            } catch (e) {
+                editor.innerHTML = base64; // fallback
+            }
+        }
+
+        function moveCursorToEnd() {
+            try {
+                var range = document.createRange();
+                var sel = window.getSelection();
+                range.selectNodeContents(editor);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } catch (e) {}
+        }
+
+        // ── Custom font injection ────────────────────────────────────────────
+        function addCustomFont(name, base64, mime) {
+            var existing = document.getElementById('font-face-' + name);
+            if (existing) return;
+            var style = document.createElement('style');
+            style.id = 'font-face-' + name;
+            style.textContent =
+                '@font-face { font-family: "' + name + '"; ' +
+                'src: url("data:' + mime + ';base64,' + base64 + '"); }';
+            document.head.appendChild(style);
+        }
+
+        // ── Image insertion ──────────────────────────────────────────────────
+        function insertImageBase64(base64, mime, name) {
+            var img = document.createElement('img');
+            img.src = 'data:' + mime + ';base64,' + base64;
+            img.setAttribute('data-filename', name);
+            img.style.maxWidth = '100%';
+
+            var sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                var range = sel.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(img);
+                range.setStartAfter(img);
+                range.setEndAfter(img);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            } else {
+                editor.appendChild(img);
+            }
+
+            try {
+                if (isAndroid) Android.onContentChanged(editor.innerHTML);
+            } catch (e) {}
+        }
+
+        // ── Image navigation ─────────────────────────────────────────────────
+        function scrollToImageByFilename(filename) {
+            var imgs = document.querySelectorAll('img');
+            for (var i = 0; i < imgs.length; i++) {
+                var img = imgs[i];
+                var fname = img.getAttribute('data-filename') || '';
+                var srcMatch = img.src && img.src.indexOf(encodeURIComponent(filename)) >= 0;
+                var srcMatch2 = img.src && img.src.indexOf(filename) >= 0;
+                if (fname === filename || srcMatch || srcMatch2) {
+                    img.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    img.style.outline = '3px solid #2196F3';
+                    setTimeout(function(el) { el.style.outline = ''; }, 1500, img);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // ── Image cut (copy to clipboard + remove) ───────────────────────────
+        function cutImageByFilename(filename) {
+            var imgs = document.querySelectorAll('img');
+            for (var i = 0; i < imgs.length; i++) {
+                var img = imgs[i];
+                var fname = img.getAttribute('data-filename') || '';
+                if (fname === filename || (img.src && img.src.indexOf(filename) >= 0)) {
+                    var src = img.src || '';
+                    try { if (isAndroid) Android.onImageCut(src, filename); } catch(e) {}
+                    img.parentNode.removeChild(img);
+                    try { if (isAndroid) Android.onContentChanged(editor.innerHTML); } catch(e) {}
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // ── Image delete (remove only) ────────────────────────────────────────
+        function deleteImageByFilename(filename) {
+            var imgs = document.querySelectorAll('img');
+            for (var i = 0; i < imgs.length; i++) {
+                var img = imgs[i];
+                var fname = img.getAttribute('data-filename') || '';
+                if (fname === filename || (img.src && img.src.indexOf(filename) >= 0)) {
+                    img.parentNode.removeChild(img);
+                    try { if (isAndroid) Android.onContentChanged(editor.innerHTML); } catch(e) {}
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // ── Image long-press (contextmenu fires on long-press in WebView) ────
+        editor.addEventListener('contextmenu', function(e) {
+            if (e.target && e.target.tagName === 'IMG') {
+                e.preventDefault();
+                var img = e.target;
+                var src = img.src || '';
+                var fname = img.getAttribute('data-filename') || src.split('/').pop() || '';
+                try { if (isAndroid) Android.onImageLongPress(src, fname); } catch(ex) {}
+                return false;
+            }
+        });
+
+        // ── Init ─────────────────────────────────────────────────────────────
+        window.addEventListener('load', function () {
+            editor.focus();
+        });
+    </script>
+</body>
+</html>

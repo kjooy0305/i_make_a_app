@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- 페이지 넘김 방식 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/nav_mode"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp"/>
+
+        <Spinner
+            android:id="@+id/spinnerNavMode"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"/>
+
+        <!-- 방향 반전 -->
+        <android.widget.Switch
+            android:id="@+id/switchReverse"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="@string/reverse_nav"
+            android:textSize="13sp"
+            android:layout_marginTop="8dp"/>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#EEEEEE" android:layout_marginVertical="8dp"/>
+
+        <!-- 글자 크기 -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+            <TextView android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/font_size" android:textStyle="bold" android:textSize="14sp"/>
+            <TextView android:id="@+id/tvFontSizeValue"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textSize="14sp" android:textColor="@color/colorPrimary"/>
+        </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/seekFontSize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="32"/>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#EEEEEE" android:layout_marginVertical="8dp"/>
+
+        <!-- 이미지 잘림 방지 -->
+        <android.widget.Switch
+            android:id="@+id/switchPreventClip"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="@string/prevent_image_clip"
+            android:textSize="13sp"/>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#EEEEEE" android:layout_marginVertical="8dp"/>
+
+        <!-- 스크롤 잠금 -->
+        <android.widget.Switch
+            android:id="@+id/switchScrollLock"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="스크롤 잠금"
+            android:textSize="13sp"/>
+
+    </LinearLayout>
+</ScrollView>

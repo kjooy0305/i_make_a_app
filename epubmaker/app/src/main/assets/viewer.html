@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --font-size: 18px;
+            --bg-color: #FFFFFF;
+            --text-color: #1A1A1A;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            background: var(--bg-color);
+        }
+        body {
+            font-size: var(--font-size);
+            color: var(--text-color);
+            line-height: 1.8;
+            font-family: serif;
+            padding: 20px 16px 60px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 8px auto;
+        }
+        img.clip-safe {
+            max-width: 100% !important;
+            max-height: 90vh !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain;
+        }
+        p { margin-bottom: 0.8em; }
+        mark.search-hl {
+            background: #FFD700;
+            color: #000;
+        }
+        mark.search-hl.current {
+            background: #FF6600;
+            color: #FFF;
+        }
+    </style>
+</head>
+<body>
+    <div id="content"></div>
+
+    <script>
+        'use strict';
+        var isAndroid = (typeof Android !== 'undefined');
+        var preventClip = true;
+        var hlNodes = [];
+        var hlIdx = -1;
+
+        function setContent(html) {
+            document.getElementById('content').innerHTML = html || '';
+            applyImageClip();
+            window.scrollTo(0, 0);
+        }
+
+        function setContentBase64(b64) {
+            try {
+                var bin = atob(b64);
+                var bytes = new Uint8Array(bin.length);
+                for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                var text = new TextDecoder('utf-8').decode(bytes);
+                document.getElementById('content').innerHTML = text;
+                applyImageClip();
+                window.scrollTo(0, 0);
+            } catch(e) {
+                console.error('setContentBase64 error:', e);
+                document.getElementById('content').innerHTML = '<p style="color:red">콘텐츠 로드 오류</p>';
+            }
+        }
+
+        function setTheme(bg, text) {
+            document.documentElement.style.setProperty('--bg-color', bg);
+            document.documentElement.style.setProperty('--text-color', text);
+            document.body.style.background = bg;
+        }
+
+        function setFontSize(px) {
+            document.documentElement.style.setProperty('--font-size', px + 'px');
+        }
+
+        function setPreventImageClip(enable) {
+            preventClip = !!enable;
+            applyImageClip();
+        }
+
+        function applyImageClip() {
+            var imgs = document.querySelectorAll('img');
+            for (var i = 0; i < imgs.length; i++) {
+                if (preventClip) imgs[i].classList.add('clip-safe');
+                else imgs[i].classList.remove('clip-safe');
+            }
+        }
+
+        // Return integer so Kotlin toIntOrNull() works reliably
+        function getScrollY() { return Math.round(window.scrollY); }
+        function scrollToY(y)  { window.scrollTo(0, y); }
+
+        var _scrollLocked = false;
+        function _preventScroll(e) { e.preventDefault(); }
+
+        function setScrollEnabled(enabled) {
+            _scrollLocked = !enabled;
+            if (!enabled) {
+                document.addEventListener('touchmove', _preventScroll, { passive: false });
+            } else {
+                document.removeEventListener('touchmove', _preventScroll);
+            }
+        }
+
+        // ── Search ──────────────────────────────────────────────────
+        function clearHighlight() {
+            for (var i = 0; i < hlNodes.length; i++) {
+                var n = hlNodes[i];
+                var parent = n.parentNode;
+                if (parent) {
+                    parent.replaceChild(document.createTextNode(n.textContent), n);
+                    parent.normalize();
+                }
+            }
+            hlNodes = [];
+            hlIdx = -1;
+        }
+
+        function findText(query) {
+            clearHighlight();
+            if (!query) return 0;
+            var content = document.getElementById('content');
+            if (!content) return 0;
+
+            // Collect all text nodes under content
+            var walker = document.createTreeWalker(
+                content,
+                NodeFilter.SHOW_TEXT,
+                { acceptNode: function(n) {
+                    // Skip nodes inside script/style
+                    var tag = n.parentNode && n.parentNode.tagName ? n.parentNode.tagName.toUpperCase() : '';
+                    if (tag === 'SCRIPT' || tag === 'STYLE') return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }},
+                false
+            );
+            var nodes = [];
+            var node;
+            while ((node = walker.nextNode())) nodes.push(node);
+
+            var lq = query.toLowerCase();
+            for (var ni = 0; ni < nodes.length; ni++) {
+                var tn = nodes[ni];
+                var txt = tn.nodeValue;
+                if (!txt) continue;
+                var ltxt = txt.toLowerCase();
+                var idx = ltxt.indexOf(lq);
+                if (idx < 0) continue;
+
+                var frag = document.createDocumentFragment();
+                var last = 0;
+                while (idx >= 0) {
+                    frag.appendChild(document.createTextNode(txt.slice(last, idx)));
+                    var mark = document.createElement('mark');
+                    mark.className = 'search-hl';
+                    mark.textContent = txt.slice(idx, idx + query.length);
+                    frag.appendChild(mark);
+                    hlNodes.push(mark);
+                    last = idx + query.length;
+                    idx = ltxt.indexOf(lq, last);
+                }
+                frag.appendChild(document.createTextNode(txt.slice(last)));
+                if (tn.parentNode) tn.parentNode.replaceChild(frag, tn);
+            }
+
+            if (hlNodes.length > 0) {
+                hlIdx = 0;
+                activateCurrent();
+            }
+            return hlNodes.length;
+        }
+
+        function nextMatch() {
+            if (hlNodes.length === 0) return;
+            hlNodes[hlIdx].classList.remove('current');
+            hlIdx = (hlIdx + 1) % hlNodes.length;
+            activateCurrent();
+        }
+
+        function prevMatch() {
+            if (hlNodes.length === 0) return;
+            hlNodes[hlIdx].classList.remove('current');
+            hlIdx = (hlIdx - 1 + hlNodes.length) % hlNodes.length;
+            activateCurrent();
+        }
+
+        function activateCurrent() {
+            var el = hlNodes[hlIdx];
+            el.classList.add('current');
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // ── Touch: notify Kotlin of tap zone ────────────────────────
+        // Only fire for tap_lr / tap_tb modes. Ignore taps on links and images.
+        document.addEventListener('click', function(e) {
+            var tag = e.target ? e.target.tagName : '';
+            if (tag === 'A' || tag === 'IMG') return;  // let links and images handle their own events
+
+            var x = e.clientX, y = e.clientY;
+            var w = window.innerWidth, h = window.innerHeight;
+            var zone = '';
+            if      (x < w * 0.3)  zone = 'left';
+            else if (x > w * 0.7)  zone = 'right';
+            else if (y < h * 0.35) zone = 'top';
+            else if (y > h * 0.65) zone = 'bottom';
+            else                    zone = 'center';
+
+            try { if (isAndroid) Android.onTap(zone); } catch(ex) {}
+        });
+
+        window.addEventListener('load', function() {
+            applyImageClip();
+        });
+    </script>
+</body>
+</html>

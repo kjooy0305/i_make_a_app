@@ -1,0 +1,73 @@
+name: "[EpubMaker] Build & Release APK"
+
+on:
+  push:
+    tags:
+      - 'epubmaker-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $RUNNER_TEMP/release.p12
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x epubmaker/gradlew
+
+      - name: Build Release APK
+        working-directory: epubmaker
+        env:
+          SIGNING_KEY_PATH: ${{ runner.temp }}/release.p12
+          SIGNING_STORE_PASS: ${{ secrets.SIGNING_STORE_PASS }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK
+        run: |
+          TAG=${{ github.ref_name }}
+          VER=${TAG#epubmaker-}
+          mv epubmaker/app/build/outputs/apk/release/app-release.apk \
+             epubmaker/app/build/outputs/apk/release/EpubMaker-${VER}.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "📖 EpubMaker ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## 📖 EpubMaker
+
+            > **설치 기기:** Android 8.0(API 26) 이상
+
+            ### 설치 방법
+            1. 아래 `.apk` 파일 다운로드
+            2. Android → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+            3. APK 파일 실행 후 설치
+
+            ### 주요 기능
+            - ✏️ EPUB 편집기 (서식·글자색·크기·이미지 삽입)
+            - 📚 EPUB 뷰어 (검색·책갈피·챕터 탐색)
+            - 🔤 커스텀 글꼴 관리
+            - 💾 EPUB3 표준 저장
+          files: epubmaker/app/build/outputs/apk/release/EpubMaker-*.apk
+          draft: false
+          prerelease: false
