@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg">
+
+    <!-- Toolbar -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface_toolbar"
+        app:elevation="0dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            app:navigationIcon="@drawable/ic_arrow_back"
+            app:navigationIconTint="@color/text_primary"
+            app:titleTextColor="@color/text_primary"
+            app:titleTextAppearance="@style/AppToolbarTitle" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/border" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Canvas fills remaining space -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <com.kjooy0305.choicetheroute.ui.GraphCanvasView
+            android:id="@+id/canvas"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Viewport controls (top-right) -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="12dp"
+            android:orientation="vertical"
+            android:background="@drawable/bg_control_panel"
+            android:padding="4dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCenter"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="⊙"
+                android:textSize="16sp"
+                android:textColor="@color/text_secondary"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp" />
+
+            <View
+                android:layout_width="24dp"
+                android:layout_height="1dp"
+                android:layout_gravity="center"
+                android:background="@color/border"
+                android:layout_marginVertical="2dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAutoLayout"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="▣"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp" />
+
+        </LinearLayout>
+
+        <!-- FAB -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabAdd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="88dp"
+            android:contentDescription="새 노드 추가"
+            app:srcCompat="@android:drawable/ic_input_add"
+            app:backgroundTint="@color/surface_toolbar"
+            app:tint="@color/text_secondary"
+            app:elevation="4dp"
+            app:fabSize="mini" />
+
+        <!-- Action Panel (bottom) -->
+        <LinearLayout
+            android:id="@+id/actionPanel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:background="@color/surface_toolbar"
+            android:visibility="gone"
+            android:elevation="8dp">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/border" />
+
+            <!-- 선택된 항목 제목 (노드명 또는 "연결선") -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="8dp">
+
+                <View
+                    android:id="@+id/panelIndicator"
+                    android:layout_width="4dp"
+                    android:layout_height="32dp"
+                    android:background="@drawable/bg_accent_line"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:id="@+id/tvSelectedTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+            </LinearLayout>
+
+            <!-- 하위 분기 표시 단계 (노드 선택 시) -->
+            <LinearLayout
+                android:id="@+id/depthGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="하위 표시"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_hint"
+                    android:layout_marginEnd="10dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDepth1"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="1단계"
+                    android:textSize="12sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingHorizontal="0dp"
+                    android:minWidth="0dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/border"
+                    android:textColor="@color/text_secondary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDepth2"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="2단계"
+                    android:textSize="12sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingHorizontal="0dp"
+                    android:minWidth="0dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/border"
+                    android:textColor="@color/text_secondary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDepth3"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:text="3단계"
+                    android:textSize="12sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingHorizontal="0dp"
+                    android:minWidth="0dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/border"
+                    android:textColor="@color/text_secondary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDepthAll"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_weight="1"
+                    android:text="전체"
+                    android:textSize="12sp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingHorizontal="0dp"
+                    android:minWidth="0dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/border"
+                    android:textColor="@color/text_secondary" />
+
+            </LinearLayout>
+
+            <!-- 노드 선택 시 버튼 그룹 -->
+            <LinearLayout
+                android:id="@+id/nodeButtonGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingHorizontal="8dp"
+                android:paddingBottom="12dp"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEdit"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="4dp"
+                    android:text="편집"
+                    android:textSize="13sp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/border"
+                    android:textColor="@color/text_primary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBranch"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="4dp"
+                    android:text="분기 추가"
+                    android:textSize="13sp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/accent"
+                    android:textColor="@color/accent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnConnect"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="4dp"
+                    android:text="연결"
+                    android:textSize="13sp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/accent_alt"
+                    android:textColor="@color/accent_alt" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDelete"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="4dp"
+                    android:text="삭제"
+                    android:textSize="13sp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/danger"
+                    android:textColor="@color/danger" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCancelConnect"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="2"
+                    android:layout_marginHorizontal="4dp"
+                    android:text="연결 취소"
+                    android:textSize="13sp"
+                    android:visibility="gone"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/text_hint"
+                    android:textColor="@color/text_hint" />
+
+            </LinearLayout>
+
+            <!-- 엣지 선택 시 버튼 그룹 -->
+            <LinearLayout
+                android:id="@+id/edgeButtonGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingHorizontal="8dp"
+                android:paddingBottom="12dp"
+                android:gravity="center"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEdgeToggleStraight"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="2"
+                    android:layout_marginHorizontal="4dp"
+                    android:text="직선으로 전환"
+                    android:textSize="13sp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/accent"
+                    android:textColor="@color/accent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEdgeDelete"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="4dp"
+                    android:text="선 삭제"
+                    android:textSize="13sp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    app:strokeColor="@color/danger"
+                    android:textColor="@color/danger" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

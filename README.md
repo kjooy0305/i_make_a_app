@@ -14,6 +14,8 @@ i_make_a_app/
 │   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
 ├── repeatalarm/    ← 네이티브 Android 앱
 ├── randomread/     ← 네이티브 Android 앱
+├── epubmaker/      ← 네이티브 Android 앱
+├── choicetheroute/ ← 네이티브 Android 앱 (분기점 기록기)
 ├── shortkey/       ← Windows 앱 소스
 └── README.md
 ```
@@ -30,6 +32,8 @@ i_make_a_app/
 | 📖 소설 창작 위키 | Android | .apk | [다운로드](../../releases?q=novelwiki) |
 | ⏰ 반복 알림 앱 | Android | .apk | [다운로드](../../releases?q=repeatalarm) |
 | 📚 RandomRead | Android | .apk | [다운로드](../../releases?q=randomread) |
+| 📖 EpubMaker | Android | .apk | [다운로드](../../releases?q=epubmaker) |
+| ⬡ 분기점 기록기 | Android | .apk | [다운로드](../../releases?q=choicetheroute) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---
@@ -126,6 +130,52 @@ epub / txt 파일을 모아두고 랜덤으로 한 권을 뽑아주는 독서 �
 
 ---
 
+## 📖 EpubMaker
+
+> **설치 가능 기기:** Android 스마트폰 · 태블릿 (Android 8.0 이상)
+> **파일 형식:** `.apk`
+
+스마트폰에서 직접 EPUB 전자책을 만들고 편집할 수 있는 앱입니다. 자세한 설치 안내는 [epubmaker/README.md](epubmaker/README.md) 참고.
+
+### 기능
+- **EPUB 만들기 / 편집** — 새 파일 생성, 기존 파일 열어 수정
+- **챕터별 집필** — 챕터 단위로 내용 작성
+- **서식** — 굵게 · 기울임 · 밑줄 · 정렬(왼쪽/가운데/양쪽)
+- **글꼴** — 내장 글꼴 선택 + 커스텀 폰트 추가
+- **이미지 삽입** — 본문 사이에 이미지 배치
+- **목차 자동 생성**
+
+### 설치 방법
+1. [Releases](../../releases?q=epubmaker)에서 `EpubMaker-vX.X.X.apk` 다운로드
+2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+3. APK 파일 실행 후 설치
+
+---
+
+## ⬡ 분기점 기록기 (ChoiceTheRoute)
+
+> **설치 가능 기기:** Android 스마트폰 · 태블릿 (Android 8.0 이상)
+> **파일 형식:** `.apk`
+
+이야기·게임의 분기 구조를 손가락으로 직접 그려서 기록하는 그래프 편집 앱입니다.
+
+### 기능
+- **그래프 편집** — 분기점 노드를 화면에서 바로 추가하고 드래그로 이동
+- **연결** — 순방향 / 역방향 / 자기참조 연결 지원 (다시 연결하면 해제되는 토글 방식)
+- **엣지 모양** — 직선 / S자 곡선을 개별 엣지마다 선택
+- **자동 정리** — 교차를 줄이고 상위 노드를 하위 노드 중앙에 배치
+- **다중 시작 노드**, 분기점 색상 지정, 하위 단계 필터
+- **노드 내용** — 노드마다 제목 + 본문 자유 작성
+- **JSON 내보내기 / 가져오기**, 로컬 영구 저장
+- 🌑 딥 네이비 다크 테마
+
+### 설치 방법
+1. [Releases](../../releases?q=choicetheroute)에서 `BranchRecorder-vX.X.X.apk` 다운로드
+2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+3. APK 파일 실행 후 설치
+
+---
+
 ## ⌨️ ShortKey
 
 > **설치 가능 기기:** Windows 10 · 11 PC
@@ -162,6 +212,12 @@ git tag repeatalarm-v1.0.1 && git push origin repeatalarm-v1.0.1
 
 # RandomRead 새 버전
 git tag randomread-v1.0.1 && git push origin randomread-v1.0.1
+
+# EpubMaker 새 버전
+git tag epubmaker-v1.0.1 && git push origin epubmaker-v1.0.1
+
+# 분기점 기록기 새 버전
+git tag choicetheroute-v1.0.1 && git push origin choicetheroute-v1.0.1
 
 # ShortKey 새 버전
 git tag shortkey-v1.0.1 && git push origin shortkey-v1.0.1

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menuExport"
+        android:title="내보내기 (JSON 파일 저장)"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menuImport"
+        android:title="가져오기 (JSON 파일 열기)"
+        app:showAsAction="never" />
+
+</menu>

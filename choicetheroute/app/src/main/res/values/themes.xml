@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.BranchRecorder" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryVariant">@color/accent</item>
+        <item name="colorOnPrimary">@color/on_accent</item>
+        <item name="colorSecondary">@color/accent_alt</item>
+        <item name="colorOnSecondary">@color/bg</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="colorControlHighlight">@color/ripple</item>
+        <item name="android:statusBarColor">@color/surface_toolbar</item>
+        <item name="android:navigationBarColor">@color/surface_toolbar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="editTextColor">@color/text_primary</item>
+        <item name="android:editTextColor">@color/text_primary</item>
+        <item name="android:textColorHint">@color/text_hint</item>
+    </style>
+
+    <style name="AppToolbarTitle" parent="TextAppearance.MaterialComponents.Headline6">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="MaterialAlertDialog_Dark" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:colorBackground">@color/surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/AlertDialogTitleText</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/AlertDialogBodyText</item>
+    </style>
+
+    <style name="AlertDialogTitleText" parent="MaterialAlertDialog.MaterialComponents.Title.Text">
+        <item name="android:textColor">@color/text_primary</item>
+    </style>
+
+    <style name="AlertDialogBodyText" parent="MaterialAlertDialog.MaterialComponents.Body.Text">
+        <item name="android:textColor">@color/text_secondary</item>
+    </style>
+
+</resources>
