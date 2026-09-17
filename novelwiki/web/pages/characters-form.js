@@ -268,7 +268,7 @@ Object.assign(window.Pages.characters, {
           <div>
             <div style="font-size:12px;color:var(--color-text-muted);margin-bottom:5px;">서브 직업 (복수)</div>
             <div id="subJobChips" style="display:flex;flex-wrap:wrap;gap:5px;min-height:24px;margin-bottom:5px;">
-              ${[...subJobIds].map(jid => { const sj = sortedJobs.find(x=>x.id===jid); if(!sj) return ''; return \`<span class="sub-job-chip" data-jid="\${Utils.escHtml(jid)}" style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:2px 8px;border-radius:12px;font-size:12px;cursor:pointer;" title="클릭하여 제거">\${Utils.escHtml(sj.name)} ✕</span>\`; }).filter(Boolean).join('')}
+              ${[...subJobIds].map(jid => { const sj = sortedJobs.find(x=>x.id===jid); if(!sj) return ''; return `<span class="sub-job-chip" data-jid="${Utils.escHtml(jid)}" style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);padding:2px 8px;border-radius:12px;font-size:12px;cursor:pointer;" title="클릭하여 제거">${Utils.escHtml(sj.name)} ✕</span>`; }).filter(Boolean).join('')}
             </div>
             <div style="position:relative;">
               <input class="input-field" id="subJobSearch" placeholder="서브 직업 검색..." style="width:100%;box-sizing:border-box;font-size:12px;" />
