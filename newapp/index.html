@@ -103,7 +103,7 @@ header h1{font-size:18px;font-weight:700;flex:1}
       <button onclick="setMode('connect')" id="btn-connect">연결</button>
       <button onclick="zoomIn()">+</button>
       <button onclick="zoomOut()">−</button>
-      <button onclick="resetView()">重置</button>
+      <button onclick="resetView()">초기화</button>
     </div>
     <div class="panel" id="node-panel">
       <button class="panel-close" onclick="closeNodePanel()">×</button>
@@ -387,7 +387,12 @@ function setMode(m) {
 
 function zoomIn() { view.zoom = Math.min(2, view.zoom + 0.15); applyView(); }
 function zoomOut() { view.zoom = Math.max(0.3, view.zoom - 0.15); applyView(); }
-function resetView() { view = { x: 0, y: 0, zoom: 1 }; applyView(); }
+function resetView() {
+  view = { x: 0, y: 0, zoom: 1 };
+  applyView();
+  renderNodes();
+  renderEdges();
+}
 
 // ═══════════════════════════════════════════
 // 노드 이벤트
