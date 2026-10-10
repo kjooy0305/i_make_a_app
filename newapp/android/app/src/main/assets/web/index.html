@@ -27,6 +27,7 @@ header h1{font-size:18px;font-weight:700;flex:1}
 .event-item.selected{border-color:#e94560;background:#2a1a2e}
 .event-item .badge{font-size:10px;padding:2px 6px;border-radius:4px;background:#0f3460;flex-shrink:0}
 .canvas-wrap{flex:1;position:relative;overflow:hidden;background:#0f0f1a}
+#viewport{position:absolute;top:0;left:0;width:100%;height:100%;transform-origin:0 0}
 #canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default}
 #canvas.panning{cursor:grab}
 #canvas.connecting{cursor:crosshair}
@@ -96,7 +97,9 @@ header h1{font-size:18px;font-weight:700;flex:1}
     </div>
   </div>
   <div class="canvas-wrap">
-    <svg id="canvas"></svg>
+    <div id="viewport">
+      <svg id="canvas"></svg>
+    </div>
     <div class="toolbar">
       <button onclick="setMode('select')" id="btn-select" class="active">선택</button>
       <button onclick="setMode('pan')" id="btn-pan">패닝</button>
@@ -206,7 +209,7 @@ function renderEventList() {
   events.forEach((ev, i) => {
     const div = document.createElement('div');
     div.className = 'event-item' + (selectedNode && selectedNode.eventId === ev.id ? ' selected' : '');
-    div.innerHTML = `<span class="badge">${currentPack === 'main' ? '메인' : currentPack === 'common' ? '공용' : '지역'}</span><span>${ev.title || ev.id}</span>`;
+    div.innerHTML = `<span class="badge">${currentPack === 'main' ? '메인' : currentPack === 'common' ? '공용' : '지역'}</span><span>${ev.title || ev.id}</span><button class="btn-remove" style="margin-left:auto;font-size:14px;padding:2px 6px" onclick="event.stopPropagation();deleteEvent('${ev.id}')">×</button>`;
     div.onclick = () => selectEvent(ev.id);
     list.appendChild(div);
   });
@@ -260,7 +263,7 @@ function renderNodes() {
     `;
     el.addEventListener('mousedown', e => onNodeMouseDown(e, node));
     el.addEventListener('dblclick', () => openNodePanel(node));
-    document.querySelector('.canvas-wrap').appendChild(el);
+    document.getElementById('viewport').appendChild(el);
   });
 }
 
@@ -300,7 +303,7 @@ function renderEdges() {
       label.style.top = (y1 + y2) / 2 + 'px';
       label.style.transform = 'translate(-50%,-50%)';
       label.textContent = edge.label;
-      document.querySelector('.canvas-wrap').appendChild(label);
+      document.getElementById('viewport').appendChild(label);
     }
   });
 }
@@ -373,9 +376,8 @@ function onWheel(e) {
 }
 
 function applyView() {
-  const wrap = document.querySelector('.canvas-wrap');
-  wrap.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.zoom})`;
-  wrap.style.transformOrigin = '0 0';
+  const vp = document.getElementById('viewport');
+  vp.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.zoom})`;
 }
 
 function setMode(m) {
@@ -611,6 +613,23 @@ function selectEvent(eventId) {
 
 function getEvent(eventId) {
   return [...project.packs.main, ...project.packs.common, ...project.packs.region].find(e => e.id === eventId);
+}
+
+function deleteEvent(eventId) {
+  if (!confirm('이 이벤트를 삭제하시겠습니까?')) return;
+  project.packs.main = project.packs.main.filter(e => e.id !== eventId);
+  project.packs.common = project.packs.common.filter(e => e.id !== eventId);
+  project.packs.region = project.packs.region.filter(e => e.id !== eventId);
+  const removedNodeIds = project.nodes.filter(n => n.eventId === eventId).map(n => n.id);
+  project.nodes = project.nodes.filter(n => n.eventId !== eventId);
+  project.edges = project.edges.filter(e => !removedNodeIds.includes(e.from) && !removedNodeIds.includes(e.to));
+  if (selectedNode && selectedNode.eventId === eventId) {
+    selectedNode = null;
+    closeNodePanel();
+  }
+  renderAll();
+  saveToStorage();
+  toast('이벤트가 삭제되었습니다');
 }
 
 // ═══════════════════════════════════════════
