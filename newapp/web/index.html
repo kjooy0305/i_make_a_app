@@ -2,26 +2,689 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>테스트 예정입니다</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>스토리 팩 에디터</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,'Segoe UI',sans-serif;background:#f0f2f5;height:100dvh;display:flex;align-items:center;justify-content:center}
-.card{background:#fff;border:1px solid #e4e6ea;border-radius:16px;padding:40px;text-align:center}
-.card h1{font-size:22px;font-weight:800}
-.card p{font-size:13px;color:#999;margin-top:8px}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:#1a1a2e;color:#eee;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+header{background:#16213e;padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #0f3460;flex-shrink:0}
+header h1{font-size:18px;font-weight:700;flex:1}
+.btn{background:#0f3460;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;transition:background .15s}
+.btn:hover{background:#1a4a7a}
+.btn-primary{background:#e94560}
+.btn-primary:hover{background:#ff6b81}
+.btn-sm{padding:4px 10px;font-size:12px}
+.main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:280px;background:#16213e;border-right:1px solid #0f3460;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidebar-section{padding:12px;border-bottom:1px solid #0f3460}
+.sidebar-section h3{font-size:13px;font-weight:700;color:#a0a0b0;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+.pack-tabs{display:flex;gap:4px;margin-bottom:8px}
+.pack-tab{flex:1;padding:6px 4px;font-size:11px;border-radius:6px;border:1px solid #0f3460;background:transparent;color:#a0a0b0;cursor:pointer;text-align:center}
+.pack-tab.active{background:#0f3460;color:#fff}
+.event-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+.event-item{padding:8px 10px;background:#1a1a2e;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;border:1px solid transparent}
+.event-item:hover{border-color:#0f3460}
+.event-item.selected{border-color:#e94560;background:#2a1a2e}
+.event-item .badge{font-size:10px;padding:2px 6px;border-radius:4px;background:#0f3460;flex-shrink:0}
+.canvas-wrap{flex:1;position:relative;overflow:hidden;background:#0f0f1a}
+#canvas{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default}
+#canvas.panning{cursor:grab}
+#canvas.connecting{cursor:crosshair}
+.node{position:absolute;background:#16213e;border:2px solid #0f3460;border-radius:10px;padding:10px 14px;min-width:160px;cursor:move;user-select:none;transition:border-color .15s,box-shadow .15s}
+.node:hover{border-color:#e94560}
+.node.selected{border-color:#e94560;box-shadow:0 0 12px rgba(233,69,96,.3)}
+.node-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.node-type{font-size:10px;color:#a0a0b0;text-transform:uppercase;letter-spacing:.5px}
+.node-conds{font-size:11px;color:#ffd460;margin-top:6px}
+.node-rewards{font-size:11px;color:#6bff8f;margin-top:2px}
+.edge-label{position:absolute;font-size:10px;background:#0f3460;padding:2px 6px;border-radius:4px;pointer-events:none;white-space:nowrap}
+.panel{position:absolute;top:12px;right:12px;width:320px;background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:16px;display:none;z-index:100;max-height:calc(100% - 24px);overflow-y:auto}
+.panel.open{display:block}
+.panel h2{font-size:15px;font-weight:700;margin-bottom:12px}
+.panel-close{position:absolute;top:10px;right:10px;background:none;border:none;color:#a0a0b0;font-size:18px;cursor:pointer}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:11px;color:#a0a0b0;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.form-group select,.form-group input,.form-group textarea{width:100%;background:#1a1a2e;border:1px solid #0f3460;color:#eee;padding:8px 10px;border-radius:6px;font-size:13px;font-family:inherit}
+.form-group textarea{resize:vertical;min-height:60px}
+.cond-row,.reward-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.cond-row select,.reward-row select{flex:1}
+.cond-row input,.reward-row input{width:60px}
+.btn-remove{background:none;border:none;color:#e94560;cursor:pointer;font-size:16px;padding:4px}
+.btn-add{background:#0f3460;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;width:100%;margin-top:4px}
+.shuffle-rule{background:#1a1a2e;border:1px solid #0f3460;border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px}
+.shuffle-rule .rule-text{color:#a0a0b0;margin-bottom:6px}
+.toolbar{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#16213e;border:1px solid #0f3460;border-radius:10px;padding:8px;display:flex;gap:6px;z-index:50}
+.toolbar button{background:#0f3460;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px}
+.toolbar button:hover{background:#1a4a7a}
+.toolbar button.active{background:#e94560}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16213e;border:1px solid #0f3460;padding:10px 20px;border-radius:8px;font-size:13px;z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none}
+.toast.show{opacity:1}
+.empty-state{text-align:center;color:#a0a0b0;padding:20px;font-size:12px}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#1a1a2e}
+::-webkit-scrollbar-thumb{background:#0f3460;border-radius:3px}
 </style>
 </head>
 <body>
-<div class="card">
-<h1>테스트 예정입니다</h1>
-<p># 해시 라우팅 테스트용 껍데기</p>
+<header>
+  <h1>📖 스토리 팩 에디터</h1>
+  <button class="btn" onclick="exportProject()">💾 내보내기</button>
+  <button class="btn" onclick="document.getElementById('import-file').click()">📂 불러오기</button>
+  <input type="file" id="import-file" accept=".json" style="display:none" onchange="importProject(event)">
+  <button class="btn btn-primary" onclick="addEvent()">+ 이벤트 추가</button>
+</header>
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <h3>팩 종류</h3>
+      <div class="pack-tabs">
+        <button class="pack-tab active" data-pack="main" onclick="switchPack('main')">메인</button>
+        <button class="pack-tab" data-pack="common" onclick="switchPack('common')">공용</button>
+        <button class="pack-tab" data-pack="region" onclick="switchPack('region')">지역</button>
+      </div>
+      <div class="event-list" id="event-list"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>셔플 규칙</h3>
+      <div id="shuffle-rules"></div>
+      <button class="btn-add" onclick="addShuffleRule()">+ 규칙 추가</button>
+    </div>
+    <div class="sidebar-section">
+      <h3>능력치 목록</h3>
+      <div class="event-list" id="stat-list"></div>
+      <button class="btn-add" onclick="addStat()">+ 능력치 추가</button>
+    </div>
+  </div>
+  <div class="canvas-wrap">
+    <svg id="canvas"></svg>
+    <div class="toolbar">
+      <button onclick="setMode('select')" id="btn-select" class="active">선택</button>
+      <button onclick="setMode('pan')" id="btn-pan">패닝</button>
+      <button onclick="setMode('connect')" id="btn-connect">연결</button>
+      <button onclick="zoomIn()">+</button>
+      <button onclick="zoomOut()">−</button>
+      <button onclick="resetView()">重置</button>
+    </div>
+    <div class="panel" id="node-panel">
+      <button class="panel-close" onclick="closeNodePanel()">×</button>
+      <h2>노드 설정</h2>
+      <div class="form-group">
+        <label>이벤트 선택</label>
+        <select id="np-event" onchange="updateNodeEvent()"></select>
+      </div>
+      <div class="form-group">
+        <label>선택지 텍스트</label>
+        <input id="np-choice" oninput="updateNodeChoice()" placeholder="선택지 문구...">
+      </div>
+      <div class="form-group">
+        <label>요구 조건</label>
+        <div id="np-conds"></div>
+        <button class="btn-add" onclick="addCondition()">+ 조건 추가</button>
+      </div>
+      <div class="form-group">
+        <label>보상</label>
+        <div id="np-rewards"></div>
+        <button class="btn-add" onclick="addReward()">+ 보상 추가</button>
+      </div>
+      <div class="form-group">
+        <label>메모</label>
+        <textarea id="np-memo" oninput="updateNodeMemo()" placeholder="노드 메모..."></textarea>
+      </div>
+    </div>
+  </div>
 </div>
+<div class="toast" id="toast"></div>
+
 <script>
-if(location.hash) document.querySelector('p').textContent='hash: '+location.hash;
-window.addEventListener('hashchange',()=>{
-  document.querySelector('p').textContent=location.hash?'hash: '+location.hash:'# 해시 라우팅 테스트용 껍데기';
-});
+// ═══════════════════════════════════════════
+// 데이터 모델
+// ═══════════════════════════════════════════
+let project = {
+  packs: { main: [], common: [], region: [] },
+  shuffleRules: [],
+  nodes: [],
+  edges: [],
+  stats: ['근력', '민첩', '체력', '지능', '매력'],
+  regions: ['강남역', '북한산', '홍대', '부산해운대', '제주도']
+};
+let currentPack = 'main';
+let mode = 'select';
+let selectedNode = null;
+let connectingFrom = null;
+let panStart = null;
+let view = { x: 0, y: 0, zoom: 1 };
+let nodeIdCounter = 1;
+let edgeIdCounter = 1;
+
+// ═══════════════════════════════════════════
+// 초기화
+// ═══════════════════════════════════════════
+function init() {
+  loadFromStorage();
+  renderAll();
+  setupCanvas();
+  setupGlobalEvents();
+}
+
+function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem('storypack-project');
+    if (saved) {
+      const data = JSON.parse(saved);
+      project = { ...project, ...data };
+      nodeIdCounter = Math.max(0, ...project.nodes.map(n => parseInt(n.id.replace('n','')) || 0)) + 1;
+      edgeIdCounter = Math.max(0, ...project.edges.map(e => parseInt(e.id.replace('e','')) || 0)) + 1;
+    }
+  } catch(e) {}
+}
+
+function saveToStorage() {
+  localStorage.setItem('storypack-project', JSON.stringify(project));
+  toast('저장되었습니다');
+}
+
+// ═══════════════════════════════════════════
+// 렌더링
+// ═══════════════════════════════════════════
+function renderAll() {
+  renderEventList();
+  renderShuffleRules();
+  renderStatList();
+  renderNodes();
+  renderEdges();
+  updateEventSelect();
+}
+
+function renderEventList() {
+  const list = document.getElementById('event-list');
+  const events = project.packs[currentPack];
+  if (events.length === 0) {
+    list.innerHTML = '<div class="empty-state">이벤트가 없습니다<br>+ 이벤트 추가 버튼으로 생성</div>';
+    return;
+  }
+  list.innerHTML = '';
+  events.forEach((ev, i) => {
+    const div = document.createElement('div');
+    div.className = 'event-item' + (selectedNode && selectedNode.eventId === ev.id ? ' selected' : '');
+    div.innerHTML = `<span class="badge">${currentPack === 'main' ? '메인' : currentPack === 'common' ? '공용' : '지역'}</span><span>${ev.title || ev.id}</span>`;
+    div.onclick = () => selectEvent(ev.id);
+    list.appendChild(div);
+  });
+}
+
+function renderShuffleRules() {
+  const wrap = document.getElementById('shuffle-rules');
+  if (project.shuffleRules.length === 0) {
+    wrap.innerHTML = '<div class="empty-state">셔플 규칙이 없습니다</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  project.shuffleRules.forEach((rule, i) => {
+    const div = document.createElement('div');
+    div.className = 'shuffle-rule';
+    div.innerHTML = `
+      <div class="rule-text">${rule.from} → ${rule.to} 사이에 공용 ${rule.common}개, 지역 ${rule.region}개 랜덤 배치</div>
+      <button class="btn-remove" onclick="removeShuffleRule(${i})">×</button>
+    `;
+    wrap.appendChild(div);
+  });
+}
+
+function renderStatList() {
+  const list = document.getElementById('stat-list');
+  list.innerHTML = '';
+  project.stats.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'event-item';
+    div.innerHTML = `<span>${s}</span>`;
+    div.onclick = () => { if(selectedNode) { addCondition(s, 1); } };
+    list.appendChild(div);
+  });
+}
+
+function renderNodes() {
+  document.querySelectorAll('.node').forEach(n => n.remove());
+  project.nodes.forEach(node => {
+    const el = document.createElement('div');
+    el.className = 'node' + (selectedNode === node ? ' selected' : '');
+    el.id = 'node-' + node.id;
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+    const ev = getEvent(node.eventId);
+    el.innerHTML = `
+      <div class="node-title">${ev ? ev.title : '미지정'}</div>
+      <div class="node-type">${node.packType}</div>
+      ${node.choice ? `<div style="font-size:11px;color:#a0a0b0;margin-top:4px">"${node.choice}"</div>` : ''}
+      ${node.conditions && node.conditions.length ? `<div class="node-conds">⚠ ${node.conditions.map(c=>`${c.stat}≥${c.value}`).join(', ')}</div>` : ''}
+      ${node.rewards && node.rewards.length ? `<div class="node-rewards">🎁 ${node.rewards.map(r=>r.type==='stat' ? `${r.stat}${r.value>=0?'+':''}${r.value}` : r.type).join(', ')}</div>` : ''}
+    `;
+    el.addEventListener('mousedown', e => onNodeMouseDown(e, node));
+    el.addEventListener('dblclick', () => openNodePanel(node));
+    document.querySelector('.canvas-wrap').appendChild(el);
+  });
+}
+
+function renderEdges() {
+  document.querySelectorAll('.edge-path,.edge-arrow,.edge-label').forEach(e => e.remove());
+  const svg = document.getElementById('canvas');
+  project.edges.forEach(edge => {
+    const fromNode = project.nodes.find(n => n.id === edge.from);
+    const toNode = project.nodes.find(n => n.id === edge.to);
+    if (!fromNode || !toNode) return;
+    const x1 = fromNode.x + 80, y1 = fromNode.y + 30;
+    const x2 = toNode.x + 80, y2 = toNode.y + 30;
+    const cx = (x1 + x2) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`);
+    path.setAttribute('stroke', '#e94560');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('class', 'edge-path');
+    svg.appendChild(path);
+    // 화살표
+    const angle = Math.atan2(y2 - cy, x2 - cx);
+    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    const ax = x2 - 10 * Math.cos(angle - 0.4);
+    const ay = y2 - 10 * Math.sin(angle - 0.4);
+    const bx = x2 - 10 * Math.cos(angle + 0.4);
+    const by = y2 - 10 * Math.sin(angle + 0.4);
+    arrow.setAttribute('points', `${x2},${y2} ${ax},${ay} ${bx},${by}`);
+    arrow.setAttribute('fill', '#e94560');
+    arrow.setAttribute('class', 'edge-arrow');
+    svg.appendChild(arrow);
+    // 라벨
+    if (edge.label) {
+      const label = document.createElement('div');
+      label.className = 'edge-label';
+      label.style.left = cx + 'px';
+      label.style.top = (y1 + y2) / 2 + 'px';
+      label.style.transform = 'translate(-50%,-50%)';
+      label.textContent = edge.label;
+      document.querySelector('.canvas-wrap').appendChild(label);
+    }
+  });
+}
+
+function updateEventSelect() {
+  const sel = document.getElementById('np-event');
+  sel.innerHTML = '';
+  const allEvents = [...project.packs.main, ...project.packs.common, ...project.packs.region];
+  allEvents.forEach(ev => {
+    const opt = document.createElement('option');
+    opt.value = ev.id;
+    opt.textContent = `${ev.title} (${ev.packType})`;
+    sel.appendChild(opt);
+  });
+}
+
+// ═══════════════════════════════════════════
+// 캔버스 이벤트
+// ═══════════════════════════════════════════
+function setupCanvas() {
+  const wrap = document.querySelector('.canvas-wrap');
+  wrap.addEventListener('mousedown', onCanvasMouseDown);
+  wrap.addEventListener('mousemove', onCanvasMouseMove);
+  wrap.addEventListener('mouseup', onMouseUp);
+  wrap.addEventListener('wheel', onWheel);
+}
+
+function setupGlobalEvents() {
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Delete' && selectedNode) {
+      deleteNode(selectedNode);
+    }
+    if (e.key === 'Escape') {
+      closeNodePanel();
+      connectingFrom = null;
+    }
+  });
+}
+
+function onCanvasMouseDown(e) {
+  if (e.target.closest('.node')) return;
+  if (mode === 'pan') {
+    panStart = { x: e.clientX - view.x, y: e.clientY - view.y };
+    document.getElementById('canvas').classList.add('panning');
+  } else if (mode === 'select') {
+    selectedNode = null;
+    closeNodePanel();
+    renderNodes();
+  }
+}
+
+function onCanvasMouseMove(e) {
+  if (panStart) {
+    view.x = e.clientX - panStart.x;
+    view.y = e.clientY - panStart.y;
+    applyView();
+  }
+}
+
+function onMouseUp() {
+  panStart = null;
+  document.getElementById('canvas').classList.remove('panning');
+}
+
+function onWheel(e) {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.1 : 0.1;
+  view.zoom = Math.max(0.3, Math.min(2, view.zoom + delta));
+  applyView();
+}
+
+function applyView() {
+  const wrap = document.querySelector('.canvas-wrap');
+  wrap.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.zoom})`;
+  wrap.style.transformOrigin = '0 0';
+}
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + m).classList.add('active');
+  document.getElementById('canvas').className = m === 'pan' ? 'panning' : m === 'connect' ? 'connecting' : '';
+}
+
+function zoomIn() { view.zoom = Math.min(2, view.zoom + 0.15); applyView(); }
+function zoomOut() { view.zoom = Math.max(0.3, view.zoom - 0.15); applyView(); }
+function resetView() { view = { x: 0, y: 0, zoom: 1 }; applyView(); }
+
+// ═══════════════════════════════════════════
+// 노드 이벤트
+// ═══════════════════════════════════════════
+function onNodeMouseDown(e, node) {
+  e.stopPropagation();
+  if (mode === 'connect') {
+    if (!connectingFrom) {
+      connectingFrom = node;
+      toast('연결할 대상 노드를 클릭하세요');
+    } else if (connectingFrom.id !== node.id) {
+      project.edges.push({ id: 'e' + edgeIdCounter++, from: connectingFrom.id, to: node.id, label: '' });
+      connectingFrom = null;
+      renderEdges();
+      saveToStorage();
+    }
+    return;
+  }
+  selectedNode = node;
+  renderNodes();
+  openNodePanel(node);
+  const startX = e.clientX - node.x;
+  const startY = e.clientY - node.y;
+  const onMove = ev => {
+    node.x = ev.clientX - startX;
+    node.y = ev.clientY - startY;
+    const el = document.getElementById('node-' + node.id);
+    if (el) { el.style.left = node.x + 'px'; el.style.top = node.y + 'px'; }
+    renderEdges();
+  };
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    saveToStorage();
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function deleteNode(node) {
+  project.nodes = project.nodes.filter(n => n.id !== node.id);
+  project.edges = project.edges.filter(e => e.from !== node.id && e.to !== node.id);
+  selectedNode = null;
+  closeNodePanel();
+  renderAll();
+  saveToStorage();
+}
+
+// ═══════════════════════════════════════════
+// 노드 패널
+// ═══════════════════════════════════════════
+function openNodePanel(node) {
+  selectedNode = node;
+  const panel = document.getElementById('node-panel');
+  panel.classList.add('open');
+  document.getElementById('np-event').value = node.eventId || '';
+  document.getElementById('np-choice').value = node.choice || '';
+  document.getElementById('np-memo').value = node.memo || '';
+  renderConditions();
+  renderRewards();
+}
+
+function closeNodePanel() {
+  document.getElementById('node-panel').classList.remove('open');
+  selectedNode = null;
+  renderNodes();
+}
+
+function updateNodeEvent() {
+  if (!selectedNode) return;
+  selectedNode.eventId = document.getElementById('np-event').value;
+  renderNodes();
+  saveToStorage();
+}
+
+function updateNodeChoice() {
+  if (!selectedNode) return;
+  selectedNode.choice = document.getElementById('np-choice').value;
+  renderNodes();
+  saveToStorage();
+}
+
+function updateNodeMemo() {
+  if (!selectedNode) return;
+  selectedNode.memo = document.getElementById('np-memo').value;
+  saveToStorage();
+}
+
+// ═══════════════════════════════════════════
+// 조건 / 보상
+// ═══════════════════════════════════════════
+function renderConditions() {
+  const wrap = document.getElementById('np-conds');
+  wrap.innerHTML = '';
+  if (!selectedNode.conditions) selectedNode.conditions = [];
+  selectedNode.conditions.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'cond-row';
+    row.innerHTML = `
+      <select onchange="updateCondition(${i},'stat',this.value)">
+        ${project.stats.map(s=>`<option ${s===c.stat?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <input type="number" value="${c.value}" onchange="updateCondition(${i},'value',this.value)">
+      <select onchange="updateCondition(${i},'op',this.value)">
+        <option value="≥" ${c.op==='≥'?'selected':''}>≥</option>
+        <option value="≤" ${c.op==='≤'?'selected':''}>≤</option>
+        <option value="=" ${c.op==='='?'selected':''}>=</option>
+      </select>
+      <button class="btn-remove" onclick="removeCondition(${i})">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+function renderRewards() {
+  const wrap = document.getElementById('np-rewards');
+  wrap.innerHTML = '';
+  if (!selectedNode.rewards) selectedNode.rewards = [];
+  selectedNode.rewards.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'reward-row';
+    row.innerHTML = `
+      <select onchange="updateReward(${i},'type',this.value)">
+        <option value="stat" ${r.type==='stat'?'selected':''}>능력치</option>
+        <option value="item" ${r.type==='item'?'selected':''}>아이템</option>
+        <option value="gold" ${r.type==='gold'?'selected':''}>골드</option>
+      </select>
+      <select onchange="updateReward(${i},'stat',this.value)" id="rw-stat-${i}">
+        ${project.stats.map(s=>`<option ${s===r.stat?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <input type="number" value="${r.value}" onchange="updateReward(${i},'value',this.value)">
+      <button class="btn-remove" onclick="removeReward(${i})">×</button>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+function addCondition(stat, value) {
+  if (!selectedNode) return;
+  if (!selectedNode.conditions) selectedNode.conditions = [];
+  selectedNode.conditions.push({ stat: stat || project.stats[0], value: value || 1, op: '≥' });
+  renderConditions();
+  renderNodes();
+  saveToStorage();
+}
+
+function updateCondition(i, field, val) {
+  selectedNode.conditions[i][field] = field === 'value' ? parseInt(val) || 0 : val;
+  renderNodes();
+  saveToStorage();
+}
+
+function removeCondition(i) {
+  selectedNode.conditions.splice(i, 1);
+  renderConditions();
+  renderNodes();
+  saveToStorage();
+}
+
+function addReward() {
+  if (!selectedNode) return;
+  if (!selectedNode.rewards) selectedNode.rewards = [];
+  selectedNode.rewards.push({ type: 'stat', stat: project.stats[0], value: 1 });
+  renderRewards();
+  renderNodes();
+  saveToStorage();
+}
+
+function updateReward(i, field, val) {
+  selectedNode.rewards[i][field] = field === 'value' ? parseInt(val) || 0 : val;
+  renderNodes();
+  saveToStorage();
+}
+
+function removeReward(i) {
+  selectedNode.rewards.splice(i, 1);
+  renderRewards();
+  renderNodes();
+  saveToStorage();
+}
+
+// ═══════════════════════════════════════════
+// 이벤트 / 팩
+// ═══════════════════════════════════════════
+function switchPack(pack) {
+  currentPack = pack;
+  document.querySelectorAll('.pack-tab').forEach(t => t.classList.toggle('active', t.dataset.pack === pack));
+  renderEventList();
+}
+
+function addEvent() {
+  const id = currentPack[0] + Date.now().toString(36);
+  const ev = { id, title: '새 이벤트', packType: currentPack, content: '', region: currentPack === 'region' ? project.regions[0] : null };
+  project.packs[currentPack].push(ev);
+  renderEventList();
+  saveToStorage();
+}
+
+function selectEvent(eventId) {
+  const node = {
+    id: 'n' + nodeIdCounter++,
+    eventId,
+    packType: currentPack,
+    x: 100 + Math.random() * 300,
+    y: 100 + Math.random() * 200,
+    choice: '',
+    conditions: [],
+    rewards: [],
+    memo: ''
+  };
+  project.nodes.push(node);
+  renderNodes();
+  openNodePanel(node);
+  saveToStorage();
+}
+
+function getEvent(eventId) {
+  return [...project.packs.main, ...project.packs.common, ...project.packs.region].find(e => e.id === eventId);
+}
+
+// ═══════════════════════════════════════════
+// 셔플 규칙
+// ═══════════════════════════════════════════
+function addShuffleRule() {
+  const mainEvents = project.packs.main;
+  if (mainEvents.length < 2) { toast('메인 이벤트가 2개 이상 필요합니다'); return; }
+  project.shuffleRules.push({ from: mainEvents[0].id, to: mainEvents[1].id, common: 2, region: 1 });
+  renderShuffleRules();
+  saveToStorage();
+}
+
+function removeShuffleRule(i) {
+  project.shuffleRules.splice(i, 1);
+  renderShuffleRules();
+  saveToStorage();
+}
+
+// ═══════════════════════════════════════════
+// 능력치
+// ═══════════════════════════════════════════
+function addStat() {
+  const name = prompt('능력치 이름:');
+  if (name && !project.stats.includes(name)) {
+    project.stats.push(name);
+    renderStatList();
+    saveToStorage();
+  }
+}
+
+// ═══════════════════════════════════════════
+// 내보내기 / 불러오기
+// ═══════════════════════════════════════════
+function exportProject() {
+  const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'storypack-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('프로젝트를 내보냈습니다');
+}
+
+function importProject(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      project = { ...project, ...data };
+      nodeIdCounter = Math.max(0, ...project.nodes.map(n => parseInt(n.id.replace('n','')) || 0)) + 1;
+      edgeIdCounter = Math.max(0, ...project.edges.map(e => parseInt(e.id.replace('e','')) || 0)) + 1;
+      renderAll();
+      saveToStorage();
+      toast('프로젝트를 불러왔습니다');
+    } catch(err) {
+      toast('파일을 불러오는 중 오류가 발생했습니다');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ═══════════════════════════════════════════
+// 유틸
+// ═══════════════════════════════════════════
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ═══════════════════════════════════════════
+// 시작
+// ═══════════════════════════════════════════
+init();
 </script>
 </body>
 </html>
