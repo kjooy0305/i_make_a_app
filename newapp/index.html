@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>테스트 예정입니다</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:#f0f2f5;height:100dvh;display:flex;align-items:center;justify-content:center}
+.card{background:#fff;border:1px solid #e4e6ea;border-radius:16px;padding:40px;text-align:center}
+.card h1{font-size:22px;font-weight:800}
+.card p{font-size:13px;color:#999;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>테스트 예정입니다</h1>
+<p># 해시 라우팅 테스트용 껍데기</p>
+</div>
+<script>
+if(location.hash) document.querySelector('p').textContent='hash: '+location.hash;
+window.addEventListener('hashchange',()=>{
+  document.querySelector('p').textContent=location.hash?'hash: '+location.hash:'# 해시 라우팅 테스트용 껍데기';
+});
+</script>
+</body>
+</html>
