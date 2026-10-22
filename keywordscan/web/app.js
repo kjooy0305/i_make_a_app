@@ -283,6 +283,31 @@
     if (targets.length) { toast(targets.length + '개 재분석을 시작해요'); S.tab = 'up'; render(); } else toast('재분석할 파일이 없어요');
   }
 
+  /* ================= 목록 텍스트 추출 (제목 + 상위 태그만) ================= */
+  function buildListText(list) {
+    const ups = upperKws();
+    const lines = list.map((n) => {
+      const tags = hitsOf(n, ups).filter((h) => h.status).map((h) => h.name + '(' + h.status + ')');
+      return n.title + (tags.length ? ' | ' + tags.join(', ') : '');
+    });
+    return '소설 목록 (' + list.length + '개)\n' + lines.join('\n') + '\n';
+  }
+  function exportListTxt() {
+    const list = filteredNovels();
+    if (!list.length) { toast('추출할 목록이 없어요'); return; }
+    const text = buildListText(list);
+    const d = new Date();
+    const pad = (v) => String(v).padStart(2, '0');
+    const name = '소설목록_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.txt';
+    if (window.AndroidBridge && window.AndroidBridge.saveText) { window.AndroidBridge.saveText(name, text); return; }
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) { copyText(text); }
+  }
+
   /* ================= 화면: 라이브러리 ================= */
   function filteredNovels() {
     const f = S.filter;
@@ -345,7 +370,7 @@
     let h = '<div class="row"><input type="text" class="grow" id="q" placeholder="제목 검색" value="' + esc(f.q) + '"><select id="sort" style="width:auto"><option value="new"' + (f.sort === 'new' ? ' selected' : '') + '>최근순</option><option value="title"' + (f.sort === 'title' ? ' selected' : '') + '>제목순</option></select></div>';
     h += '<div style="margin-top:8px">' + (ups.length ? ups.map((u) => '<span class="chip' + (f.upper.has(u.id) ? ' sel' : '') + '" data-act="fup" data-id="' + u.id + '">' + esc(u.name) + '</span>').join('') : '<span class="muted">키워드 탭에서 상위 키워드를 추가하세요</span>') + '</div>';
     h += '<div class="row" style="margin-top:4px"><label class="ck"><input type="radio" name="mode" value="or"' + (f.mode === 'or' ? ' checked' : '') + '> 하나라도</label><label class="ck"><input type="radio" name="mode" value="and"' + (f.mode === 'and' ? ' checked' : '') + '> 모두 포함</label><label class="ck"><input type="checkbox" id="nod"' + (f.noDislike ? ' checked' : '') + '> 불호 키워드(!) 제외</label></div>';
-    h += '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">태그 파일명 목록 복사</button>' : '') + '</div>';
+    h += '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">태그 파일명 복사</button><button class="btn sm" data-act="exporttxt">📄 목록 txt 추출</button>' : '') + '</div>';
     h += list.length ? list.map(novelCard).join('') : '<div class="card muted" style="text-align:center">' + (S.novels.length ? '조건에 맞는 소설이 없어요' : '업로드 탭에서 TXT·ePub 파일을 추가하세요') + '</div>';
     $('#main').innerHTML = h;
   }
@@ -429,6 +454,7 @@
       case 'toggle': S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderLib(); break;
       case 'fup': S.filter.upper.has(id) ? S.filter.upper.delete(id) : S.filter.upper.add(id); renderLib(); break;
       case 'copytag': { const n = S.novels.find((x) => x.id === id); if (n) copyText(tagName(n) + n.ext); break; }
+      case 'exporttxt': exportListTxt(); break;
       case 'copyall': copyText(filteredNovels().map((n) => tagName(n) + n.ext).join('\n')); break;
       case 'rescan': { const n = S.novels.find((x) => x.id === id); if (n) enqueue({ kind: 'rescan', novelId: id, label: n.fileName }); S.tab = 'up'; render(); break; }
       case 'del': {

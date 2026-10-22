@@ -3,6 +3,8 @@ package com.kjooy0305.keywordscan
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.webkit.JavascriptInterface
+import android.widget.Toast
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -29,6 +31,45 @@ class MainActivity : AppCompatActivity() {
         filePathCallback = null
     }
 
+    private var pendingText: String? = null
+
+    // 웹에서 넘긴 텍스트를 사용자가 고른 위치에 저장 (저장소 권한 불필요)
+    private val saveFile = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val text = pendingText
+        pendingText = null
+        val uri = result.data?.data
+        if (result.resultCode == RESULT_OK && uri != null && text != null) {
+            try {
+                contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                Toast.makeText(this, "저장했어요", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "저장 실패: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    inner class Bridge {
+        @JavascriptInterface
+        fun saveText(name: String, text: String) {
+            runOnUiThread {
+                pendingText = text
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TITLE, name)
+                }
+                try {
+                    saveFile.launch(intent)
+                } catch (e: Exception) {
+                    pendingText = null
+                    Toast.makeText(this@MainActivity, "저장 창을 열 수 없어요", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         webView = WebView(this)
@@ -46,6 +87,8 @@ class MainActivity : AppCompatActivity() {
             allowContentAccess = true
             cacheMode = WebSettings.LOAD_DEFAULT
         }
+
+        webView.addJavascriptInterface(Bridge(), "AndroidBridge")
 
         webView.webViewClient = object : WebViewClientCompat() {
             override fun shouldInterceptRequest(

@@ -76,6 +76,7 @@ jobs:
             - ⚠️ 유사 파일명 중복 경고 (덮어쓰기 / 이름 변경 후 추가 / 취소)
             - 🔍 상위 키워드 중심 검색 + 하위 키워드 상세 표시
             - 💚🚫 호감 / 일반 / 불호 키워드 구분 표시
+            - 📄 목록 + 상위 태그만 담은 txt 파일 추출
             - 🔄 키워드 추가·수정 후 기존 파일 재분석
             - 오프라인 완전 동작 / IndexedDB 영구 저장
           files: keywordscan/android/app/build/outputs/apk/release/KeywordScan-*.apk
