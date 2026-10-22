@@ -16,3 +16,5 @@ make123/android/app/src/main/assets/*
 !make123/android/app/src/main/assets/.gitkeep
 novelwiki/android/app/src/main/assets/www/*
 !novelwiki/android/app/src/main/assets/www/.gitkeep
+keywordscan/android/app/src/main/assets/www/*
+!keywordscan/android/app/src/main/assets/www/.gitkeep

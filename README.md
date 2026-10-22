@@ -12,6 +12,9 @@ i_make_a_app/
 ├── novelwiki/
 │   ├── web/        ← 웹 원본 소스 (수정은 여기서)
 │   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
+├── keywordscan/
+│   ├── web/        ← 웹 원본 소스 (수정은 여기서)
+│   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
 ├── repeatalarm/    ← 네이티브 Android 앱
 ├── randomread/     ← 네이티브 Android 앱
 ├── epubmaker/      ← 네이티브 Android 앱
@@ -30,6 +33,7 @@ i_make_a_app/
 |---|---|---|---|
 | 📜 스크립트 TRPG 작성 앱 | Android | .apk | [다운로드](../../releases?q=make123) |
 | 📖 소설 창작 위키 | Android | .apk | [다운로드](../../releases?q=novelwiki) |
+| 🔎 소설 키워드 분석기 | Android | .apk | [다운로드](../../releases?q=keywordscan) |
 | ⏰ 반복 알림 앱 | Android | .apk | [다운로드](../../releases?q=repeatalarm) |
 | 📚 RandomRead | Android | .apk | [다운로드](../../releases?q=randomread) |
 | 📖 EpubMaker | Android | .apk | [다운로드](../../releases?q=epubmaker) |
@@ -83,6 +87,32 @@ TRPG(테이블탑 롤플레잉 게임) 시나리오를 직접 쓰고, 그 자리
 
 ### 설치 방법
 1. [Releases](../../releases?q=novelwiki)에서 `NovelWiki-vX.X.X.apk` 다운로드
+2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+3. APK 파일 실행 후 설치
+
+---
+
+## 🔎 소설 키워드 분석기 (KeywordScan)
+
+> **설치 가능 기기:** Android 스마트폰 · 태블릿 (Android 8.0 이상)
+> **파일 형식:** `.apk`
+
+TXT · ePub 소설 파일을 읽어 등록한 키워드가 얼마나 등장하는지 자동으로 세고, 그 결과로 검색·태그 파일명 생성까지 해주는 분석 앱입니다.
+
+### 기능
+- **다중 키워드 1회 스캔** — 수십 개 키워드를 본문 한 번 훑으면서 동시에 집계 (유의어는 한 키워드로 합산, 띄어쓰기 무시)
+- **빈도 · 밀도 · 분포** — 등장 횟수, 1만자당 빈도, 소설 10개 구간별 분포(분산 / 집중)
+- **상위 / 하위 키워드** — 상위는 검색·목록에 보여줄 대표 단어, 하위는 본문에서 실제로 찾는 세부 요소
+- **키워드 관리** — 추가 · 수정 · 삭제, 키워드 변경 후 기존 파일 재분석 (필요한 것만 / 전체)
+- **파일명 태그 `(!)` / `(?)`** — 키워드별 임계 횟수 이상이면 `(!)`, 있지만 미달이면 `(?)` (예: `작품명_무협(!)_로맨스판타지(?)`). 앱이 만든 이름을 복사해서 파일명에 쓰세요
+- **유사 파일명 중복 경고** — 제목 일부·뒷부분만 비슷해도 경고 → 덮어쓰기 / 이름 변경 후 추가 / 취소
+- **검색** — 상위 키워드로만 필터(하나라도 / 모두), 결과마다 하위 키워드 목록 표시
+- **호감 · 일반 · 불호** 영역 구분 표시, 불호 키워드(!) 포함 소설 제외 옵션
+- **대량 업로드** — 100개 이상 한 번에 선택, 한 파일씩 순차 처리하는 대기열
+- 오프라인 완전 동작 / IndexedDB 영구 저장
+
+### 설치 방법
+1. [Releases](../../releases?q=keywordscan)에서 `KeywordScan-vX.X.X.apk` 다운로드
 2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
 3. APK 파일 실행 후 설치
 
@@ -206,6 +236,9 @@ git tag make123-v1.0.1 && git push origin make123-v1.0.1
 
 # NovelWiki 새 버전
 git tag novelwiki-v1.0.1 && git push origin novelwiki-v1.0.1
+
+# 소설 키워드 분석기 새 버전
+git tag keywordscan-v1.0.1 && git push origin keywordscan-v1.0.1
 
 # 반복 알림 앱 새 버전
 git tag repeatalarm-v1.0.1 && git push origin repeatalarm-v1.0.1
