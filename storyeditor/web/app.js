@@ -7,7 +7,7 @@
   const COLORS = ['#6d8cff', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#4ade80', '#2dd4bf', '#94a3b8'];
   const KEY = 'storyeditor.projects.v1';
 
-  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false };
+  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false, trail: [], editCi: null };
 
   /* ================= 저장 ================= */
   function load() {
@@ -63,16 +63,21 @@
     const hd = $('#hd');
     if (S.view === 'home') {
       hd.innerHTML = '<div class="ttl">📖 나만의 이야기 에디터</div><button data-act="import">가져오기</button><button class="pri" data-act="newproj">＋ 새 프로젝트</button>';
+    } else if (S.view === 'flow') {
+      const pj = proj();
+      hd.innerHTML = '<button data-act="flowexit">‹ 편집</button><div class="ttl">🔀 ' + esc(pj.name) + '</div>' +
+        '<button data-act="json">{ } JSON</button><button class="pri" data-act="playhere">▶ 여기서</button>';
     } else {
       const pj = proj();
       hd.innerHTML = '<button data-act="home">‹ 목록</button><div class="ttl">' + esc(pj.name) + '</div>' +
         '<button class="tgl-side" data-act="toggleside">☰ 페이지</button>' +
-        '<button data-act="achvs">🏆 업적</button><button data-act="check">검사</button><button data-act="settings">⚙</button><button class="pri" data-act="play0">▶ 미리보기</button>';
+        '<button data-act="flow">🔀 분기도</button><button data-act="achvs">🏆 업적</button><button data-act="check">검사</button><button data-act="settings">⚙</button><button class="pri" data-act="play0">▶ 미리보기</button>';
     }
   }
   function render() {
+    if (S.view !== 'flow' && window.SFlow) window.SFlow.unmount();
     renderHeader();
-    if (S.view === 'home') renderHome(); else renderEditor();
+    if (S.view === 'home') renderHome(); else if (S.view === 'flow') renderFlow(); else renderEditor();
   }
 
   /* ================= 홈 ================= */
@@ -179,7 +184,7 @@
     const q = S.q.trim().toLowerCase();
     const list = pj.pages.slice().sort((a, b) => a.n - b.n).filter((p) => !q || String(p.n) === q || p.body.toLowerCase().includes(q));
     return '<div class="row" style="margin-bottom:6px"><input type="text" id="pq" class="grow" placeholder="페이지 번호·본문 검색" value="' + esc(S.q) + '"><button class="pri sm" data-act="addpage">＋</button></div>' +
-      (list.length ? list.map((p) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(firstLine(p.body)) + '</span></div>').join('') : '<div class="muted" style="padding:8px">결과 없음</div>');
+      (list.length ? list.map((p) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(E.pageLabel(p)) + '</span></div>').join('') : '<div class="muted" style="padding:8px">결과 없음</div>');
   }
   function renderEditor() {
     const pj = proj();
@@ -197,6 +202,7 @@
     let h = '<div class="card"><div class="row"><h3 style="margin:0" class="grow">P.' + p.n + (p.n === 0 ? ' <span class="muted">(시작)</span>' : '') + '</h3>' +
       '<label class="muted"><input type="checkbox" data-f="isEnd"' + (p.isEnd ? ' checked' : '') + '> 마지막 페이지</label>' +
       '<button class="sm" data-act="playhere">▶ 여기서</button><button class="sm" data-act="duppage">복제</button><button class="sm dng" data-act="delpage">삭제</button></div>' +
+      '<input type="text" data-f="title" placeholder="제목 (선택, 분기도에 표시돼요)" value="' + esc(p.title || '') + '" maxlength="40" style="margin-top:8px">' +
       '<textarea data-f="body" placeholder="본문을 입력하세요" style="margin-top:8px">' + esc(p.body) + '</textarea>' +
       '<div class="muted"><span class="cnt' + (p.body.length > E.BODY_MAX ? ' over' : '') + '" id="cnt">' + p.body.length + '</span> / ' + E.BODY_MAX + '자</div></div>';
     if (p.isEnd) {
@@ -273,6 +279,7 @@
         const cnt = $('#cnt'); if (cnt) { cnt.textContent = p.body.length; cnt.classList.toggle('over', p.body.length > E.BODY_MAX); }
         touch(); renderSideDebounced(); return;
       }
+      if (f === 'title') { p.title = el.value; touch(); renderSideDebounced(); return; }
       if (f === 'isEnd') { p.isEnd = el.checked; touch(); renderPage(); renderSide(); }
       return;
     }
@@ -348,6 +355,78 @@
     }
   }
 
+
+  /* ================= 분기도 (ReactFlow) ================= */
+  function flowProps() {
+    const pj = proj();
+    const refresh = () => { saveNow(); flowRefresh(); };
+    const goTo = (n) => { S.trail.push(S.pn); if (S.trail.length > 30) S.trail.shift(); S.pn = n; S.editCi = null; };
+    const api = {
+      rev: Date.now(),
+      back(n) { const i = S.trail.lastIndexOf(n); S.trail = i >= 0 ? S.trail.slice(0, i) : []; S.pn = n; S.editCi = null; flowRefresh(); },
+      go(ci) {
+        const p = page(), c = p && p.choices[ci]; if (!c) return;
+        let to = Number(c.base.next);
+        if (!E.pageOf(pj, to)) {
+          if (!(to >= 0)) to = newPageNo();
+          pj.pages.push(E.newPage(to)); c.base.next = to; touch(); toast('P.' + to + ' 페이지를 새로 만들었어요');
+        }
+        goTo(to); flowRefresh();
+      },
+      edit(ci) { S.editCi = ci; flowRefresh(); },
+      closeEdit() { S.editCi = null; flowRefresh(); },
+      add() {
+        const p = page(); if (!p) return;
+        const n = newPageNo(); pj.pages.push(E.newPage(n));
+        const c = E.newChoice(n); c.text = '새 선택지'; p.choices.push(c);
+        S.editCi = p.choices.length - 1; touch(); refresh();
+      },
+      editPage() { S.view = 'edit'; render(); },
+      play() { startPlay(pj, S.pn); },
+      setText(ci, v) { const p = page(); if (p && p.choices[ci]) { p.choices[ci].text = v; touch(); flowRefresh(); } },
+      setNext(ci, n) { const p = page(); if (p && p.choices[ci] && n >= 0) { p.choices[ci].base.next = n; touch(); flowRefresh(); } },
+      newPageFor(ci) {
+        const p = page(); if (!p || !p.choices[ci]) return;
+        const n = newPageNo(); pj.pages.push(E.newPage(n)); p.choices[ci].base.next = n; touch(); refresh(); toast('P.' + n + ' 페이지를 만들어 연결했어요');
+      },
+      move(ci, d) { const p = page(), j = ci + d; if (p && p.choices[j]) { [p.choices[ci], p.choices[j]] = [p.choices[j], p.choices[ci]]; S.editCi = j; touch(); refresh(); } },
+      dup(ci) { const p = page(); if (!p || !p.choices[ci]) return; const c = E.clone(p.choices[ci]); c.id = E.uid('c'); p.choices.splice(ci + 1, 0, c); S.editCi = ci + 1; touch(); refresh(); },
+      del(ci) { const p = page(); if (!p) return; p.choices.splice(ci, 1); S.editCi = null; touch(); refresh(); },
+    };
+    return { pj, cur: S.pn, trail: S.trail.slice(), editCi: S.editCi, api };
+  }
+  function flowRefresh() {
+    const el = $('#flowRoot'); if (!el || !window.SFlow || !proj()) return;
+    window.SFlow.render(el, flowProps());
+  }
+  function renderFlow() {
+    const pj = proj();
+    if (!pj) return go('home');
+    if (!window.SFlow) { toast('분기도 라이브러리를 불러오지 못했어요'); S.view = 'edit'; return render(); }
+    if (!E.pageOf(pj, S.pn)) S.pn = pj.pages.length ? pj.pages[0].n : 0;
+    if (!E.pageOf(pj, S.pn)) { toast('페이지가 없어요'); S.view = 'edit'; return render(); }
+    $('#main').innerHTML = '<div id="flowRoot"></div><div class="muted" style="margin-top:8px">오른쪽 분기를 눌러 이야기를 따라가고, 왼쪽 회색 이야기를 눌러 되돌아가요. ✎ 로 분기를 바로 고치거나 ＋ 로 새 분기를 이어 붙일 수 있어요.</div>';
+    flowRefresh();
+  }
+  function showJson() {
+    const pj = proj();
+    const m = modal('<h3 style="margin-top:0">스토리 JSON</h3><div class="muted">페이지를 <code>{ id, title, text, choices:[{ text, to }], end }</code> 배열로 쓰고 “적용”하면 추가·수정돼요. 같은 id 는 덮어쓰고, 배열에 없는 페이지는 그대로 둬요. 선택지의 조건·아이템 같은 고급 속성은 순서대로 유지돼요.</div>' +
+      '<textarea id="jsonTa" spellcheck="false" style="min-height:300px;font-family:monospace;font-size:12px;margin-top:8px">' + esc(JSON.stringify(E.toStoryArray(pj), null, 2)) + '</textarea>' +
+      '<div class="row" style="justify-content:flex-end;margin-top:10px"><button data-x="0">닫기</button><button class="pri" data-x="1">적용</button></div>');
+    m.el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-x]'); if (!b) return;
+      if (b.dataset.x === '0') return m.close();
+      let arr;
+      try { arr = JSON.parse($('#jsonTa', m.el).value); } catch (err) { toast('JSON 형식 오류: ' + err.message); return; }
+      try {
+        const r = E.applyStoryArray(pj, arr);
+        touch(); saveNow(); m.close();
+        if (!E.pageOf(pj, S.pn) && pj.pages.length) S.pn = pj.pages[0].n;
+        flowRefresh(); toast('적용했어요 (추가 ' + r.added + ' · 수정 ' + r.updated + ')');
+      } catch (err) { toast(err.message); }
+    });
+  }
+
   /* ================= 검사 / 업적 ================= */
   function showCheck() {
     const pj = proj(); const list = E.validate(pj);
@@ -408,6 +487,9 @@
         if (v.stats) pj.stats = v.stats;
         touch(); saveNow(); render();
       }); break;
+      case 'flow': S.trail = []; S.editCi = null; S.view = 'flow'; render(); break;
+      case 'flowexit': S.view = 'edit'; render(); break;
+      case 'json': showJson(); break;
       case 'achvs': showAchvs(); break;
       case 'check': showCheck(); break;
       case 'toggleside': S.side = !S.side; renderEditor(); break;

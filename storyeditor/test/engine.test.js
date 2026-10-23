@@ -137,3 +137,81 @@ test('가져오기 정리 + 라운드트립', () => {
   assert.strictEqual(re.pages[0].choices[0].text, 'go');
   assert.throws(() => E.normalizeProject({}));
 });
+
+function flowProj() {
+  const pj = E.newProject('f');
+  const mk = (n, body, tos, isEnd) => {
+    const p = E.newPage(n); p.body = body; p.isEnd = !!isEnd;
+    p.choices = (tos || []).map((to, i) => { const c = E.newChoice(to); c.text = '선택' + i; return c; });
+    return p;
+  };
+  pj.pages = [mk(0, '시작', [1, 2]), mk(1, '하나', [3, 3, 4]), mk(2, '둘', [3]), mk(3, '셋', [], true), mk(4, '넷', [0])];
+  return pj;
+}
+
+test('분기도: 3열 배치 / 노드 종류 / 연결선', () => {
+  const pj = flowProj();
+  const g = E.buildFlow(pj, 1, [0]);
+  const by = (t) => g.nodes.filter((n) => n.type === t);
+  assert.strictEqual(by('prev').length, 1);
+  assert.strictEqual(by('cur').length, 1);
+  assert.strictEqual(by('choice').length, 3);
+  assert.strictEqual(by('add').length, 1);
+  assert.ok(by('prev')[0].position.x < by('cur')[0].position.x);
+  assert.ok(by('cur')[0].position.x < by('choice')[0].position.x);
+  // 선택 노드는 세로로 겹치지 않음
+  const ys = by('choice').concat(by('add')).map((n) => n.position.y);
+  assert.strictEqual(new Set(ys).size, ys.length);
+  // 연결선: 이전→현재, 현재→각 분기
+  assert.ok(g.edges.some((e) => e.source === 'prev-0' && e.target === 'cur'));
+  assert.strictEqual(g.edges.filter((e) => e.source === 'cur').length, 3);
+  assert.ok(g.edges.every((e) => g.nodes.some((n) => n.id === e.source) && g.nodes.some((n) => n.id === e.target)));
+});
+
+test('분기도: trail 이 비면 상위 페이지를 이전 이야기로, 마지막 페이지는 끝 노드', () => {
+  const pj = flowProj();
+  assert.deepStrictEqual(E.parentsOf(pj, 3), [1, 2]);
+  const g = E.buildFlow(pj, 3, []);
+  assert.deepStrictEqual(g.nodes.filter((n) => n.type === 'prev').map((n) => n.data.n), [1, 2]);
+  assert.strictEqual(g.nodes.filter((n) => n.type === 'choice').length, 0);
+  assert.strictEqual(g.nodes.filter((n) => n.type === 'end').length, 1);
+  assert.strictEqual(E.buildFlow(pj, 99, []).nodes.length, 0);
+});
+
+test('분기도: 없는 페이지 표시 / 이전 노드는 최대 4개, 중복 제거', () => {
+  const pj = flowProj();
+  pj.pages[0].choices[0].base.next = 77;
+  const g = E.buildFlow(pj, 0, [4, 1, 2, 1, 4, 2]);
+  assert.ok(g.nodes.find((n) => n.id === 'choice-0').data.missing);
+  assert.ok(g.nodes.filter((n) => n.type === 'prev').length <= 4);
+  const ids = g.nodes.map((n) => n.id);
+  assert.strictEqual(new Set(ids).size, ids.length);
+});
+
+test('스토리 배열: 내보내기 → 적용 라운드트립, 고급 속성 유지', () => {
+  const pj = flowProj();
+  pj.pages[0].choices[0].base.gain = '열쇠';
+  const arr = E.toStoryArray(pj);
+  assert.strictEqual(arr.length, 5);
+  assert.deepStrictEqual(arr[0].choices[0], { text: '선택0', to: 1 });
+  assert.strictEqual(arr[3].end, true);
+  arr[0].choices[0].text = '바뀐 텍스트';
+  arr[0].choices[0].to = 4;
+  arr.push({ id: 9, title: '새 이야기', text: '추가됨', choices: [{ text: '돌아가기', to: 0 }] });
+  const r = E.applyStoryArray(pj, arr);
+  assert.deepStrictEqual(r, { added: 1, updated: 5 });
+  assert.strictEqual(pj.pages[0].choices[0].text, '바뀐 텍스트');
+  assert.strictEqual(pj.pages[0].choices[0].base.next, 4);
+  assert.strictEqual(pj.pages[0].choices[0].base.gain, '열쇠');
+  assert.strictEqual(E.pageOf(pj, 9).title, '새 이야기');
+});
+
+test('스토리 배열: 잘못된 입력은 거부하고 아무것도 바꾸지 않음', () => {
+  const pj = flowProj();
+  const before = JSON.stringify(pj);
+  assert.throws(() => E.applyStoryArray(pj, {}), /배열/);
+  assert.throws(() => E.applyStoryArray(pj, [{ id: 1.5 }]), /정수/);
+  assert.throws(() => E.applyStoryArray(pj, [{ id: 1 }, { id: 1 }]), /겹쳐/);
+  assert.throws(() => E.applyStoryArray(pj, [{ id: 1, choices: [{ text: 'x' }] }]), /to/);
+  assert.strictEqual(JSON.stringify(pj), before);
+});

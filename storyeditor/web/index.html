@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>나만의 이야기 에디터</title>
+<link rel="stylesheet" href="vendor/reactflow.css">
 <style>
 :root{
   --bg:#14161f;--bg2:#1b1f2d;--card:#222739;--line:#343b57;--txt:#e9ecf6;--sub:#9aa3c2;
@@ -73,6 +74,35 @@ button:disabled{opacity:.4;cursor:default}
   .tgl-side{display:inline-block!important}
 }
 .tgl-side{display:none}
+/* 분기도: 흰 바탕 + 검정 테두리 */
+#flowRoot{display:flex;flex-direction:column;gap:10px}
+.flow-wrap{height:calc(100vh - 230px);min-height:380px;background:#f4f5f9;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.flow-wrap .react-flow__renderer{cursor:grab}
+.fn{width:250px;background:#fff;color:#111;border:2px solid #111;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45;text-align:left}
+.fn .react-flow__handle{width:8px;height:8px;background:#111;border:0}
+.fn-tag{font-size:11px;color:#666;margin-bottom:2px}
+.fn-ttl{font-weight:700;word-break:break-all}
+.fn-txt{margin-top:4px;color:#444;font-size:12px;word-break:break-all}
+.fn-sub{margin-top:3px;font-size:11px;color:#555;word-break:break-all}
+.fn-row{display:flex;gap:6px;align-items:flex-start}
+.fn-row .grow{min-width:0}
+.fn.prev{border-color:#aeb2c0;background:#ececf1;color:#8a8fa3;cursor:pointer;opacity:.85}
+.fn.prev .fn-tag{color:#9a9fb2}
+.fn.prev .react-flow__handle{background:#aeb2c0}
+.fn.cur{border:5px solid #000;padding:12px 14px;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+.fn-act{display:flex;gap:6px;margin-top:8px}
+.fn-act button,.fn-ed{background:#eceef5;color:#111;border:1px solid #c9cddb;border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer}
+.fn.choice{cursor:pointer;transition:background .12s,transform .12s}
+.fn.choice:hover{background:#111;color:#fff}
+.fn.choice:hover .fn-sub,.fn.choice:hover .fn-chip{color:#ddd;border-color:#777}
+.fn.choice:hover .fn-ed{background:#333;color:#fff;border-color:#666}
+.fn.choice.missing{border-style:dashed;border-color:#c0392b}
+.fn-chip{display:inline-block;border:1px solid #bbb;border-radius:10px;padding:0 7px;margin:2px 4px 0 0;font-size:11px}
+.fn-chip.bad{border-color:#c0392b;color:#c0392b}
+.fn.add{border-style:dashed;border-width:2px;text-align:center;cursor:pointer;color:#444;background:#fafafa}
+.fn.add:hover{background:#111;color:#fff}
+.fn.end{text-align:center;background:#fafafa;color:#555}
+.fe-panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
 </style>
 </head>
 <body>
@@ -81,7 +111,11 @@ button:disabled{opacity:.4;cursor:default}
 <div id="modalRoot"></div>
 <div id="toast"></div>
 <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="vendor/reactflow.min.js"></script>
 <script src="engine.js"></script>
+<script src="flow.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

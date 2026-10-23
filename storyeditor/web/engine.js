@@ -23,7 +23,7 @@
     id: uid('c'), text: '', show: null, enable: null,
     base: newOutcome(next), branchType: null, branches: [],
   });
-  const newPage = (n) => ({ n, body: '', isEnd: false, choices: [] });
+  const newPage = (n) => ({ n, title: '', body: '', isEnd: false, choices: [] });
   function newProject(name, tag, color) {
     return {
       id: uid('p'), name: name || '새 이야기', tag: tag || '', color: color || 0,
@@ -195,6 +195,111 @@
     return out;
   }
 
+
+  /* ---------- 분기도 (3열: 이전 이야기 / 현재 / 선택 분기) ---------- */
+  const FLOW = { W: 250, COL: 380, ROW: 140 };
+  const firstLine = (s) => String(s || '').split('\n').find((l) => l.trim()) || '';
+  const pageLabel = (p) => (p && (p.title || firstLine(p.body))) || '(비어 있음)';
+  const outcomesOf = (c) => [c.base].concat(c.branches || []);
+
+  // 현재 페이지로 이어지는 상위 페이지 번호 목록
+  function parentsOf(pj, n) {
+    const set = new Set();
+    pj.pages.forEach((p) => {
+      if (p.n === n) return;
+      p.choices.forEach((c) => outcomesOf(c).forEach((o) => { if (Number(o.next) === n) set.add(p.n); }));
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }
+
+  // trail: 지나온 페이지 번호(오래된 것 → 최근). 비어 있으면 상위 페이지를 대신 보여준다.
+  function buildFlow(pj, cur, trail, maxPrev) {
+    const page = pageOf(pj, cur);
+    if (!page) return { nodes: [], edges: [] };
+    maxPrev = maxPrev || 4;
+    const fromTrail = (trail || []).length > 0;
+    const prevNs = (fromTrail ? trail.slice(-maxPrev) : parentsOf(pj, cur).slice(0, maxPrev)).filter((n, i, a) => pageOf(pj, n) && a.indexOf(n) === i);
+    const nodes = [], edges = [];
+    const yOf = (i, count) => (i - (count - 1) / 2) * FLOW.ROW;
+
+    prevNs.forEach((n, i) => {
+      const pg = pageOf(pj, n);
+      nodes.push({ id: 'prev-' + n, type: 'prev', position: { x: 0, y: yOf(i, prevNs.length) }, data: { n, title: pageLabel(pg), fromTrail } });
+      edges.push({ id: 'e-prev-' + n, source: 'prev-' + n, target: 'cur', type: 'smoothstep' });
+    });
+
+    nodes.push({ id: 'cur', type: 'cur', position: { x: FLOW.COL, y: 0 }, data: { n: page.n, title: pageLabel(page), text: page.body, isEnd: page.isEnd } });
+
+    if (page.isEnd) {
+      nodes.push({ id: 'end', type: 'end', position: { x: FLOW.COL * 2, y: 0 }, data: {} });
+      edges.push({ id: 'e-end', source: 'cur', target: 'end', type: 'default' });
+    } else {
+      const total = page.choices.length + 1; // + 분기 추가 노드
+      page.choices.forEach((c, i) => {
+        const to = Number(c.base.next);
+        const target = pageOf(pj, to);
+        const extra = (c.branches || []).map((b) => ({ to: Number(b.next), when: c.branchType === 'prob' ? b.when + '%' : b.when || '', missing: !pageOf(pj, Number(b.next)) }));
+        const flags = [];
+        if (c.show) flags.push('노출 조건');
+        if (c.enable) flags.push('활성 조건');
+        if (c.branchType === 'prob') flags.push('확률 분기');
+        if (c.branchType === 'item') flags.push('아이템 분기');
+        nodes.push({
+          id: 'choice-' + i, type: 'choice', position: { x: FLOW.COL * 2, y: yOf(i, total) },
+          data: { ci: i, text: c.text, to, targetLabel: target ? pageLabel(target) : '', missing: !target, flags, extra },
+        });
+        edges.push({ id: 'e-choice-' + i, source: 'cur', target: 'choice-' + i, type: 'default' });
+      });
+      nodes.push({ id: 'add', type: 'add', position: { x: FLOW.COL * 2, y: yOf(total - 1, total) }, data: {} });
+    }
+    return { nodes, edges };
+  }
+
+  /* ---------- 단순 스토리 JSON 배열 (사람이 쓰기 쉬운 형식) ----------
+   * [{ "id": 0, "title": "시작", "text": "본문", "end": false,
+   *    "choices": [{ "text": "문을 연다", "to": 1 }] }]                       */
+  function toStoryArray(pj) {
+    return pj.pages.slice().sort((a, b) => a.n - b.n).map((p) => {
+      const o = { id: p.n, title: p.title || '', text: p.body };
+      if (p.isEnd) o.end = true;
+      else o.choices = p.choices.map((c) => ({ text: c.text, to: Number(c.base.next) }));
+      return o;
+    });
+  }
+  // 같은 id 는 덮어쓰고(선택지의 조건·아이템 등 고급 속성은 순서대로 유지), 새 id 는 추가한다. 배열에 없는 페이지는 그대로 둔다.
+  function applyStoryArray(pj, arr) {
+    if (!Array.isArray(arr)) throw new Error('JSON 배열이 아니에요 ([ ... ] 형태)');
+    const seen = new Set();
+    arr.forEach((it, i) => {
+      if (!it || typeof it !== 'object') throw new Error((i + 1) + '번째 항목이 객체가 아니에요');
+      if (!Number.isInteger(it.id) || it.id < 0) throw new Error((i + 1) + '번째 항목: id 는 0 이상의 정수여야 해요');
+      if (seen.has(it.id)) throw new Error('id 가 겹쳐요: ' + it.id);
+      seen.add(it.id);
+      if (it.choices != null && !Array.isArray(it.choices)) throw new Error('id ' + it.id + ': choices 는 배열이어야 해요');
+      (it.choices || []).forEach((c, j) => {
+        if (!c || !Number.isInteger(c.to) || c.to < 0) throw new Error('id ' + it.id + ' 선택지 ' + (j + 1) + ': to 는 0 이상의 정수여야 해요');
+      });
+    });
+    let added = 0, updated = 0;
+    arr.forEach((it) => {
+      let p = pageOf(pj, it.id);
+      if (p) updated++; else { p = newPage(it.id); pj.pages.push(p); added++; }
+      p.title = String(it.title || '');
+      p.body = String(it.text == null ? '' : it.text);
+      p.isEnd = !!it.end;
+      if (!p.isEnd || it.choices) {
+        const list = it.choices || [];
+        p.choices = list.map((c, j) => {
+          const ch = p.choices[j] || newChoice(c.to);
+          ch.text = String(c.text || '');
+          ch.base.next = c.to;
+          return ch;
+        });
+      }
+    });
+    return { added, updated };
+  }
+
   /* ---------- 가져오기 정리 ---------- */
   function normalizeProject(raw) {
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.pages)) throw new Error('올바른 프로젝트 파일이 아니에요');
@@ -213,5 +318,6 @@
     lastPageNo, pageOf, parseItems, initState, have, addItem, loseItem,
     checkCond, missingTerms, branchSum, baseProb, resolveChoice, applyOutcome,
     visibleChoices, choose, validate, normalizeProject,
+    FLOW, parentsOf, pageLabel, buildFlow, toStoryArray, applyStoryArray,
   };
 });
