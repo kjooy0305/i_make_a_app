@@ -244,3 +244,32 @@ test('스토리 배열: 잘못된 입력은 거부하고 아무것도 바꾸지 
   assert.throws(() => E.applyStoryArray(pj, [{ id: 1, choices: [{ text: 'x' }] }]), /to/);
   assert.strictEqual(JSON.stringify(pj), before);
 });
+
+test('폴더: 기본은 메인, 폴더별 목록, 잘못된 값은 메인으로 취급', () => {
+  const pj = flowProj();
+  pj.pages[1].folder = 'sub'; pj.pages[2].folder = 'random'; pj.pages[3].folder = '엉뚱한값';
+  assert.deepStrictEqual(E.pagesIn(pj, 'main').map((p) => p.n), [0, 3, 4]);
+  assert.deepStrictEqual(E.pagesIn(pj, 'sub').map((p) => p.n), [1]);
+  assert.deepStrictEqual(E.pagesIn(pj, 'random').map((p) => p.n), [2]);
+  assert.strictEqual(E.newPage(9).folder, 'main');
+  assert.strictEqual(E.newPage(9, 'sub').folder, 'sub');
+  // 폴더가 달라도 링크·분기도는 그대로 동작하고 노드에 폴더 이름이 실림
+  const g = E.buildFlow(pj, 0, []);
+  assert.strictEqual(g.nodes.find((n) => n.id === 'to-1').data.folder, '서브');
+  assert.strictEqual(g.nodes.find((n) => n.id === 'to-2').data.folder, '랜덤');
+  assert.strictEqual(E.validate(pj).filter((x) => /페이지가 없어요/.test(x.msg)).length, 0);
+});
+
+test('폴더: 스토리 JSON 에 포함·적용, 잘못된 폴더는 거부', () => {
+  const pj = flowProj();
+  pj.pages[1].folder = 'sub';
+  const arr = E.toStoryArray(pj);
+  assert.strictEqual(arr[1].folder, 'sub');
+  assert.strictEqual(arr[0].folder, undefined, '메인은 생략');
+  arr.push({ id: 20, folder: 'random', text: '랜덤', choices: [{ text: 'x', to: 0 }] });
+  E.applyStoryArray(pj, arr);
+  assert.strictEqual(E.pageOf(pj, 20).folder, 'random');
+  assert.strictEqual(E.pageOf(pj, 1).folder, 'sub');
+  assert.throws(() => E.applyStoryArray(pj, [{ id: 21, folder: 'nope' }]), /folder/);
+  assert.strictEqual(E.pageOf(pj, 21), null);
+});

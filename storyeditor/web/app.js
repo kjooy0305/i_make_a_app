@@ -7,7 +7,7 @@
   const COLORS = ['#6d8cff', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#4ade80', '#2dd4bf', '#94a3b8'];
   const KEY = 'storyeditor.projects.v1';
 
-  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false, trail: [], editCi: null };
+  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false, trail: [], editCi: null, folder: 'main' };
 
   /* ================= 저장 ================= */
   function load() {
@@ -183,14 +183,22 @@
   /* ================= 에디터 ================= */
   function sideHtml(pj) {
     const q = S.q.trim().toLowerCase();
-    const list = pj.pages.slice().sort((a, b) => a.n - b.n).filter((p) => !q || String(p.n) === q || p.body.toLowerCase().includes(q));
-    return '<div class="row" style="margin-bottom:6px"><input type="text" id="pq" class="grow" placeholder="페이지 번호·본문 검색" value="' + esc(S.q) + '"><button class="pri sm" data-act="addpage">＋</button></div>' +
-      (list.length ? list.map((p) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(E.pageLabel(p)) + '</span></div>').join('') : '<div class="muted" style="padding:8px">결과 없음</div>');
+    const list = E.pagesIn(pj, S.folder).filter((p) => !q || String(p.n) === q || p.body.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q));
+    const tabs = '<div class="ftabs">' + E.FOLDERS.map((f) => '<button class="ft' + (f.id === S.folder ? ' on' : '') + '" data-act="folder" data-folder="' + f.id + '">' + esc(f.name) + ' <span>' + E.pagesIn(pj, f.id).length + '</span></button>').join('') + '</div>';
+    const cur = E.FOLDERS.find((f) => f.id === S.folder);
+    return tabs + '<div class="row" style="margin-bottom:6px"><input type="text" id="pq" class="grow" placeholder="페이지 번호·본문 검색" value="' + esc(S.q) + '"><button class="pri sm" data-act="addpage" title="' + esc(cur.name) + '에 페이지 추가">＋</button></div>' +
+      (list.length ? list.map((p) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(E.pageLabel(p)) + '</span></div>').join('')
+        : '<div class="muted" style="padding:8px">' + (q ? '검색 결과 없음' : esc(cur.name) + '가 비어 있어요.<br>＋ 로 첫 페이지를 만들어 보세요.') + '</div>');
   }
   function renderEditor() {
     const pj = proj();
     if (!pj) return go('home');
-    if (!E.pageOf(pj, S.pn)) S.pn = pj.pages.length ? pj.pages[0].n : 0;
+    const cur = E.pageOf(pj, S.pn);
+    if (cur) S.folder = E.folderOf(cur);              // 다른 폴더의 페이지로 이동하면 탭도 따라간다
+    else {
+      const first = E.pagesIn(pj, S.folder)[0];
+      S.pn = first ? first.n : -1;                    // -1 = 이 폴더에 페이지 없음
+    }
     $('#main').innerHTML = '<div class="ed' + (S.side ? '' : ' noside') + '"><div class="side" id="side">' + sideHtml(pj) + '</div><div id="pageBox"></div></div>';
     renderPage();
   }
@@ -199,8 +207,9 @@
   function renderPage() {
     const pj = proj(), p = page(), box = $('#pageBox');
     if (!box) return;
-    if (!p) { box.innerHTML = '<div class="card">페이지가 없어요. 왼쪽의 ＋ 로 추가하세요.</div>'; return; }
+    if (!p) { box.innerHTML = '<div class="card">이 폴더에 페이지가 없어요. 왼쪽의 ＋ 로 추가하세요.' + (window.innerWidth <= 760 ? '<br><span class="muted">(☰ 페이지 버튼으로 목록을 열 수 있어요)</span>' : '') + '</div>'; return; }
     let h = '<div class="card"><div class="row"><h3 style="margin:0" class="grow">P.' + p.n + (p.n === 0 ? ' <span class="muted">(시작)</span>' : '') + '</h3>' +
+      '<label class="muted">폴더 <select data-f="folder" style="width:auto;padding:3px 6px">' + E.FOLDERS.map((f) => '<option value="' + f.id + '"' + (f.id === E.folderOf(p) ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('') + '</select></label>' +
       '<label class="muted"><input type="checkbox" data-f="isEnd"' + (p.isEnd ? ' checked' : '') + '> 마지막 페이지</label>' +
       '<button class="sm" data-act="playhere">▶ 여기서</button><button class="sm" data-act="duppage">복제</button><button class="sm dng" data-act="delpage">삭제</button></div>' +
       '<input type="text" data-f="title" placeholder="제목 (선택, 분기도에 표시돼요)" value="' + esc(p.title || '') + '" maxlength="40" style="margin-top:8px">' +
@@ -280,6 +289,7 @@
         const cnt = $('#cnt'); if (cnt) { cnt.textContent = p.body.length; cnt.classList.toggle('over', p.body.length > E.BODY_MAX); }
         touch(); renderSideDebounced(); return;
       }
+      if (f === 'folder') { p.folder = el.value; S.folder = el.value; touch(); renderEditor(); toast('“' + E.FOLDERS.find((x) => x.id === el.value).name + '”로 옮겼어요'); return; }
       if (f === 'title') { p.title = el.value; touch(); renderSideDebounced(); return; }
       if (f === 'isEnd') { p.isEnd = el.checked; touch(); renderPage(); renderSide(); }
       return;
@@ -309,7 +319,7 @@
   function newPageNo() { return E.lastPageNo(proj()) + 1; }
   function addPage(from) {
     const pj = proj(); const n = newPageNo();
-    const p = from ? Object.assign(E.clone(from), { n }) : E.newPage(n);
+    const p = from ? Object.assign(E.clone(from), { n }) : E.newPage(n, S.folder);
     if (from) p.choices.forEach((c) => { c.id = E.uid('c'); });
     pj.pages.push(p); S.pn = n; touch(); renderEditor();
     toast('P.' + n + ' 페이지를 추가했어요');
@@ -368,14 +378,14 @@
       goPage(to) {
         to = Number(to);
         if (!(to >= 0)) return;
-        if (!E.pageOf(pj, to)) { pj.pages.push(E.newPage(to)); touch(); toast('P.' + to + ' 페이지를 새로 만들었어요'); }
+        if (!E.pageOf(pj, to)) { pj.pages.push(E.newPage(to, E.folderOf(page()))); touch(); toast('P.' + to + ' 페이지를 새로 만들었어요'); }
         goTo(to); flowRefresh();
       },
       edit(ci) { S.editCi = ci; flowRefresh(); },
       closeEdit() { S.editCi = null; flowRefresh(); },
       add() {
         const p = page(); if (!p) return;
-        const n = newPageNo(); pj.pages.push(E.newPage(n));
+        const n = newPageNo(); pj.pages.push(E.newPage(n, E.folderOf(p)));
         const c = E.newChoice(n); c.text = '새 선택지'; p.choices.push(c);
         S.editCi = p.choices.length - 1; touch(); refresh();
       },
@@ -385,7 +395,7 @@
       setNext(ci, n) { const p = page(); if (p && p.choices[ci] && n >= 0) { p.choices[ci].base.next = n; touch(); flowRefresh(); } },
       newPageFor(ci) {
         const p = page(); if (!p || !p.choices[ci]) return;
-        const n = newPageNo(); pj.pages.push(E.newPage(n)); p.choices[ci].base.next = n; touch(); refresh(); toast('P.' + n + ' 페이지를 만들어 연결했어요');
+        const n = newPageNo(); pj.pages.push(E.newPage(n, E.folderOf(p))); p.choices[ci].base.next = n; touch(); refresh(); toast('P.' + n + ' 페이지를 만들어 연결했어요');
       },
       move(ci, d) { const p = page(), j = ci + d; if (p && p.choices[j]) { [p.choices[ci], p.choices[j]] = [p.choices[j], p.choices[ci]]; S.editCi = j; touch(); refresh(); } },
       dup(ci) { const p = page(); if (!p || !p.choices[ci]) return; const c = E.clone(p.choices[ci]); c.id = E.uid('c'); p.choices.splice(ci + 1, 0, c); S.editCi = ci + 1; touch(); refresh(); },
@@ -491,13 +501,18 @@
       case 'achvs': showAchvs(); break;
       case 'check': showCheck(); break;
       case 'toggleside': S.side = !S.side; renderEditor(); break;
+      case 'folder': {
+        S.folder = a.dataset.folder; S.q = '';
+        const first = E.pagesIn(pj, S.folder)[0]; S.pn = first ? first.n : -1;
+        renderEditor(); break;
+      }
       case 'gopage': S.pn = +a.dataset.n; if (window.innerWidth <= 760) S.side = false; renderEditor(); window.scrollTo(0, 0); $('#main').scrollTop = 0; break;
       case 'addpage': addPage(); break;
       case 'duppage': if (p) addPage(p); break;
       case 'delpage':
         if (p && await ask('P.' + p.n + ' 페이지를 삭제할까요?\n다른 페이지의 번호는 바뀌지 않아요.', '삭제')) {
           pj.pages = pj.pages.filter((x) => x.n !== p.n);
-          S.pn = pj.pages.length ? pj.pages[0].n : 0; touch(); renderEditor();
+          S.pn = -1; touch(); renderEditor();   // renderEditor 가 같은 폴더의 첫 페이지를 고른다
         }
         break;
       case 'addchoice': if (p) { p.choices.push(E.newChoice(newPageNo())); touch(); renderPage(); } break;

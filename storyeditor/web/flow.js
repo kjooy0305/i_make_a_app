@@ -16,14 +16,14 @@
   /* ---------- 노드 ---------- */
   function PrevNode({ data }) {
     return h('div', { className: 'fn prev', title: 'P.' + data.n + ' 로 돌아가기', onClick: () => data.onBack(data.n) },
-      h('div', { className: 'fn-tag' }, data.fromTrail ? '이전 이야기' : '상위 이야기'),
+      h('div', { className: 'fn-tag' }, (data.fromTrail ? '이전 이야기' : '상위 이야기') + (data.folder ? ' · ' + data.folder : '')),
       h('div', { className: 'fn-ttl' }, 'P.' + data.n + ' · ' + clip(data.title, 26)),
       h(Handle, { type: 'source', position: Position.Right, isConnectable: false }));
   }
   function CurNode({ data }) {
     return h('div', { className: 'fn cur' },
       h(Handle, { type: 'target', position: Position.Left, isConnectable: false }),
-      h('div', { className: 'fn-tag' }, '선택한 이야기' + (data.isEnd ? ' · 마지막' : '')),
+      h('div', { className: 'fn-tag' }, '선택한 이야기' + (data.folder ? ' · ' + data.folder : '') + (data.isEnd ? ' · 마지막' : '')),
       h('div', { className: 'fn-ttl' }, 'P.' + data.n + ' · ' + clip(data.title, 30)),
       h('div', { className: 'fn-txt' }, clip(data.text, 110) || '(본문이 비어 있어요)'),
       h('div', { className: 'fn-act ' + NO },
@@ -35,7 +35,7 @@
   function TargetNode({ data }) {
     return h('div', { className: 'fn dest' + (data.missing ? ' missing' : ''), onClick: () => data.onGo(data.to) },
       h(Handle, { type: 'target', position: Position.Left, isConnectable: false }),
-      h('div', { className: 'fn-tag' }, data.missing ? '⚠ 없는 페이지 — 눌러서 새로 만들기' : data.self ? '현재 페이지로 돌아와요' : '다음 이야기'),
+      h('div', { className: 'fn-tag' }, data.missing ? '⚠ 없는 페이지 — 눌러서 새로 만들기' : data.self ? '현재 페이지로 돌아와요' : '다음 이야기' + (data.folder ? ' · ' + data.folder : '')),
       h('div', { className: 'fn-ttl' }, 'P.' + data.to + (data.title ? ' · ' + clip(data.title, 26) : '')),
       h('div', { className: 'fn-items' }, data.items.map((it, i) =>
         h('div', { key: i, className: 'fn-item' },

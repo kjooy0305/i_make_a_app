@@ -7,6 +7,15 @@
   'use strict';
 
   const BODY_MAX = 1000;
+  // 페이지를 묶는 폴더 (페이지 번호는 폴더와 상관없이 프로젝트 전체에서 하나로 이어진다)
+  const FOLDERS = [
+    { id: 'main', name: '메인 이벤트', short: '메인' },
+    { id: 'sub', name: '서브 이벤트', short: '서브' },
+    { id: 'random', name: '랜덤 이벤트', short: '랜덤' },
+  ];
+  const folderOf = (p) => (p && FOLDERS.some((f) => f.id === p.folder) ? p.folder : 'main');
+  const folderShort = (id) => (FOLDERS.find((f) => f.id === id) || FOLDERS[0]).short;
+  const pagesIn = (pj, folder) => pj.pages.filter((p) => folderOf(p) === folder).sort((a, b) => a.n - b.n);
 
   /* ---------- 생성 ---------- */
   const uid = (p) => (p || 'x') + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
@@ -23,7 +32,7 @@
     id: uid('c'), text: '', show: null, enable: null,
     base: newOutcome(next), branchType: null, branches: [],
   });
-  const newPage = (n) => ({ n, title: '', body: '', isEnd: false, choices: [] });
+  const newPage = (n, folder) => ({ n, folder: folder || 'main', title: '', body: '', isEnd: false, choices: [] });
   function newProject(name, tag, color) {
     return {
       id: uid('p'), name: name || '새 이야기', tag: tag || '', color: color || 0,
@@ -241,11 +250,11 @@
 
     const py = stackY(prevNs.map(() => H.prev));
     prevNs.forEach((n, i) => {
-      nodes.push({ id: 'prev-' + n, type: 'prev', position: { x: 0, y: py[i] }, data: { n, title: pageLabel(pageOf(pj, n)), fromTrail } });
+      nodes.push({ id: 'prev-' + n, type: 'prev', position: { x: 0, y: py[i] }, data: { n, title: pageLabel(pageOf(pj, n)), fromTrail, folder: folderShort(folderOf(pageOf(pj, n))) } });
       edges.push({ id: 'e-prev-' + n, source: 'prev-' + n, target: 'cur', type: 'default' });
     });
 
-    nodes.push({ id: 'cur', type: 'cur', position: { x: FLOW.COL, y: -H.cur / 2 }, data: { n: page.n, title: pageLabel(page), text: page.body, isEnd: page.isEnd } });
+    nodes.push({ id: 'cur', type: 'cur', position: { x: FLOW.COL, y: -H.cur / 2 }, data: { n: page.n, title: pageLabel(page), text: page.body, isEnd: page.isEnd, folder: folderShort(folderOf(page)) } });
 
     const X3 = FLOW.COL * 2;
     if (page.isEnd) {
@@ -266,7 +275,7 @@
         let g = byTo.get(d.to);
         if (!g) {
           const target = pageOf(pj, d.to);
-          g = { to: d.to, title: target ? pageLabel(target) : '', missing: !target, self: d.to === page.n, items: [] };
+          g = { to: d.to, title: target ? pageLabel(target) : '', folder: target ? folderShort(folderOf(target)) : '', missing: !target, self: d.to === page.n, items: [] };
           byTo.set(d.to, g); groups.push(g);
         }
         // 같은 선택지의 분기가 같은 페이지로 가는 경우 한 줄로 합친다
@@ -297,6 +306,7 @@
   function toStoryArray(pj) {
     return pj.pages.slice().sort((a, b) => a.n - b.n).map((p) => {
       const o = { id: p.n, title: p.title || '', text: p.body };
+      if (folderOf(p) !== 'main') o.folder = folderOf(p);
       if (p.isEnd) o.end = true;
       else o.choices = p.choices.map((c) => ({ text: c.text, to: Number(c.base.next) }));
       return o;
@@ -311,6 +321,7 @@
       if (!Number.isInteger(it.id) || it.id < 0) throw new Error((i + 1) + '번째 항목: id 는 0 이상의 정수여야 해요');
       if (seen.has(it.id)) throw new Error('id 가 겹쳐요: ' + it.id);
       seen.add(it.id);
+      if (it.folder != null && !FOLDERS.some((f) => f.id === it.folder)) throw new Error('id ' + it.id + ': folder 는 ' + FOLDERS.map((f) => f.id).join(' / ') + ' 중 하나여야 해요');
       if (it.choices != null && !Array.isArray(it.choices)) throw new Error('id ' + it.id + ': choices 는 배열이어야 해요');
       (it.choices || []).forEach((c, j) => {
         if (!c || !Number.isInteger(c.to) || c.to < 0) throw new Error('id ' + it.id + ' 선택지 ' + (j + 1) + ': to 는 0 이상의 정수여야 해요');
@@ -320,6 +331,7 @@
     arr.forEach((it) => {
       let p = pageOf(pj, it.id);
       if (p) updated++; else { p = newPage(it.id); pj.pages.push(p); added++; }
+      if (it.folder) p.folder = it.folder;
       p.title = String(it.title || '');
       p.body = String(it.text == null ? '' : it.text);
       p.isEnd = !!it.end;
@@ -350,7 +362,7 @@
   }
 
   return {
-    BODY_MAX, uid, clone, defaultStats, newOutcome, newChoice, newPage, newProject,
+    BODY_MAX, FOLDERS, folderOf, folderShort, pagesIn, uid, clone, defaultStats, newOutcome, newChoice, newPage, newProject,
     lastPageNo, pageOf, parseItems, initState, have, addItem, loseItem,
     checkCond, missingTerms, branchSum, baseProb, resolveChoice, applyOutcome,
     visibleChoices, choose, validate, normalizeProject,
