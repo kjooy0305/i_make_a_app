@@ -30,15 +30,18 @@
         h('button', { onClick: () => data.onPlay() }, '▶ 여기서')),
       h(Handle, { type: 'source', position: Position.Right, isConnectable: false }));
   }
-  function ChoiceNode({ data }) {
-    return h('div', { className: 'fn choice' + (data.missing ? ' missing' : ''), onClick: () => data.onGo(data.ci) },
+  // 도착 페이지 노드: 같은 페이지로 이어지는 선택지는 한 노드 안에 줄로 모아 보여준다
+  function TargetNode({ data }) {
+    return h('div', { className: 'fn target' + (data.missing ? ' missing' : ''), onClick: () => data.onGo(data.to) },
       h(Handle, { type: 'target', position: Position.Left, isConnectable: false }),
-      h('div', { className: 'fn-row' },
-        h('div', { className: 'fn-ttl grow' }, data.text || '(선택지 텍스트 없음)'),
-        h('button', { className: 'fn-ed ' + NO, title: '이 분기 편집', onClick: (e) => { e.stopPropagation(); data.onEdit(data.ci); } }, '✎')),
-      h('div', { className: 'fn-sub' }, data.missing ? '⚠ P.' + data.to + ' 없음 — 눌러서 새로 만들기' : '→ P.' + data.to + ' · ' + clip(data.targetLabel, 22)),
-      data.extra.length ? h('div', { className: 'fn-sub' }, data.extra.map((x, i) => h('span', { key: i, className: 'fn-chip' + (x.missing ? ' bad' : '') }, (x.when ? x.when + ' ' : '') + '→ P.' + x.to))) : null,
-      data.flags.length ? h('div', { className: 'fn-sub' }, data.flags.map((f, i) => h('span', { key: i, className: 'fn-chip' }, f))) : null);
+      h('div', { className: 'fn-tag' }, data.missing ? '⚠ 없는 페이지 — 눌러서 새로 만들기' : data.self ? '현재 페이지로 돌아와요' : '다음 이야기'),
+      h('div', { className: 'fn-ttl' }, 'P.' + data.to + (data.title ? ' · ' + clip(data.title, 26) : '')),
+      h('div', { className: 'fn-items' }, data.items.map((it, i) =>
+        h('div', { key: i, className: 'fn-item' },
+          h('div', { className: 'fn-itxt' },
+            h('span', null, it.text || '(선택지 텍스트 없음)'),
+            it.tags.concat(it.flags).map((t, k) => h('span', { key: k, className: 'fn-chip' }, t))),
+          h('button', { className: 'fn-ed ' + NO, title: '이 선택지 편집', onClick: (e) => { e.stopPropagation(); data.onEdit(it.ci); } }, '✎')))));
   }
   function AddNode({ data }) {
     return h('div', { className: 'fn add', onClick: () => data.onAdd() },
@@ -48,7 +51,7 @@
   function EndNode() {
     return h('div', { className: 'fn end' }, h(Handle, { type: 'target', position: Position.Left, isConnectable: false }), '— 끝 —', h('div', { className: 'fn-sub' }, '마지막 페이지라 선택지가 없어요'));
   }
-  const nodeTypes = { prev: PrevNode, cur: CurNode, choice: ChoiceNode, add: AddNode, end: EndNode };
+  const nodeTypes = { prev: PrevNode, cur: CurNode, target: TargetNode, add: AddNode, end: EndNode };
 
   /* ---------- 분기 편집 패널 ---------- */
   function EditPanel({ pj, cur, ci, api }) {
@@ -83,13 +86,15 @@
         const d = Object.assign({}, n.data);
         if (n.type === 'prev') d.onBack = api.back;
         if (n.type === 'cur') { d.onEditPage = api.editPage; d.onPlay = api.play; }
-        if (n.type === 'choice') { d.onGo = api.go; d.onEdit = api.edit; }
+        if (n.type === 'target') { d.onGo = api.goPage; d.onEdit = api.edit; }
         if (n.type === 'add') d.onAdd = api.add;
         return Object.assign({}, n, { data: d, draggable: false, selectable: false });
       });
       const edges = base.edges.map((e) => Object.assign({}, e, {
-        markerEnd: { type: MarkerType.ArrowClosed, color: e.source === 'cur' ? '#111' : '#9aa0b4' },
-        style: e.source === 'cur' ? { stroke: '#111', strokeWidth: 2 } : { stroke: '#b7bccb', strokeWidth: 2, strokeDasharray: '6 4' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: e.source === 'cur' ? '#e8ecff' : '#7d86a8' },
+        style: e.source === 'cur' ? { stroke: '#e8ecff', strokeWidth: 2.2 } : { stroke: '#7d86a8', strokeWidth: 2, strokeDasharray: '6 4' },
+        labelStyle: { fill: '#e8ecff', fontSize: 12, fontWeight: 600 },
+        labelBgStyle: { fill: '#2a3150', stroke: '#4a5380' }, labelBgPadding: [6, 3], labelBgBorderRadius: 8,
       }));
       return { nodes, edges };
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,13 +105,16 @@
         h(ReactFlow, {
           key: cur + ':' + g.nodes.length + ':' + trail.length,
           nodes: g.nodes, edges: g.edges, nodeTypes,
-          fitView: true, fitViewOptions: { padding: 0.15, maxZoom: 1 },
-          minZoom: 0.3, maxZoom: 1.5,
+          fitView: true, fitViewOptions: { padding: 0.12, maxZoom: 1.25 },
+          minZoom: 0.2, maxZoom: 2.5,
           nodesDraggable: false, nodesConnectable: false, elementsSelectable: false,
-          zoomOnScroll: false, panOnScroll: false, preventScrolling: false,
+          zoomOnScroll: true, zoomOnPinch: true, zoomOnDoubleClick: false, panOnDrag: true, preventScrolling: true,
           proOptions: { hideAttribution: true },
-        })),
-      editCi != null ? h(EditPanel, { pj, cur, ci: editCi, api }) : null);
+        },
+          h(RF.Background, { color: '#434b72', gap: 22, size: 1.4 }),
+          h(RF.Controls, { position: 'bottom-right', showInteractive: false, fitViewOptions: { padding: 0.12, maxZoom: 1.25 } }))),
+      editCi != null ? h(EditPanel, { pj, cur, ci: editCi, api }) : null,
+      h('div', { className: 'flow-help' }, '오른쪽 페이지를 눌러 따라가고, 왼쪽 회색 페이지를 눌러 되돌아가요. 휠·핀치·오른쪽 아래 버튼으로 확대/축소하고, ✎ 로 선택지를 고치거나 ＋ 로 새 분기를 이어 붙여요. 같은 페이지로 모이는 선택지는 한 노드에 함께 표시돼요.'));
   }
 
   /* ---------- 마운트 ---------- */

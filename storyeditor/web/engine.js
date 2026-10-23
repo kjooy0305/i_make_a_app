@@ -212,6 +212,24 @@
     return Array.from(set).sort((a, b) => a - b);
   }
 
+  // 한 선택지가 가질 수 있는 도착 페이지(기본 + 분기)를 [{ to, tag }] 로 펼친다.
+  function destinationsOf(c) {
+    const out = [{ to: Number(c.base.next), tag: c.branchType ? '기본' : '' }];
+    (c.branches || []).forEach((b) => {
+      out.push({ to: Number(b.next), tag: c.branchType === 'prob' ? '확률 ' + (Number(b.when) || 0) + '%' : '조건 ' + (b.when || '') });
+    });
+    return out;
+  }
+
+  // 노드 높이 추정치 (실제 크기는 화면에서 측정되므로 겹치지 않을 만큼만 넉넉히)
+  const H = { prev: 58, cur: 160, target: (rows) => 62 + rows * 34, add: 46, end: 66, gap: 26 };
+  function stackY(heights) {
+    const total = heights.reduce((a, b) => a + b, 0) + H.gap * Math.max(0, heights.length - 1);
+    let y = -total / 2;
+    return heights.map((h) => { const top = y; y += h + H.gap; return top; });
+  }
+
+  // 페이지 단위 분기도. 도착 페이지가 같은 선택지들은 한 노드로 합친다.
   // trail: 지나온 페이지 번호(오래된 것 → 최근). 비어 있으면 상위 페이지를 대신 보여준다.
   function buildFlow(pj, cur, trail, maxPrev) {
     const page = pageOf(pj, cur);
@@ -220,38 +238,56 @@
     const fromTrail = (trail || []).length > 0;
     const prevNs = (fromTrail ? trail.slice(-maxPrev) : parentsOf(pj, cur).slice(0, maxPrev)).filter((n, i, a) => pageOf(pj, n) && a.indexOf(n) === i);
     const nodes = [], edges = [];
-    const yOf = (i, count) => (i - (count - 1) / 2) * FLOW.ROW;
 
+    const py = stackY(prevNs.map(() => H.prev));
     prevNs.forEach((n, i) => {
-      const pg = pageOf(pj, n);
-      nodes.push({ id: 'prev-' + n, type: 'prev', position: { x: 0, y: yOf(i, prevNs.length) }, data: { n, title: pageLabel(pg), fromTrail } });
-      edges.push({ id: 'e-prev-' + n, source: 'prev-' + n, target: 'cur', type: 'smoothstep' });
+      nodes.push({ id: 'prev-' + n, type: 'prev', position: { x: 0, y: py[i] }, data: { n, title: pageLabel(pageOf(pj, n)), fromTrail } });
+      edges.push({ id: 'e-prev-' + n, source: 'prev-' + n, target: 'cur', type: 'default' });
     });
 
-    nodes.push({ id: 'cur', type: 'cur', position: { x: FLOW.COL, y: 0 }, data: { n: page.n, title: pageLabel(page), text: page.body, isEnd: page.isEnd } });
+    nodes.push({ id: 'cur', type: 'cur', position: { x: FLOW.COL, y: -H.cur / 2 }, data: { n: page.n, title: pageLabel(page), text: page.body, isEnd: page.isEnd } });
 
+    const X3 = FLOW.COL * 2;
     if (page.isEnd) {
-      nodes.push({ id: 'end', type: 'end', position: { x: FLOW.COL * 2, y: 0 }, data: {} });
+      nodes.push({ id: 'end', type: 'end', position: { x: X3, y: -H.end / 2 }, data: {} });
       edges.push({ id: 'e-end', source: 'cur', target: 'end', type: 'default' });
-    } else {
-      const total = page.choices.length + 1; // + 분기 추가 노드
-      page.choices.forEach((c, i) => {
-        const to = Number(c.base.next);
-        const target = pageOf(pj, to);
-        const extra = (c.branches || []).map((b) => ({ to: Number(b.next), when: c.branchType === 'prob' ? b.when + '%' : b.when || '', missing: !pageOf(pj, Number(b.next)) }));
-        const flags = [];
-        if (c.show) flags.push('노출 조건');
-        if (c.enable) flags.push('활성 조건');
-        if (c.branchType === 'prob') flags.push('확률 분기');
-        if (c.branchType === 'item') flags.push('아이템 분기');
-        nodes.push({
-          id: 'choice-' + i, type: 'choice', position: { x: FLOW.COL * 2, y: yOf(i, total) },
-          data: { ci: i, text: c.text, to, targetLabel: target ? pageLabel(target) : '', missing: !target, flags, extra },
-        });
-        edges.push({ id: 'e-choice-' + i, source: 'cur', target: 'choice-' + i, type: 'default' });
-      });
-      nodes.push({ id: 'add', type: 'add', position: { x: FLOW.COL * 2, y: yOf(total - 1, total) }, data: {} });
+      return { nodes, edges };
     }
+
+    // 도착 페이지별로 선택지를 모은다 (처음 나온 순서 유지)
+    const groups = [];
+    const byTo = new Map();
+    page.choices.forEach((c, ci) => {
+      const flags = [];
+      if (c.show) flags.push('노출 조건');
+      if (c.enable) flags.push('활성 조건');
+      const seenHere = new Set();
+      destinationsOf(c).forEach((d) => {
+        let g = byTo.get(d.to);
+        if (!g) {
+          const target = pageOf(pj, d.to);
+          g = { to: d.to, title: target ? pageLabel(target) : '', missing: !target, self: d.to === page.n, items: [] };
+          byTo.set(d.to, g); groups.push(g);
+        }
+        // 같은 선택지의 분기가 같은 페이지로 가는 경우 한 줄로 합친다
+        const key = ci + ':' + d.to;
+        if (seenHere.has(key)) { const it = g.items.find((x) => x.ci === ci); if (it && d.tag && !it.tags.includes(d.tag)) it.tags.push(d.tag); return; }
+        seenHere.add(key);
+        g.items.push({ ci, text: c.text, tags: d.tag ? [d.tag] : [], flags });
+      });
+    });
+
+    const heights = groups.map((g) => H.target(g.items.length)).concat([H.add]);
+    const ys = stackY(heights);
+    groups.forEach((g, i) => {
+      nodes.push({ id: 'to-' + g.to, type: 'target', position: { x: X3, y: ys[i] }, data: g });
+      const choiceCount = new Set(g.items.map((x) => x.ci)).size;
+      edges.push({
+        id: 'e-to-' + g.to, source: 'cur', target: 'to-' + g.to, type: 'default',
+        label: choiceCount > 1 ? '선택지 ' + choiceCount + '개' : (g.items[0].text || '').slice(0, 14),
+      });
+    });
+    nodes.push({ id: 'add', type: 'add', position: { x: X3, y: ys[groups.length] }, data: {} });
     return { nodes, edges };
   }
 
@@ -318,6 +354,6 @@
     lastPageNo, pageOf, parseItems, initState, have, addItem, loseItem,
     checkCond, missingTerms, branchSum, baseProb, resolveChoice, applyOutcome,
     visibleChoices, choose, validate, normalizeProject,
-    FLOW, parentsOf, pageLabel, buildFlow, toStoryArray, applyStoryArray,
+    FLOW, parentsOf, pageLabel, destinationsOf, buildFlow, toStoryArray, applyStoryArray,
   };
 });

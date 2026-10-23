@@ -74,35 +74,43 @@ button:disabled{opacity:.4;cursor:default}
   .tgl-side{display:inline-block!important}
 }
 .tgl-side{display:none}
-/* 분기도: 흰 바탕 + 검정 테두리 */
-#flowRoot{display:flex;flex-direction:column;gap:10px}
-.flow-wrap{height:calc(100vh - 230px);min-height:380px;background:#f4f5f9;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.flow-wrap .react-flow__renderer{cursor:grab}
-.fn{width:250px;background:#fff;color:#111;border:2px solid #111;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45;text-align:left}
-.fn .react-flow__handle{width:8px;height:8px;background:#111;border:0}
+/* 분기도: 어두운 남색 바탕 + 밝은 카드(검정 테두리) */
+main.flowmode{display:flex;flex-direction:column;padding-bottom:12px;overflow-y:auto}
+#flowRoot{flex:1;display:flex;flex-direction:column;gap:10px;min-height:420px}
+.flow-wrap{flex:1;min-height:340px;background:#252b45;border:1px solid #3a4268;border-radius:12px;overflow:hidden;position:relative}
+.flow-wrap .react-flow{background:transparent}
+.flow-wrap .react-flow__pane{cursor:grab}
+.flow-help{flex:none;color:var(--sub);font-size:12px;line-height:1.6}
+.react-flow__controls{box-shadow:0 2px 8px rgba(0,0,0,.4);border-radius:8px;overflow:hidden}
+.react-flow__controls-button{background:#2f3659;border-bottom:1px solid #454e7a;color:#e8ecff;width:30px;height:30px}
+.react-flow__controls-button:hover{background:#3d4670}
+.react-flow__controls-button svg{fill:#e8ecff;max-width:14px;max-height:14px}
+.react-flow__attribution{display:none}
+.fn{width:250px;background:#f3f4fa;color:#111;border:2px solid #000;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.45;text-align:left}
+.fn .react-flow__handle{width:8px;height:8px;background:#000;border:2px solid #f3f4fa}
 .fn-tag{font-size:11px;color:#666;margin-bottom:2px}
 .fn-ttl{font-weight:700;word-break:break-all}
 .fn-txt{margin-top:4px;color:#444;font-size:12px;word-break:break-all}
 .fn-sub{margin-top:3px;font-size:11px;color:#555;word-break:break-all}
-.fn-row{display:flex;gap:6px;align-items:flex-start}
-.fn-row .grow{min-width:0}
-.fn.prev{border-color:#aeb2c0;background:#ececf1;color:#8a8fa3;cursor:pointer;opacity:.85}
-.fn.prev .fn-tag{color:#9a9fb2}
-.fn.prev .react-flow__handle{background:#aeb2c0}
-.fn.cur{border:5px solid #000;padding:12px 14px;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+.fn.prev{border-color:#5a6285;background:#38405f;color:#a4acc9;cursor:pointer}
+.fn.prev .fn-tag{color:#8a93b4}
+.fn.prev:hover{background:#434c70;color:#d6dbef}
+.fn.prev .react-flow__handle{background:#5a6285;border-color:#38405f}
+.fn.cur{border:5px solid #000;padding:12px 14px;box-shadow:0 0 0 2px rgba(255,255,255,.7),0 6px 18px rgba(0,0,0,.45)}
 .fn-act{display:flex;gap:6px;margin-top:8px}
-.fn-act button,.fn-ed{background:#eceef5;color:#111;border:1px solid #c9cddb;border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer}
-.fn.choice{cursor:pointer;transition:background .12s,transform .12s}
-.fn.choice:hover{background:#111;color:#fff}
-.fn.choice:hover .fn-sub,.fn.choice:hover .fn-chip{color:#ddd;border-color:#777}
-.fn.choice:hover .fn-ed{background:#333;color:#fff;border-color:#666}
-.fn.choice.missing{border-style:dashed;border-color:#c0392b}
-.fn-chip{display:inline-block;border:1px solid #bbb;border-radius:10px;padding:0 7px;margin:2px 4px 0 0;font-size:11px}
-.fn-chip.bad{border-color:#c0392b;color:#c0392b}
-.fn.add{border-style:dashed;border-width:2px;text-align:center;cursor:pointer;color:#444;background:#fafafa}
-.fn.add:hover{background:#111;color:#fff}
-.fn.end{text-align:center;background:#fafafa;color:#555}
-.fe-panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.fn-act button,.fn-ed{background:#e3e6f2;color:#111;border:1px solid #b9bfd6;border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer;flex:none}
+.fn.target{cursor:pointer;transition:background .12s}
+.fn.target:hover{background:#fff;box-shadow:0 0 0 3px #9db1ff}
+.fn.target.missing{border-style:dashed;border-color:#e0584a}
+.fn.target.missing .fn-tag{color:#c0392b}
+.fn-items{margin-top:6px;display:flex;flex-direction:column;gap:5px}
+.fn-item{display:flex;gap:6px;align-items:flex-start;background:#fff;border:1px solid #c8cde0;border-radius:8px;padding:4px 6px}
+.fn-itxt{flex:1;min-width:0;word-break:break-all;font-size:12px}
+.fn-chip{display:inline-block;border:1px solid #9aa2c0;border-radius:10px;padding:0 6px;margin:2px 0 0 4px;font-size:10.5px;color:#444;background:#eef0f8}
+.fn.add{border-style:dashed;text-align:center;cursor:pointer;color:#333;background:#dfe3f2}
+.fn.add:hover{background:#fff}
+.fn.end{text-align:center;background:#dfe3f2;color:#444}
+.fe-panel{flex:none;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
 </style>
 </head>
 <body>

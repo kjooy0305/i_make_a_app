@@ -77,6 +77,7 @@
   function render() {
     if (S.view !== 'flow' && window.SFlow) window.SFlow.unmount();
     renderHeader();
+    $('#main').className = S.view === 'flow' ? 'flowmode' : '';
     if (S.view === 'home') renderHome(); else if (S.view === 'flow') renderFlow(); else renderEditor();
   }
 
@@ -364,13 +365,10 @@
     const api = {
       rev: Date.now(),
       back(n) { const i = S.trail.lastIndexOf(n); S.trail = i >= 0 ? S.trail.slice(0, i) : []; S.pn = n; S.editCi = null; flowRefresh(); },
-      go(ci) {
-        const p = page(), c = p && p.choices[ci]; if (!c) return;
-        let to = Number(c.base.next);
-        if (!E.pageOf(pj, to)) {
-          if (!(to >= 0)) to = newPageNo();
-          pj.pages.push(E.newPage(to)); c.base.next = to; touch(); toast('P.' + to + ' 페이지를 새로 만들었어요');
-        }
+      goPage(to) {
+        to = Number(to);
+        if (!(to >= 0)) return;
+        if (!E.pageOf(pj, to)) { pj.pages.push(E.newPage(to)); touch(); toast('P.' + to + ' 페이지를 새로 만들었어요'); }
         goTo(to); flowRefresh();
       },
       edit(ci) { S.editCi = ci; flowRefresh(); },
@@ -405,7 +403,7 @@
     if (!window.SFlow) { toast('분기도 라이브러리를 불러오지 못했어요'); S.view = 'edit'; return render(); }
     if (!E.pageOf(pj, S.pn)) S.pn = pj.pages.length ? pj.pages[0].n : 0;
     if (!E.pageOf(pj, S.pn)) { toast('페이지가 없어요'); S.view = 'edit'; return render(); }
-    $('#main').innerHTML = '<div id="flowRoot"></div><div class="muted" style="margin-top:8px">오른쪽 분기를 눌러 이야기를 따라가고, 왼쪽 회색 이야기를 눌러 되돌아가요. ✎ 로 분기를 바로 고치거나 ＋ 로 새 분기를 이어 붙일 수 있어요.</div>';
+    $('#main').innerHTML = '<div id="flowRoot"></div>';
     flowRefresh();
   }
   function showJson() {

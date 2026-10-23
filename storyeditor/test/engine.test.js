@@ -149,23 +149,52 @@ function flowProj() {
   return pj;
 }
 
-test('분기도: 3열 배치 / 노드 종류 / 연결선', () => {
+test('분기도: 3열 배치 / 노드 종류 / 연결선 (페이지 단위)', () => {
   const pj = flowProj();
-  const g = E.buildFlow(pj, 1, [0]);
+  const g = E.buildFlow(pj, 1, [0]);   // P.1 의 선택지: →3, →3, →4  (두 선택지가 P.3 으로 합류)
   const by = (t) => g.nodes.filter((n) => n.type === t);
   assert.strictEqual(by('prev').length, 1);
   assert.strictEqual(by('cur').length, 1);
-  assert.strictEqual(by('choice').length, 3);
+  assert.strictEqual(by('target').length, 2, '도착 페이지 2개(P.3, P.4)로 합쳐져야 함');
   assert.strictEqual(by('add').length, 1);
   assert.ok(by('prev')[0].position.x < by('cur')[0].position.x);
-  assert.ok(by('cur')[0].position.x < by('choice')[0].position.x);
-  // 선택 노드는 세로로 겹치지 않음
-  const ys = by('choice').concat(by('add')).map((n) => n.position.y);
-  assert.strictEqual(new Set(ys).size, ys.length);
-  // 연결선: 이전→현재, 현재→각 분기
+  assert.ok(by('cur')[0].position.x < by('target')[0].position.x);
   assert.ok(g.edges.some((e) => e.source === 'prev-0' && e.target === 'cur'));
-  assert.strictEqual(g.edges.filter((e) => e.source === 'cur').length, 3);
+  assert.strictEqual(g.edges.filter((e) => e.source === 'cur').length, 2);
   assert.ok(g.edges.every((e) => g.nodes.some((n) => n.id === e.source) && g.nodes.some((n) => n.id === e.target)));
+  // 합류: P.3 노드 하나에 선택지 2개, 간선 라벨에 개수
+  const p3 = g.nodes.find((n) => n.id === 'to-3');
+  assert.deepStrictEqual(p3.data.items.map((i) => i.ci), [0, 1]);
+  assert.strictEqual(g.edges.find((e) => e.id === 'e-to-3').label, '선택지 2개');
+  assert.strictEqual(g.edges.find((e) => e.id === 'e-to-4').label, '선택2');
+});
+
+test('분기도: 같은 열의 노드는 세로로 겹치지 않고 가운데 정렬', () => {
+  const pj = flowProj();
+  const g = E.buildFlow(pj, 1, [0]);
+  const right = g.nodes.filter((n) => n.position.x === E.FLOW.COL * 2).sort((a, b) => a.position.y - b.position.y);
+  const hs = { target: (n) => 62 + n.data.items.length * 34, add: () => 46 };
+  for (let i = 1; i < right.length; i++) {
+    const prev = right[i - 1];
+    assert.ok(right[i].position.y >= prev.position.y + hs[prev.type](prev), '겹침');
+  }
+  const top = right[0].position.y, last = right[right.length - 1];
+  const bottom = last.position.y + hs[last.type](last);
+  assert.ok(Math.abs(top + bottom) < 1, '세로 중앙(0) 기준 대칭');
+});
+
+test('분기도: 확률/아이템 분기와 한 선택지의 여러 도착 페이지', () => {
+  const pj = flowProj();
+  const c = pj.pages[0].choices[0];            // P.0 선택0 → 기본 P.1
+  c.branchType = 'prob';
+  c.branches = [Object.assign(E.newOutcome(2), { when: 30 }), Object.assign(E.newOutcome(2), { when: 20 })];
+  const g = E.buildFlow(pj, 0, []);
+  const to2 = g.nodes.find((n) => n.id === 'to-2');
+  // P.2: 선택1(기본 P.2) + 선택0 의 분기 2개 → 선택0 은 한 줄로 합쳐지고 태그 2개
+  assert.strictEqual(to2.data.items.length, 2);
+  const it0 = to2.data.items.find((i) => i.ci === 0);
+  assert.deepStrictEqual(it0.tags, ['확률 30%', '확률 20%']);
+  assert.ok(g.nodes.find((n) => n.id === 'to-1').data.items[0].tags.includes('기본'));
 });
 
 test('분기도: trail 이 비면 상위 페이지를 이전 이야기로, 마지막 페이지는 끝 노드', () => {
@@ -173,7 +202,7 @@ test('분기도: trail 이 비면 상위 페이지를 이전 이야기로, 마�
   assert.deepStrictEqual(E.parentsOf(pj, 3), [1, 2]);
   const g = E.buildFlow(pj, 3, []);
   assert.deepStrictEqual(g.nodes.filter((n) => n.type === 'prev').map((n) => n.data.n), [1, 2]);
-  assert.strictEqual(g.nodes.filter((n) => n.type === 'choice').length, 0);
+  assert.strictEqual(g.nodes.filter((n) => n.type === 'target').length, 0);
   assert.strictEqual(g.nodes.filter((n) => n.type === 'end').length, 1);
   assert.strictEqual(E.buildFlow(pj, 99, []).nodes.length, 0);
 });
@@ -182,7 +211,7 @@ test('분기도: 없는 페이지 표시 / 이전 노드는 최대 4개, 중복 
   const pj = flowProj();
   pj.pages[0].choices[0].base.next = 77;
   const g = E.buildFlow(pj, 0, [4, 1, 2, 1, 4, 2]);
-  assert.ok(g.nodes.find((n) => n.id === 'choice-0').data.missing);
+  assert.ok(g.nodes.find((n) => n.id === 'to-77').data.missing);
   assert.ok(g.nodes.filter((n) => n.type === 'prev').length <= 4);
   const ids = g.nodes.map((n) => n.id);
   assert.strictEqual(new Set(ids).size, ids.length);
