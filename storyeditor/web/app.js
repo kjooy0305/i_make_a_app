@@ -8,11 +8,16 @@
   const KEY = 'storyeditor.projects.v1';
   const MODE_KEY = 'storyeditor.listmode';
 
-  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false, trail: [], editCi: null, folder: 'main', listMode: 'num' };
+  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false, trail: [], editCi: null, folder: 'main', listMode: 'num', collapsed: new Set() };
 
   /* ================= 저장 ================= */
   function load() {
-    try { const v = JSON.parse(localStorage.getItem(KEY) || '[]'); if (Array.isArray(v)) S.projects = v; }
+    try {
+      const v = JSON.parse(localStorage.getItem(KEY) || '[]');
+      if (Array.isArray(v)) S.projects = v;
+      // 묶음 기능 이전에 만든 프로젝트 보정
+      S.projects.forEach((pj) => { if (!Array.isArray(pj.groups)) pj.groups = []; pj.pages.forEach((pg) => { if (typeof pg.group !== 'string') pg.group = ''; }); });
+    }
     catch (e) { S.memOnly = true; }
   }
   let saveTimer;
@@ -176,25 +181,68 @@
     const p4 = P(4, '복도 끝의 비상구를 찾았다. 당신은 무사히 빠져나왔다.', { isEnd: true });
     const p5 = P(5, '발을 헛디뎌 넘어졌지만 그래도 비상구에 닿았다.', { isEnd: true });
     p4.isEnd = true; p5.isEnd = true;
-    pj.pages = [p0, p1, p2, p3, p4, p5];
+    // 스토리 묶음과 랜덤 이벤트 예시
+    pj.groups = [
+      { id: 'g_main', name: '1장 · 창고 탈출', folder: 'main', start: null },
+      { id: 'g_cat', name: '길고양이', folder: 'random', start: null },
+      { id: 'g_shop', name: '낯선 상인', folder: 'random', start: null },
+    ];
+    [p0, p1, p2, p3, p4, p5].forEach((pg) => { pg.group = 'g_main'; });
+    const r1 = P(6, '복도 구석에서 길고양이가 울고 있다. 품에 안아 올리자 목걸이에서 작은 열쇠가 떨어졌다.', { folder: 'random', group: 'g_cat' });
+    r1.choices = [C('열쇠를 들고 복도로 돌아간다', 3)];
+    r1.choices[0].base.gain = '고양이 열쇠'; r1.choices[0].base._p = ['gain'];
+    const r2 = P(7, '어둠 속에서 낯선 상인이 손짓한다. “이 지도, 싸게 줄게.”', { folder: 'random', group: 'g_shop' });
+    r2.choices = [C('지도를 받고 돌아간다', 3)];
+    r2.choices[0].base.gain = '낡은 지도'; r2.choices[0].base._p = ['gain'];
+    const odd = C('수상한 소리를 따라간다', 3); odd.base.mode = 'random';
+    p3.choices.push(odd);
+    pj.pages = [p0, p1, p2, p3, p4, p5, r1, r2];
     gamble.base.achv = 'a_end'; gamble.base._p = ['achv'];
     return pj;
   }
 
   /* ================= 에디터 ================= */
+  // 현재 폴더에 속한 묶음 (페이지가 다른 폴더의 묶음 id 를 갖고 있으면 묶음 없음으로 취급)
+  const folderGroupOf = (pj, p) => { const g = E.groupOf(pj, p.group); return g && g.folder === E.folderOf(p) ? g : null; };
+
   function sideHtml(pj) {
     const q = S.q.trim().toLowerCase();
     const byFolder = S.listMode === 'folder';
-    const pool = byFolder ? E.pagesIn(pj, S.folder) : pj.pages.slice().sort((a, b) => a.n - b.n);
-    const list = pool.filter((p) => !q || String(p.n) === q || p.body.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q));
+    const matches = (p) => !q || String(p.n) === q || p.body.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q) || E.groupNameOf(pj, p).toLowerCase().includes(q);
     const modes = '<div class="seg"><button data-act="mode" data-mode="num" class="' + (!byFolder ? 'on' : '') + '">번호순</button><button data-act="mode" data-mode="folder" class="' + (byFolder ? 'on' : '') + '">폴더</button></div>';
     const tabs = byFolder ? '<div class="ftabs">' + E.FOLDERS.map((f) => '<button class="ft' + (f.id === S.folder ? ' on' : '') + '" data-act="folder" data-folder="' + f.id + '">' + esc(f.name) + ' <span>' + E.pagesIn(pj, f.id).length + '</span></button>').join('') + '</div>' : '';
     const cur = E.FOLDERS.find((f) => f.id === S.folder);
     const addTitle = byFolder ? cur.name + '에 페이지 추가' : '페이지 추가';
-    const row = (p) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(E.pageLabel(p)) + '</span>' + (byFolder ? '' : '<em class="fchip">' + esc(E.folderShort(E.folderOf(p))) + '</em>') + '</div>';
-    return modes + tabs + '<div class="row" style="margin-bottom:6px"><input type="text" id="pq" class="grow" placeholder="페이지 번호·본문 검색" value="' + esc(S.q) + '"><button class="pri sm" data-act="addpage" title="' + esc(addTitle) + '">＋</button></div>' +
-      (list.length ? list.map(row).join('')
-        : '<div class="muted" style="padding:8px">' + (q ? '검색 결과 없음' : byFolder ? esc(cur.name) + '가 비어 있어요.<br>＋ 로 첫 페이지를 만들어 보세요.' : '페이지가 없어요.') + '</div>');
+    const pageRow = (p, chips) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(E.pageLabel(p)) + '</span>' + (chips || '') + '</div>';
+    let list = '';
+    if (!byFolder) {
+      const all = pj.pages.slice().sort((a, b) => a.n - b.n).filter(matches);
+      list = all.length ? all.map((p) => {
+        const gn = E.groupNameOf(pj, p);
+        return pageRow(p, '<em class="fchip">' + esc(E.folderShort(E.folderOf(p))) + (gn ? ' · ' + esc(gn) : '') + '</em>');
+      }).join('') : '<div class="muted" style="padding:8px">' + (q ? '검색 결과 없음' : '페이지가 없어요.') + '</div>';
+    } else if (q) {
+      const found = E.pagesIn(pj, S.folder).filter(matches);
+      list = found.length ? found.map((p) => { const gn = E.groupNameOf(pj, p); return pageRow(p, gn ? '<em class="fchip">' + esc(gn) + '</em>' : ''); }).join('') : '<div class="muted" style="padding:8px">검색 결과 없음</div>';
+    } else {
+      const inFolder = E.pagesIn(pj, S.folder);
+      const groups = E.groupsIn(pj, S.folder);
+      const ungrouped = inFolder.filter((p) => !folderGroupOf(pj, p));
+      groups.forEach((g) => {
+        const ps = inFolder.filter((p) => p.group === g.id);
+        const open = !S.collapsed.has(g.id);
+        list += '<div class="gh" data-act="gtoggle" data-g="' + g.id + '"><span class="car">' + (open ? '▾' : '▸') + '</span><b>' + esc(g.name) + '</b><em>' + ps.length + '</em>' +
+          '<button class="sm" data-act="gadd" data-g="' + g.id + '" title="이 묶음에 페이지 추가">＋</button><button class="sm" data-act="gedit" data-g="' + g.id + '" title="묶음 이름·시작 페이지·삭제">✎</button></div>';
+        if (open) list += '<div class="gbody">' + (ps.length ? ps.map((p) => pageRow(p, p.n === E.groupStart(pj, g) ? '<em class="fchip">시작</em>' : '')).join('') : '<div class="muted" style="padding:6px 8px">비어 있어요. 위의 ＋ 로 페이지를 추가하세요.</div>') + '</div>';
+      });
+      if (ungrouped.length) {
+        if (groups.length) list += '<div class="gh plain"><b>묶음 없음</b><em>' + ungrouped.length + '</em></div>';
+        list += ungrouped.map((p) => pageRow(p)).join('');
+      }
+      if (!list) list = '<div class="muted" style="padding:8px">' + esc(cur.name) + '가 비어 있어요.<br>＋ 로 첫 페이지를, ＋ 묶음 으로 스토리 묶음을 만들어 보세요.</div>';
+    }
+    return modes + tabs + '<div class="row" style="margin-bottom:6px"><input type="text" id="pq" class="grow" placeholder="페이지 번호·본문·묶음 검색" value="' + esc(S.q) + '"><button class="pri sm" data-act="addpage" title="' + esc(addTitle) + '">＋</button>' +
+      (byFolder ? '<button class="sm" data-act="gnew" title="' + esc(cur.name) + '에 스토리 묶음 만들기">＋ 묶음</button>' : '') + '</div>' + list;
   }
   function renderEditor() {
     const pj = proj();
@@ -219,6 +267,7 @@
     if (!p) { box.innerHTML = '<div class="card">' + (S.listMode === 'folder' ? '이 폴더에 ' : '') + '페이지가 없어요. 왼쪽의 ＋ 로 추가하세요.' + (window.innerWidth <= 760 ? '<br><span class="muted">(☰ 페이지 버튼으로 목록을 열 수 있어요)</span>' : '') + '</div>'; return; }
     let h = '<div class="card"><div class="row"><h3 style="margin:0" class="grow">P.' + p.n + (p.n === 0 ? ' <span class="muted">(시작)</span>' : '') + '</h3>' +
       '<label class="muted">폴더 <select data-f="folder" style="width:auto;padding:3px 6px">' + E.FOLDERS.map((f) => '<option value="' + f.id + '"' + (f.id === E.folderOf(p) ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('') + '</select></label>' +
+      '<label class="muted">묶음 <select data-f="group" style="width:auto;max-width:150px;padding:3px 6px"><option value="">(없음)</option>' + E.groupsIn(pj, E.folderOf(p)).map((g) => '<option value="' + g.id + '"' + (g.id === p.group ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '<option value="__new">＋ 새 묶음 만들기…</option></select></label>' +
       '<label class="muted"><input type="checkbox" data-f="isEnd"' + (p.isEnd ? ' checked' : '') + '> 마지막 페이지</label>' +
       '<button class="sm" data-act="playhere">▶ 여기서</button><button class="sm" data-act="duppage">복제</button><button class="sm dng" data-act="delpage">삭제</button></div>' +
       '<input type="text" data-f="title" placeholder="제목 (선택, 분기도에 표시돼요)" value="' + esc(p.title || '') + '" maxlength="40" style="margin-top:8px">' +
@@ -233,6 +282,26 @@
     box.innerHTML = h;
   }
 
+
+  // 선택지 결과의 이동 방식: 페이지 번호 / 스토리 묶음 / 랜덤 이벤트
+  function destHtml(pj, o, d) {
+    const m = o.mode || 'page';
+    let h = '<div class="row"><label class="muted">이동</label><select ' + d + ' data-f="mode" style="width:auto"><option value="page"' + (m === 'page' ? ' selected' : '') + '>페이지 번호</option><option value="group"' + (m === 'group' ? ' selected' : '') + '>스토리 묶음</option><option value="random"' + (m === 'random' ? ' selected' : '') + '>🎲 랜덤 이벤트</option></select>';
+    if (m === 'page') h += '<label class="muted">P.</label><input type="number" min="0" ' + d + ' data-f="next" value="' + esc(o.next) + '">';
+    if (m === 'group') {
+      const sel = E.groupOf(pj, o.group), st = sel ? E.groupStart(pj, sel) : null;
+      h += '<select class="grow" ' + d + ' data-f="group"><option value="">(묶음 선택)</option>' +
+        E.FOLDERS.map((f) => { const gs = E.groupsIn(pj, f.id); return gs.length ? '<optgroup label="' + esc(f.name) + '">' + gs.map((g) => '<option value="' + g.id + '"' + (g.id === o.group ? ' selected' : '') + '>' + esc(g.name) + ' (' + E.pagesOfGroup(pj, g.id).length + '페이지)</option>').join('') + '</optgroup>' : ''; }).join('') + '</select>';
+      h += '</div><div class="muted" style="margin:2px 0 0 4px">' + (!pj.groups.length ? '아직 묶음이 없어요. 폴더 보기에서 “＋ 묶음”으로 만드세요.' : sel ? (st == null ? '⚠ 이 묶음에는 페이지가 없어요' : '→ 시작 P.' + st) : '이동할 묶음을 고르세요');
+    }
+    if (m === 'random') {
+      const rg = E.groupsIn(pj, 'random'), n = E.randomEntries(pj, o).length;
+      h += '</div><div class="pool">' + (rg.length ? rg.map((g) => '<label><input type="checkbox" ' + d + ' data-f="pool" data-g="' + g.id + '"' + ((o.pool || []).includes(g.id) ? ' checked' : '') + '> ' + esc(g.name) + ' <span class="muted">(' + E.pagesOfGroup(pj, g.id).length + ')</span></label>').join('') : '<div class="muted">랜덤 이벤트 폴더에 묶음이 없어요.</div>') + '</div>' +
+        '<div class="muted" style="margin:2px 0 0 4px">' + ((o.pool || []).length ? '체크한 묶음' : '체크 없음 = 랜덤 이벤트 폴더 전체(묶음 + 묶음 없는 페이지)') + ' 중 하나가 무작위로 나와요 · 현재 후보 ' + n + '개' + (n ? '' : ' ⚠');
+    }
+    return h + '</div>';
+  }
+
   function outcomeHtml(pj, o, ci, bi) {
     const d = 'data-ci="' + ci + '" data-bi="' + bi + '"';
     o._p = o._p || [];
@@ -241,7 +310,7 @@
     if (o.lose && !o._p.includes('lose')) o._p.push('lose');
     if (o.achv && !o._p.includes('achv')) o._p.push('achv');
     Object.keys(o.stats || {}).forEach((id) => { if (o.stats[id] && !o._p.includes('stat:' + id)) o._p.push('stat:' + id); });
-    let h = '<div class="oc"><div class="row"><label class="muted">이동 P.</label><input type="number" min="0" ' + d + ' data-f="next" value="' + esc(o.next) + '"></div>';
+    let h = '<div class="oc">' + destHtml(pj, o, d);
     o._p.forEach((k) => {
       const rm = '<button class="x" ' + d + ' data-act="rmprop" data-k="' + esc(k) + '">✕</button>';
       if (k === 'gain') h += '<div class="prop"><label>얻는 아이템</label><input type="text" ' + d + ' data-f="gain" placeholder="칼, 열쇠*2, @히든" value="' + esc(o.gain) + '">' + rm + '</div>';
@@ -298,7 +367,12 @@
         const cnt = $('#cnt'); if (cnt) { cnt.textContent = p.body.length; cnt.classList.toggle('over', p.body.length > E.BODY_MAX); }
         touch(); renderSideDebounced(); return;
       }
-      if (f === 'folder') { p.folder = el.value; S.folder = el.value; touch(); renderEditor(); toast('“' + E.FOLDERS.find((x) => x.id === el.value).name + '”로 옮겼어요'); return; }
+      if (f === 'group') {
+        const pj = proj();
+        if (el.value === '__new') { groupForm(pj, null, E.folderOf(p), (ng) => { p.group = ng.id; touch(); renderEditor(); }, () => renderPage()); return; }
+        p.group = el.value; touch(); renderEditor(); return;
+      }
+      if (f === 'folder') { p.folder = el.value; p.group = ''; S.folder = el.value; touch(); renderEditor(); toast('“' + E.FOLDERS.find((x) => x.id === el.value).name + '”로 옮겼어요'); return; }
       if (f === 'title') { p.title = el.value; touch(); renderSideDebounced(); return; }
       if (f === 'isEnd') { p.isEnd = el.checked; touch(); renderPage(); renderSide(); }
       return;
@@ -310,7 +384,14 @@
     else if (f === 'enable') c.enable = el.value;
     else {
       const o = targetOutcome(c, bi); if (!o) return;
-      if (f === 'next') o.next = el.value === '' ? '' : Math.max(0, parseInt(el.value, 10) || 0);
+      if (f === 'mode') { o.mode = el.value; touch(); renderPage(); return; }
+      else if (f === 'group') { o.group = el.value; touch(); renderPage(); return; }
+      else if (f === 'pool') {
+        const box = el.closest('.oc');
+        o.pool = Array.from(box.querySelectorAll('[data-f=pool]')).filter((x) => x.checked).map((x) => x.dataset.g);
+        touch(); renderPage(); return;
+      }
+      else if (f === 'next') o.next = el.value === '' ? '' : Math.max(0, parseInt(el.value, 10) || 0);
       else if (f === 'when') {
         if (c.branchType === 'prob') {
           o.when = Math.max(0, Math.min(100, parseInt(el.value, 10) || 0));
@@ -350,7 +431,7 @@
       '<div class="status">' + pj.stats.map((s) => '<span>' + esc(s.name) + ' <b>' + st.stats[s.id] + (s.max ? '/' + s.max : '') + '</b></span>').join('') +
       '<span class="grow muted">🎒 ' + (items.length ? items.join(', ') : '없음') + '</span><span class="muted">🏆 ' + st.achv.length + '/' + pj.achievements.length + '</span></div>';
     h += '<div class="play-body">' + (p.body.trim() ? esc(p.body) : '<span class="muted">(본문이 비어 있어요)</span>') + '</div>';
-    if (fx.length) h += '<div>' + fx.map((f) => '<span class="chip ' + f.kind + '">' + esc(f.kind === 'lose' ? '− ' + f.text : f.kind === 'gain' ? '+ ' + f.text : '🏆 ' + f.text.replace('업적 달성: ', '')) + '</span>').join('') + '</div>';
+    if (fx.length) h += '<div>' + fx.map((f) => '<span class="chip ' + f.kind + '">' + esc(f.kind === 'lose' ? '− ' + f.text : f.kind === 'gain' ? '+ ' + f.text : f.kind === 'rand' ? '🎲 ' + f.text : '🏆 ' + f.text.replace('업적 달성: ', '')) + '</span>').join('') + '</div>';
     if (p.isEnd) {
       h += '<div class="card" style="text-align:center"><div class="muted" style="margin-bottom:8px">— 끝 —</div><button class="pri" data-pv="restart">다시 시작</button> <button data-pv="close">종료</button></div>';
     } else {
@@ -375,6 +456,39 @@
     }
   }
 
+
+
+  /* ================= 스토리 묶음 ================= */
+  // g 가 없으면 새로 만든다. onDone(g) 은 저장 후 호출.
+  function groupForm(pj, g, folder, onDone, onCancel) {
+    const isNew = !g;
+    const ps = g ? E.pagesOfGroup(pj, g.id) : [];
+    const m = modal('<h3 style="margin-top:0">' + (isNew ? '새 스토리 묶음' : '스토리 묶음 수정') + ' <span class="muted">' + esc(E.FOLDERS.find((f) => f.id === (g ? g.folder : folder)).name) + '</span></h3>' +
+      '<div class="muted">제목</div><input type="text" id="gfName" maxlength="40" placeholder="예: 1장 · 창고 탈출" value="' + esc(g ? g.name : '') + '">' +
+      (isNew ? '' : '<div class="muted" style="margin-top:8px">시작 페이지 (이 묶음으로 이동할 때 처음 열리는 페이지)</div><select id="gfStart"><option value="">자동 (가장 낮은 번호)</option>' + ps.map((p) => '<option value="' + p.n + '"' + (p.n === g.start ? ' selected' : '') + '>P.' + p.n + ' · ' + esc(E.pageLabel(p)) + '</option>').join('') + '</select>') +
+      '<div class="row" style="justify-content:' + (isNew ? 'flex-end' : 'space-between') + ';margin-top:14px">' + (isNew ? '' : '<button class="dng" data-x="del">묶음 삭제</button>') + '<span class="row"><button data-x="0">취소</button><button class="pri" data-x="1">저장</button></span></div>');
+    m.el.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-x]'); if (!b) return;
+      if (b.dataset.x === '0') { m.close(); if (onCancel) onCancel(); return; }
+      if (b.dataset.x === 'del') {
+        const n = ps.length;
+        if (!await ask('“' + g.name + '” 묶음을 삭제할까요?\n' + (n ? '안의 페이지 ' + n + '개는 지워지지 않고 “묶음 없음”으로 남아요.' : ''), '삭제')) return;
+        pj.groups = pj.groups.filter((x) => x.id !== g.id);
+        pj.pages.forEach((p) => { if (p.group === g.id) p.group = ''; });
+        touch(); saveNow(); m.close(); renderEditor(); toast('묶음을 삭제했어요 (이 묶음을 가리키던 선택지는 검사에서 확인하세요)'); return;
+      }
+      const name = $('#gfName', m.el).value.trim();
+      if (!name) { toast('제목을 입력하세요'); return; }
+      if ((pj.groups || []).some((x) => x.name === name && (!g || x.id !== g.id))) { toast('같은 이름의 묶음이 이미 있어요'); return; }
+      pj.groups = pj.groups || [];
+      let target = g;
+      if (isNew) { target = { id: E.uid('g'), name, folder, start: null }; pj.groups.push(target); }
+      else { target.name = name; const st = $('#gfStart', m.el).value; target.start = st === '' ? null : parseInt(st, 10); }
+      touch(); saveNow(); m.close();
+      if (onDone) onDone(target); else renderEditor();
+    });
+    setTimeout(() => $('#gfName', m.el).focus(), 30);
+  }
 
   /* ================= 분기도 (ReactFlow) ================= */
   function flowProps() {
@@ -401,7 +515,15 @@
       editPage() { S.view = 'edit'; render(); },
       play() { startPlay(pj, S.pn); },
       setText(ci, v) { const p = page(); if (p && p.choices[ci]) { p.choices[ci].text = v; touch(); flowRefresh(); } },
-      setNext(ci, n) { const p = page(); if (p && p.choices[ci] && n >= 0) { p.choices[ci].base.next = n; touch(); flowRefresh(); } },
+      setMode(ci, m) { const p = page(); if (p && p.choices[ci]) { p.choices[ci].base.mode = m; touch(); flowRefresh(); } },
+      setGroup(ci, id) { const p = page(); if (p && p.choices[ci]) { p.choices[ci].base.group = id; touch(); flowRefresh(); } },
+      togglePool(ci, id, on) {
+        const p = page(); if (!p || !p.choices[ci]) return;
+        const b = p.choices[ci].base; const set = new Set(b.pool || []);
+        if (on) set.add(id); else set.delete(id);
+        b.pool = Array.from(set); touch(); flowRefresh();
+      },
+      setNext(ci, n) { const p = page(); if (p && p.choices[ci] && n >= 0) { p.choices[ci].base.next = n; p.choices[ci].base.mode = 'page'; touch(); flowRefresh(); } },
       newPageFor(ci) {
         const p = page(); if (!p || !p.choices[ci]) return;
         const n = newPageNo(); pj.pages.push(E.newPage(n, E.folderOf(p))); p.choices[ci].base.next = n; touch(); refresh(); toast('P.' + n + ' 페이지를 만들어 연결했어요');
@@ -515,6 +637,14 @@
         try { localStorage.setItem(MODE_KEY, S.listMode); } catch (e) { /* 저장 못 해도 동작 */ }
         if (S.listMode === 'folder' && p) S.folder = E.folderOf(p);
         renderEditor(); break;
+      }
+      case 'gtoggle': { const g = a.dataset.g; if (S.collapsed.has(g)) S.collapsed.delete(g); else S.collapsed.add(g); renderSide(); break; }
+      case 'gnew': groupForm(pj, null, S.folder, (ng) => { S.collapsed.delete(ng.id); renderEditor(); toast('“' + ng.name + '” 묶음을 만들었어요. 묶음의 ＋ 로 페이지를 추가하세요'); }); break;
+      case 'gedit': { const g = E.groupOf(pj, a.dataset.g); if (g) groupForm(pj, g, g.folder); break; }
+      case 'gadd': {
+        const g = E.groupOf(pj, a.dataset.g); if (!g) break;
+        const n = newPageNo(); const np = E.newPage(n, g.folder, g.id); pj.pages.push(np);
+        S.collapsed.delete(g.id); S.pn = n; touch(); renderEditor(); toast('“' + g.name + '”에 P.' + n + ' 페이지를 추가했어요'); break;
       }
       case 'folder': {
         S.folder = a.dataset.folder; S.q = '';

@@ -27,17 +27,17 @@
       { id: 'money', name: '돈', init: 0, max: 0 },
     ];
   }
-  const newOutcome = (next) => ({ next, gain: '', lose: '', achv: '', stats: {} });
+  const newOutcome = (next) => ({ next, mode: 'page', group: '', pool: [], gain: '', lose: '', achv: '', stats: {} });
   const newChoice = (next) => ({
     id: uid('c'), text: '', show: null, enable: null,
     base: newOutcome(next), branchType: null, branches: [],
   });
-  const newPage = (n, folder) => ({ n, folder: folder || 'main', title: '', body: '', isEnd: false, choices: [] });
+  const newPage = (n, folder, group) => ({ n, folder: folder || 'main', group: group || '', title: '', body: '', isEnd: false, choices: [] });
   function newProject(name, tag, color) {
     return {
       id: uid('p'), name: name || '새 이야기', tag: tag || '', color: color || 0,
       createdAt: Date.now(), updatedAt: Date.now(),
-      stats: defaultStats(), achievements: [], pages: [newPage(0)],
+      stats: defaultStats(), achievements: [], groups: [], pages: [newPage(0)],
     };
   }
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -105,6 +105,52 @@
     return String(str || '').split(',').map((t) => t.trim()).filter((t) => t && !checkTerm(pj, st, t));
   }
 
+
+  /* ---------- 스토리 묶음 (제목이 있는 페이지 묶음) ----------
+   * pj.groups = [{ id, name, folder, start }], page.group = 묶음 id ('' = 묶음 없음)
+   * 선택지 결과(outcome)의 이동 방식: mode 'page'(번호) | 'group'(묶음의 시작 페이지) | 'random'(랜덤 이벤트 목록 중 하나) */
+  const groupOf = (pj, id) => (id && (pj.groups || []).find((g) => g.id === id)) || null;
+  const groupsIn = (pj, folder) => (pj.groups || []).filter((g) => g.folder === folder);
+  const pagesOfGroup = (pj, id) => pj.pages.filter((p) => p.group === id).sort((a, b) => a.n - b.n);
+  function groupStart(pj, g) {
+    const ps = pagesOfGroup(pj, g.id);
+    if (!ps.length) return null;
+    return ps.some((p) => p.n === g.start) ? g.start : ps[0].n;
+  }
+  const groupNameOf = (pj, p) => { const g = p && groupOf(pj, p.group); return g ? g.name : ''; };
+  const poolKey = (o) => (o.pool && o.pool.length ? o.pool.slice().sort().join(',') : 'all');
+
+  // 랜덤 이벤트 후보 [{ label, to, group }]. pool 이 비어 있으면 랜덤 이벤트 폴더 전체(묶음 + 묶음 없는 페이지)
+  function randomEntries(pj, o) {
+    const out = [];
+    const add = (g) => { const st = groupStart(pj, g); if (st != null) out.push({ label: g.name, to: st, group: g.id }); };
+    if (o.pool && o.pool.length) o.pool.forEach((id) => { const g = groupOf(pj, id); if (g) add(g); });
+    else {
+      groupsIn(pj, 'random').forEach(add);
+      pagesIn(pj, 'random').filter((p) => !groupOf(pj, p.group)).forEach((p) => out.push({ label: pageLabel(p), to: p.n, group: '' }));
+    }
+    return out;
+  }
+  // 한 결과가 갈 수 있는 페이지 번호들
+  function targetsOf(pj, o) {
+    const m = o.mode || 'page';
+    if (m === 'group') { const g = groupOf(pj, o.group); const st = g ? groupStart(pj, g) : null; return st == null ? [] : [st]; }
+    if (m === 'random') return randomEntries(pj, o).map((e) => e.to);
+    return [Number(o.next)];
+  }
+  // 실제 이동 지점 결정. rand01: 0 이상 1 미만 (랜덤 이벤트에서만 사용)
+  function resolveDest(pj, o, rand01) {
+    const m = o.mode || 'page';
+    if (m === 'random') {
+      const list = randomEntries(pj, o);
+      if (!list.length) return null;
+      const r = rand01 == null ? Math.random() : rand01;
+      return list[Math.min(list.length - 1, Math.floor(r * list.length))];
+    }
+    if (m === 'group') { const g = groupOf(pj, o.group); const st = g ? groupStart(pj, g) : null; return st == null ? null : { to: st, label: g.name, group: g.id }; }
+    return { to: Number(o.next), label: '', group: '' };
+  }
+
   /* ---------- 선택지 결과 계산 ---------- */
   const branchSum = (ch) => ch.branches.reduce((a, b) => a + (Number(b.when) || 0), 0);
   const baseProb = (ch) => Math.max(0, 100 - branchSum(ch));
@@ -168,14 +214,19 @@
       });
   }
 
-  // 선택지를 눌렀을 때: 결과 선택 → 효과 적용 → 이동. 이동할 페이지가 없으면 error.
-  function choose(pj, st, ch, rand) {
+  // 선택지를 눌렀을 때: 결과 선택 → 효과 적용 → 이동. 이동할 곳이 없으면 error.
+  // rand: 확률 분기용(0~100), rand2: 랜덤 이벤트용(0~1) — 테스트에서 주입
+  function choose(pj, st, ch, rand, rand2) {
     const o = resolveChoice(pj, st, ch, rand);
     const fx = applyOutcome(pj, st, o);
-    const target = pageOf(pj, Number(o.next));
-    if (!target) return { fx, error: 'P.' + o.next + ' 페이지가 없어요' };
+    const d = resolveDest(pj, o, rand2);
+    const m = o.mode || 'page';
+    if (!d) return { fx, error: m === 'group' ? '연결된 스토리 묶음에 페이지가 없어요' : m === 'random' ? '랜덤 이벤트 목록이 비어 있어요' : 'P.' + o.next + ' 페이지가 없어요' };
+    const target = pageOf(pj, d.to);
+    if (!target) return { fx, error: 'P.' + d.to + ' 페이지가 없어요' };
+    if (m === 'random') fx.push({ kind: 'rand', text: '랜덤 이벤트: ' + d.label });
     st.page = target.n;
-    return { fx, outcome: o };
+    return { fx, outcome: o, dest: d };
   }
 
   /* ---------- 검사 ---------- */
@@ -187,7 +238,11 @@
     const names = {};
     pj.achievements.forEach((a) => { names[a.name] = (names[a.name] || 0) + 1; });
     Object.keys(names).forEach((k) => { if (names[k] > 1) warn(null, '업적 이름이 겹쳐요: ' + k); });
+    const gn = {};
+    (pj.groups || []).forEach((g) => { gn[g.name] = (gn[g.name] || 0) + 1; });
+    Object.keys(gn).forEach((k) => { if (gn[k] > 1) warn(null, '스토리 묶음 이름이 겹쳐요: ' + k); });
     pj.pages.forEach((p) => {
+      if (p.group && !groupOf(pj, p.group)) warn(p.n, '삭제된 스토리 묶음에 속해 있어요');
       if (!p.body.trim()) warn(p.n, '본문이 비어 있어요');
       if (p.body.length > BODY_MAX) warn(p.n, '본문이 ' + BODY_MAX + '자를 넘어요');
       if (!p.isEnd && !p.choices.length) warn(p.n, '선택지가 없어요 (마지막 페이지로 지정하거나 선택지를 추가하세요)');
@@ -195,7 +250,15 @@
         const tag = '선택지 ' + (i + 1);
         if (!c.text.trim()) warn(p.n, tag + ' 텍스트가 비어 있어요');
         [c.base].concat(c.branches).forEach((o, j) => {
-          if (!pageOf(pj, Number(o.next))) warn(p.n, tag + (j ? ' 분기 ' + j : '') + ': P.' + o.next + ' 페이지가 없어요');
+          const where = tag + (j ? ' 분기 ' + j : '');
+          const m = o.mode || 'page';
+          if (m === 'page' && !pageOf(pj, Number(o.next))) warn(p.n, where + ': P.' + o.next + ' 페이지가 없어요');
+          if (m === 'group') {
+            const g = groupOf(pj, o.group);
+            if (!g) warn(p.n, where + ': 연결된 스토리 묶음이 없어요');
+            else if (groupStart(pj, g) == null) warn(p.n, where + ': 스토리 묶음 “' + g.name + '”에 페이지가 없어요');
+          }
+          if (m === 'random' && !randomEntries(pj, o).length) warn(p.n, where + ': 랜덤 이벤트 목록이 비어 있어요');
           if (o.achv && !pj.achievements.some((a) => a.id === o.achv)) warn(p.n, tag + ': 삭제된 업적이 연결돼 있어요');
         });
         if (c.branchType === 'prob' && branchSum(c) > 100) warn(p.n, tag + ': 확률 합이 100%를 넘어요');
@@ -216,22 +279,30 @@
     const set = new Set();
     pj.pages.forEach((p) => {
       if (p.n === n) return;
-      p.choices.forEach((c) => outcomesOf(c).forEach((o) => { if (Number(o.next) === n) set.add(p.n); }));
+      p.choices.forEach((c) => outcomesOf(c).forEach((o) => { if (targetsOf(pj, o).includes(n)) set.add(p.n); }));
     });
     return Array.from(set).sort((a, b) => a - b);
   }
 
-  // 한 선택지가 가질 수 있는 도착 페이지(기본 + 분기)를 [{ to, tag }] 로 펼친다.
-  function destinationsOf(c) {
-    const out = [{ to: Number(c.base.next), tag: c.branchType ? '기본' : '' }];
-    (c.branches || []).forEach((b) => {
-      out.push({ to: Number(b.next), tag: c.branchType === 'prob' ? '확률 ' + (Number(b.when) || 0) + '%' : '조건 ' + (b.when || '') });
-    });
+  // 한 선택지가 가질 수 있는 도착지(기본 + 분기)를 펼친다.
+  // 일반/묶음: { to, tag, groupName? } / 랜덤 이벤트: { rand:true, key, entries, tag }
+  function destinationsOf(pj, c) {
+    const out = [];
+    const one = (o, tag) => {
+      const m = o.mode || 'page';
+      if (m === 'random') out.push({ rand: true, key: 'rand:' + poolKey(o), entries: randomEntries(pj, o), tag });
+      else if (m === 'group') {
+        const g = groupOf(pj, o.group), st = g ? groupStart(pj, g) : null;
+        out.push({ to: st == null ? -1 : st, tag, groupName: g ? g.name : '', groupMissing: st == null, groupId: o.group });
+      } else out.push({ to: Number(o.next), tag });
+    };
+    one(c.base, c.branchType ? '기본' : '');
+    (c.branches || []).forEach((b) => one(b, c.branchType === 'prob' ? '확률 ' + (Number(b.when) || 0) + '%' : '조건 ' + (b.when || '')));
     return out;
   }
 
   // 노드 높이 추정치 (실제 크기는 화면에서 측정되므로 겹치지 않을 만큼만 넉넉히)
-  const H = { prev: 58, cur: 160, target: (rows) => 62 + rows * 34, add: 46, end: 66, gap: 26 };
+  const H = { prev: 58, cur: 160, target: (rows) => 62 + rows * 34, rand: (rows, entries) => 86 + rows * 34 + entries * 26, add: 46, end: 66, gap: 26 };
   function stackY(heights) {
     const total = heights.reduce((a, b) => a + b, 0) + H.gap * Math.max(0, heights.length - 1);
     let y = -total / 2;
@@ -250,11 +321,11 @@
 
     const py = stackY(prevNs.map(() => H.prev));
     prevNs.forEach((n, i) => {
-      nodes.push({ id: 'prev-' + n, type: 'prev', position: { x: 0, y: py[i] }, data: { n, title: pageLabel(pageOf(pj, n)), fromTrail, folder: folderShort(folderOf(pageOf(pj, n))) } });
+      nodes.push({ id: 'prev-' + n, type: 'prev', position: { x: 0, y: py[i] }, data: { n, title: pageLabel(pageOf(pj, n)), fromTrail, folder: folderShort(folderOf(pageOf(pj, n))), groupName: groupNameOf(pj, pageOf(pj, n)) } });
       edges.push({ id: 'e-prev-' + n, source: 'prev-' + n, target: 'cur', type: 'default' });
     });
 
-    nodes.push({ id: 'cur', type: 'cur', position: { x: FLOW.COL, y: -H.cur / 2 }, data: { n: page.n, title: pageLabel(page), text: page.body, isEnd: page.isEnd, folder: folderShort(folderOf(page)) } });
+    nodes.push({ id: 'cur', type: 'cur', position: { x: FLOW.COL, y: -H.cur / 2 }, data: { n: page.n, title: pageLabel(page), text: page.body, isEnd: page.isEnd, folder: folderShort(folderOf(page)), groupName: groupNameOf(pj, page) } });
 
     const X3 = FLOW.COL * 2;
     if (page.isEnd) {
@@ -263,36 +334,42 @@
       return { nodes, edges };
     }
 
-    // 도착 페이지별로 선택지를 모은다 (처음 나온 순서 유지)
+    // 도착지별로 선택지를 모은다 (처음 나온 순서 유지). 랜덤 이벤트는 후보 목록이 같으면 한 노드로 합친다.
     const groups = [];
-    const byTo = new Map();
+    const byKey = new Map();
     page.choices.forEach((c, ci) => {
       const flags = [];
       if (c.show) flags.push('노출 조건');
       if (c.enable) flags.push('활성 조건');
       const seenHere = new Set();
-      destinationsOf(c).forEach((d) => {
-        let g = byTo.get(d.to);
+      destinationsOf(pj, c).forEach((d) => {
+        const key = d.rand ? d.key : d.groupMissing ? 'missing-group:' + d.groupId : 'to-' + d.to;
+        let g = byKey.get(key);
         if (!g) {
-          const target = pageOf(pj, d.to);
-          g = { to: d.to, title: target ? pageLabel(target) : '', folder: target ? folderShort(folderOf(target)) : '', missing: !target, self: d.to === page.n, items: [] };
-          byTo.set(d.to, g); groups.push(g);
+          if (d.rand) g = { kind: 'rand', key, entries: d.entries.map((e) => ({ label: e.label, to: e.to })), empty: !d.entries.length, items: [] };
+          else {
+            const target = pageOf(pj, d.to);
+            g = { kind: 'page', key, to: d.to, title: target ? pageLabel(target) : '', folder: target ? folderShort(folderOf(target)) : '', groupName: groupNameOf(pj, target), missing: !target, missingGroup: !!d.groupMissing, self: d.to === page.n, items: [] };
+          }
+          byKey.set(key, g); groups.push(g);
         }
-        // 같은 선택지의 분기가 같은 페이지로 가는 경우 한 줄로 합친다
-        const key = ci + ':' + d.to;
-        if (seenHere.has(key)) { const it = g.items.find((x) => x.ci === ci); if (it && d.tag && !it.tags.includes(d.tag)) it.tags.push(d.tag); return; }
-        seenHere.add(key);
-        g.items.push({ ci, text: c.text, tags: d.tag ? [d.tag] : [], flags });
+        // 같은 선택지의 분기가 같은 곳으로 가는 경우 한 줄로 합친다
+        const ik = ci + ':' + key;
+        const tag = d.groupName ? [d.tag, '묶음 ' + d.groupName].filter(Boolean) : d.tag ? [d.tag] : [];
+        if (seenHere.has(ik)) { const it = g.items.find((x) => x.ci === ci); tag.forEach((t) => { if (!it.tags.includes(t)) it.tags.push(t); }); return; }
+        seenHere.add(ik);
+        g.items.push({ ci, text: c.text, tags: tag, flags });
       });
     });
 
-    const heights = groups.map((g) => H.target(g.items.length)).concat([H.add]);
+    const heights = groups.map((g) => (g.kind === 'rand' ? H.rand(g.items.length, g.entries.length) : H.target(g.items.length))).concat([H.add]);
     const ys = stackY(heights);
     groups.forEach((g, i) => {
-      nodes.push({ id: 'to-' + g.to, type: 'target', position: { x: X3, y: ys[i] }, data: g });
+      const id = g.kind === 'rand' ? 'rand-' + g.key : g.missingGroup ? g.key : 'to-' + g.to;
+      nodes.push({ id, type: g.kind === 'rand' ? 'rand' : 'target', position: { x: X3, y: ys[i] }, data: g });
       const choiceCount = new Set(g.items.map((x) => x.ci)).size;
       edges.push({
-        id: 'e-to-' + g.to, source: 'cur', target: 'to-' + g.to, type: 'default',
+        id: 'e-' + id, source: 'cur', target: id, type: 'default',
         label: choiceCount > 1 ? '선택지 ' + choiceCount + '개' : (g.items[0].text || '').slice(0, 14),
       });
     });
@@ -301,49 +378,84 @@
   }
 
   /* ---------- 단순 스토리 JSON 배열 (사람이 쓰기 쉬운 형식) ----------
-   * [{ "id": 0, "title": "시작", "text": "본문", "end": false,
-   *    "choices": [{ "text": "문을 연다", "to": 1 }] }]                       */
+   * [{ "id": 0, "title": "시작", "group": "1장", "folder": "main", "text": "본문", "end": false,
+   *    "choices": [ { "text": "문을 연다", "to": 1 },
+   *                 { "text": "1장으로", "group": "묶음 이름" },
+   *                 { "text": "운에 맡긴다", "random": true } ] }]   // random: true(랜덤 폴더 전체) 또는 ["묶음1","묶음2"] */
   function toStoryArray(pj) {
     return pj.pages.slice().sort((a, b) => a.n - b.n).map((p) => {
-      const o = { id: p.n, title: p.title || '', text: p.body };
+      const o = { id: p.n, title: p.title || '' };
+      const gn = groupNameOf(pj, p);
+      if (gn) o.group = gn;
+      o.text = p.body;
       if (folderOf(p) !== 'main') o.folder = folderOf(p);
       if (p.isEnd) o.end = true;
-      else o.choices = p.choices.map((c) => ({ text: c.text, to: Number(c.base.next) }));
+      else o.choices = p.choices.map((c) => {
+        const b = c.base, m = b.mode || 'page';
+        if (m === 'group') { const g = groupOf(pj, b.group); return g ? { text: c.text, group: g.name } : { text: c.text, to: Number(b.next) }; }
+        if (m === 'random') {
+          const names = (b.pool || []).map((id) => (groupOf(pj, id) || {}).name).filter(Boolean);
+          return { text: c.text, random: names.length ? names : true };
+        }
+        return { text: c.text, to: Number(b.next) };
+      });
       return o;
     });
   }
   // 같은 id 는 덮어쓰고(선택지의 조건·아이템 등 고급 속성은 순서대로 유지), 새 id 는 추가한다. 배열에 없는 페이지는 그대로 둔다.
+  // 검사를 모두 통과해야만 변경한다.
   function applyStoryArray(pj, arr) {
     if (!Array.isArray(arr)) throw new Error('JSON 배열이 아니에요 ([ ... ] 형태)');
     const seen = new Set();
+    const folderFor = (it) => it.folder || (pageOf(pj, it.id) ? folderOf(pageOf(pj, it.id)) : 'main');
+    const known = new Set((pj.groups || []).map((g) => g.name));
+    arr.forEach((it) => { if (it && typeof it.group === 'string' && it.group) known.add(it.group); });
     arr.forEach((it, i) => {
       if (!it || typeof it !== 'object') throw new Error((i + 1) + '번째 항목이 객체가 아니에요');
       if (!Number.isInteger(it.id) || it.id < 0) throw new Error((i + 1) + '번째 항목: id 는 0 이상의 정수여야 해요');
       if (seen.has(it.id)) throw new Error('id 가 겹쳐요: ' + it.id);
       seen.add(it.id);
       if (it.folder != null && !FOLDERS.some((f) => f.id === it.folder)) throw new Error('id ' + it.id + ': folder 는 ' + FOLDERS.map((f) => f.id).join(' / ') + ' 중 하나여야 해요');
+      if (it.group != null && typeof it.group !== 'string') throw new Error('id ' + it.id + ': group 은 묶음 이름(문자열)이어야 해요');
       if (it.choices != null && !Array.isArray(it.choices)) throw new Error('id ' + it.id + ': choices 는 배열이어야 해요');
       (it.choices || []).forEach((c, j) => {
-        if (!c || !Number.isInteger(c.to) || c.to < 0) throw new Error('id ' + it.id + ' 선택지 ' + (j + 1) + ': to 는 0 이상의 정수여야 해요');
+        const w = 'id ' + it.id + ' 선택지 ' + (j + 1) + ': ';
+        if (!c || typeof c !== 'object') throw new Error(w + '객체가 아니에요');
+        if (c.random != null) {
+          if (c.random !== true && !(Array.isArray(c.random) && c.random.length && c.random.every((n) => known.has(n)))) throw new Error(w + 'random 은 true 이거나 존재하는 묶음 이름 배열이어야 해요');
+        } else if (c.group != null) {
+          if (!known.has(c.group)) throw new Error(w + '스토리 묶음 “' + c.group + '” 을 찾을 수 없어요');
+        } else if (!Number.isInteger(c.to) || c.to < 0) throw new Error(w + 'to 는 0 이상의 정수여야 해요 (또는 group / random)');
       });
     });
+    pj.groups = pj.groups || [];
+    const gid = (name, folder) => {
+      let g = pj.groups.find((x) => x.name === name);
+      if (!g) { g = { id: uid('g'), name, folder, start: null }; pj.groups.push(g); }
+      return g.id;
+    };
     let added = 0, updated = 0;
     arr.forEach((it) => {
       let p = pageOf(pj, it.id);
       if (p) updated++; else { p = newPage(it.id); pj.pages.push(p); added++; }
       if (it.folder) p.folder = it.folder;
+      if (typeof it.group === 'string') p.group = it.group ? gid(it.group, folderFor(it)) : '';
       p.title = String(it.title || '');
       p.body = String(it.text == null ? '' : it.text);
       p.isEnd = !!it.end;
-      if (!p.isEnd || it.choices) {
-        const list = it.choices || [];
-        p.choices = list.map((c, j) => {
-          const ch = p.choices[j] || newChoice(c.to);
-          ch.text = String(c.text || '');
-          ch.base.next = c.to;
-          return ch;
-        });
-      }
+    });
+    arr.forEach((it) => {
+      const p = pageOf(pj, it.id);
+      if (p.isEnd && !it.choices) return;
+      p.choices = (it.choices || []).map((c, j) => {
+        const ch = p.choices[j] || newChoice(0);
+        ch.text = String(c.text || '');
+        const b = ch.base;
+        if (c.random != null) { b.mode = 'random'; b.pool = c.random === true ? [] : c.random.map((n) => gid(n, 'random')); }
+        else if (c.group != null) { b.mode = 'group'; b.group = gid(c.group, 'main'); }
+        else { b.mode = 'page'; b.next = c.to; }
+        return ch;
+      });
     });
     return { added, updated };
   }
@@ -355,6 +467,7 @@
     pj.id = uid('p');
     pj.stats = Array.isArray(raw.stats) && raw.stats.length ? raw.stats : defaultStats();
     pj.achievements = Array.isArray(raw.achievements) ? raw.achievements : [];
+    pj.groups = Array.isArray(raw.groups) ? raw.groups : [];
     pj.pages = raw.pages.map((p) => Object.assign(newPage(p.n | 0), p, {
       choices: (p.choices || []).map((c) => Object.assign(newChoice(0), c, { base: Object.assign(newOutcome(0), c.base), branches: (c.branches || []).map((b) => Object.assign(newOutcome(0), b)) })),
     }));
@@ -362,7 +475,8 @@
   }
 
   return {
-    BODY_MAX, FOLDERS, folderOf, folderShort, pagesIn, uid, clone, defaultStats, newOutcome, newChoice, newPage, newProject,
+    BODY_MAX, FOLDERS, folderOf, folderShort, pagesIn,
+    groupOf, groupsIn, pagesOfGroup, groupStart, groupNameOf, randomEntries, targetsOf, resolveDest, uid, clone, defaultStats, newOutcome, newChoice, newPage, newProject,
     lastPageNo, pageOf, parseItems, initState, have, addItem, loseItem,
     checkCond, missingTerms, branchSum, baseProb, resolveChoice, applyOutcome,
     visibleChoices, choose, validate, normalizeProject,

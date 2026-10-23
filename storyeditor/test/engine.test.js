@@ -273,3 +273,148 @@ test('폴더: 스토리 JSON 에 포함·적용, 잘못된 폴더는 거부', ()
   assert.throws(() => E.applyStoryArray(pj, [{ id: 21, folder: 'nope' }]), /folder/);
   assert.strictEqual(E.pageOf(pj, 21), null);
 });
+
+/* ---------- 스토리 묶음 / 랜덤 이벤트 ---------- */
+function groupProj() {
+  const pj = E.newProject('g');
+  const mk = (n, folder, group, body) => { const p = E.newPage(n, folder, group); p.body = body || ('본문' + n); p.isEnd = n >= 10; return p; };
+  pj.groups = [
+    { id: 'gA', name: '1장 창고', folder: 'main', start: null },
+    { id: 'gR1', name: '길고양이', folder: 'random', start: null },
+    { id: 'gR2', name: '낯선 상인', folder: 'random', start: 12 },
+  ];
+  pj.pages = [
+    mk(0, 'main', ''), mk(1, 'main', 'gA'), mk(2, 'main', 'gA'),
+    mk(10, 'random', 'gR1'), mk(11, 'random', 'gR1'), mk(12, 'random', 'gR2'), mk(13, 'random', 'gR2'),
+    mk(14, 'random', ''), // 묶음 없는 랜덤 페이지
+  ];
+  pj.pages[0].isEnd = false;
+  return pj;
+}
+const mkChoice = (mode, extra) => { const c = E.newChoice(0); c.text = 'c'; Object.assign(c.base, { mode }, extra); return c; };
+
+test('묶음: 시작 페이지는 지정값 → 없으면 가장 낮은 번호', () => {
+  const pj = groupProj();
+  assert.strictEqual(E.groupStart(pj, E.groupOf(pj, 'gA')), 1);
+  assert.strictEqual(E.groupStart(pj, E.groupOf(pj, 'gR1')), 10);
+  assert.strictEqual(E.groupStart(pj, E.groupOf(pj, 'gR2')), 12);
+  E.groupOf(pj, 'gR2').start = 99;                       // 묶음에 없는 번호면 무시
+  assert.strictEqual(E.groupStart(pj, E.groupOf(pj, 'gR2')), 12);
+  pj.groups.push({ id: 'gE', name: '빈 묶음', folder: 'sub', start: null });
+  assert.strictEqual(E.groupStart(pj, E.groupOf(pj, 'gE')), null);
+  assert.deepStrictEqual(E.pagesOfGroup(pj, 'gA').map((p) => p.n), [1, 2]);
+});
+
+test('묶음으로 이동: 선택지를 누르면 묶음의 시작 페이지로', () => {
+  const pj = groupProj(), st = E.initState(pj);
+  const c = mkChoice('group', { group: 'gA', gain: '열쇠' });
+  pj.pages[0].choices = [c];
+  const r = E.choose(pj, st, c);
+  assert.strictEqual(r.error, undefined);
+  assert.strictEqual(st.page, 1);
+  assert.strictEqual(E.have(st, '열쇠'), 1);
+  // 비어 있거나 없는 묶음은 이동하지 않고 오류
+  const st2 = E.initState(pj);
+  assert.match(E.choose(pj, st2, mkChoice('group', { group: 'nope' })).error, /묶음/);
+  assert.strictEqual(st2.page, 0);
+});
+
+test('랜덤 이벤트: 목록 중 하나 (난수 주입), 기본은 랜덤 폴더 전체', () => {
+  const pj = groupProj();
+  const c = mkChoice('random');
+  const labels = E.randomEntries(pj, c.base).map((e) => e.label + ':' + e.to);
+  assert.deepStrictEqual(labels, ['길고양이:10', '낯선 상인:12', '본문14:14'], '묶음 2개 + 묶음 없는 랜덤 페이지 1개');
+  const pick = (r) => { const st = E.initState(pj); const res = E.choose(pj, st, c, 0, r); return { page: st.page, fx: res.fx }; };
+  assert.strictEqual(pick(0).page, 10);
+  assert.strictEqual(pick(0.34).page, 12);
+  assert.strictEqual(pick(0.999).page, 14);
+  assert.ok(pick(0).fx.some((f) => f.kind === 'rand' && /길고양이/.test(f.text)));
+  // 균등하게 뽑히는지: 난수 없이 많이 돌려 세 곳 모두 나오는지만 확인
+  const seen = new Set(); for (let i = 0; i < 200; i++) seen.add(pick(undefined).page);
+  assert.deepStrictEqual([...seen].sort((a, b) => a - b), [10, 12, 14]);
+});
+
+test('랜덤 이벤트: 일부 묶음만 지정 / 비어 있으면 오류', () => {
+  const pj = groupProj();
+  const c = mkChoice('random', { pool: ['gR2'] });
+  const st = E.initState(pj);
+  assert.deepStrictEqual(E.randomEntries(pj, c.base).map((e) => e.to), [12]);
+  assert.strictEqual(E.choose(pj, st, c, 0, 0.9).error, undefined);
+  assert.strictEqual(st.page, 12);
+  pj.pages = pj.pages.filter((p) => p.folder !== 'random');
+  const st2 = E.initState(pj);
+  assert.match(E.choose(pj, st2, mkChoice('random')).error, /비어/);
+});
+
+test('묶음/랜덤 연결도 상위 페이지·검사·분기도에 반영', () => {
+  const pj = groupProj();
+  const c1 = mkChoice('group', { group: 'gA' });
+  const c2 = mkChoice('random');
+  pj.pages[0].choices = [c1, c2];
+  assert.deepStrictEqual(E.parentsOf(pj, 1), [0]);
+  assert.deepStrictEqual(E.parentsOf(pj, 12), [0]);
+  assert.strictEqual(E.validate(pj).some((x) => /없어요|비어 있어요/.test(x.msg) && x.page === 0), false);
+  const g = E.buildFlow(pj, 0, []);
+  const dest = g.nodes.find((n) => n.id === 'to-1');
+  assert.ok(dest && dest.data.items[0].tags.includes('묶음 1장 창고'));
+  const rand = g.nodes.find((n) => n.type === 'rand');
+  assert.ok(rand, '랜덤 이벤트 노드');
+  assert.strictEqual(rand.data.entries.length, 3);
+  assert.ok(g.edges.some((e) => e.target === rand.id));
+  // 깨진 연결은 검사에 걸림
+  pj.pages[0].choices.push(mkChoice('group', { group: 'ghost' }));
+  assert.ok(E.validate(pj).some((x) => /연결된 스토리 묶음이 없어요/.test(x.msg)));
+});
+
+test('분기도: 서로 다른 랜덤 풀은 각각 노드, 같은 풀은 합쳐짐', () => {
+  const pj = groupProj();
+  pj.pages[0].choices = [mkChoice('random'), mkChoice('random'), mkChoice('random', { pool: ['gR1'] })];
+  const g = E.buildFlow(pj, 0, []);
+  const rands = g.nodes.filter((n) => n.type === 'rand');
+  assert.strictEqual(rands.length, 2);
+  assert.strictEqual(rands.find((n) => n.data.items.length === 2) !== undefined, true);
+  const ids = g.nodes.map((n) => n.id);
+  assert.strictEqual(new Set(ids).size, ids.length);
+});
+
+test('스토리 JSON: 묶음·랜덤 이벤트 왕복', () => {
+  const pj = groupProj();
+  pj.pages[0].choices = [mkChoice('group', { group: 'gA' }), mkChoice('random', { pool: ['gR1', 'gR2'] }), mkChoice('random')];
+  pj.pages[0].choices.forEach((c, i) => { c.text = '선택' + i; });
+  const arr = E.toStoryArray(pj);
+  assert.strictEqual(arr.find((x) => x.id === 1).group, '1장 창고');
+  assert.deepStrictEqual(arr[0].choices[0], { text: '선택0', group: '1장 창고' });
+  assert.deepStrictEqual(arr[0].choices[1], { text: '선택1', random: ['길고양이', '낯선 상인'] });
+  assert.deepStrictEqual(arr[0].choices[2], { text: '선택2', random: true });
+  // 새 묶음을 JSON 으로 만들고 연결
+  const next = JSON.parse(JSON.stringify(arr));
+  next.push({ id: 30, group: '새 묶음', folder: 'sub', text: '새', end: true });
+  next[0].choices.push({ text: '새로', group: '새 묶음' });
+  const r = E.applyStoryArray(pj, next);
+  assert.strictEqual(r.added, 1);
+  const ng = pj.groups.find((g) => g.name === '새 묶음');
+  assert.ok(ng && ng.folder === 'sub');
+  assert.strictEqual(E.pageOf(pj, 30).group, ng.id);
+  assert.strictEqual(pj.pages[0].choices[3].base.mode, 'group');
+  assert.strictEqual(pj.pages[0].choices[3].base.group, ng.id);
+  assert.strictEqual(pj.pages[0].choices[0].base.group, 'gA', '기존 묶음 id 유지');
+});
+
+test('스토리 JSON: 없는 묶음 이름/잘못된 random 은 거부하고 변경 없음', () => {
+  const pj = groupProj();
+  const before = JSON.stringify(pj);
+  assert.throws(() => E.applyStoryArray(pj, [{ id: 0, text: 'x', choices: [{ text: 'a', group: '없는 묶음' }] }]), /찾을 수 없어요/);
+  assert.throws(() => E.applyStoryArray(pj, [{ id: 0, text: 'x', choices: [{ text: 'a', random: ['없는'] }] }]), /random/);
+  assert.throws(() => E.applyStoryArray(pj, [{ id: 0, text: 'x', choices: [{ text: 'a' }] }]), /to/);
+  assert.strictEqual(JSON.stringify(pj), before);
+});
+
+test('가져오기: 옛 프로젝트(묶음 없음, mode 없음)도 정상 동작', () => {
+  const old = { name: 'old', pages: [{ n: 0, body: 'a', choices: [{ id: 'c1', text: 'go', base: { next: 1 } }] }, { n: 1, body: 'b', isEnd: true, choices: [] }] };
+  const pj = E.normalizeProject(old);
+  assert.deepStrictEqual(pj.groups, []);
+  const st = E.initState(pj);
+  assert.strictEqual(E.choose(pj, st, pj.pages[0].choices[0]).error, undefined);
+  assert.strictEqual(st.page, 1);
+  assert.deepStrictEqual(E.validate(pj), []);
+});
