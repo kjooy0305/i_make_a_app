@@ -109,13 +109,14 @@ class MainActivity : AppCompatActivity() {
                 filePathCallback?.onReceiveValue(null)
                 filePathCallback = callback
                 // 기기에 따라 .epub MIME이 달라 필터가 막힐 수 있어 모든 파일을 보여주고 웹에서 걸러낸다
-                val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                // GET_CONTENT+chooser는 일부 기기에서 결과가 비어 돌아와 RandomRead와 같은 OPEN_DOCUMENT 사용
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
                     putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                 }
                 return try {
-                    fileChooser.launch(Intent.createChooser(intent, "소설 파일 선택"))
+                    fileChooser.launch(intent)
                     true
                 } catch (e: Exception) {
                     filePathCallback = null
