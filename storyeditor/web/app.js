@@ -6,8 +6,9 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const COLORS = ['#6d8cff', '#a78bfa', '#f472b6', '#fb923c', '#facc15', '#4ade80', '#2dd4bf', '#94a3b8'];
   const KEY = 'storyeditor.projects.v1';
+  const MODE_KEY = 'storyeditor.listmode';
 
-  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false, trail: [], editCi: null, folder: 'main' };
+  const S = { projects: [], view: 'home', pid: null, pn: 0, q: '', side: false, memOnly: false, trail: [], editCi: null, folder: 'main', listMode: 'num' };
 
   /* ================= 저장 ================= */
   function load() {
@@ -183,21 +184,29 @@
   /* ================= 에디터 ================= */
   function sideHtml(pj) {
     const q = S.q.trim().toLowerCase();
-    const list = E.pagesIn(pj, S.folder).filter((p) => !q || String(p.n) === q || p.body.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q));
-    const tabs = '<div class="ftabs">' + E.FOLDERS.map((f) => '<button class="ft' + (f.id === S.folder ? ' on' : '') + '" data-act="folder" data-folder="' + f.id + '">' + esc(f.name) + ' <span>' + E.pagesIn(pj, f.id).length + '</span></button>').join('') + '</div>';
+    const byFolder = S.listMode === 'folder';
+    const pool = byFolder ? E.pagesIn(pj, S.folder) : pj.pages.slice().sort((a, b) => a.n - b.n);
+    const list = pool.filter((p) => !q || String(p.n) === q || p.body.toLowerCase().includes(q) || (p.title || '').toLowerCase().includes(q));
+    const modes = '<div class="seg"><button data-act="mode" data-mode="num" class="' + (!byFolder ? 'on' : '') + '">번호순</button><button data-act="mode" data-mode="folder" class="' + (byFolder ? 'on' : '') + '">폴더</button></div>';
+    const tabs = byFolder ? '<div class="ftabs">' + E.FOLDERS.map((f) => '<button class="ft' + (f.id === S.folder ? ' on' : '') + '" data-act="folder" data-folder="' + f.id + '">' + esc(f.name) + ' <span>' + E.pagesIn(pj, f.id).length + '</span></button>').join('') + '</div>' : '';
     const cur = E.FOLDERS.find((f) => f.id === S.folder);
-    return tabs + '<div class="row" style="margin-bottom:6px"><input type="text" id="pq" class="grow" placeholder="페이지 번호·본문 검색" value="' + esc(S.q) + '"><button class="pri sm" data-act="addpage" title="' + esc(cur.name) + '에 페이지 추가">＋</button></div>' +
-      (list.length ? list.map((p) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(E.pageLabel(p)) + '</span></div>').join('')
-        : '<div class="muted" style="padding:8px">' + (q ? '검색 결과 없음' : esc(cur.name) + '가 비어 있어요.<br>＋ 로 첫 페이지를 만들어 보세요.') + '</div>');
+    const addTitle = byFolder ? cur.name + '에 페이지 추가' : '페이지 추가';
+    const row = (p) => '<div class="pi' + (p.n === S.pn ? ' on' : '') + (p.isEnd ? ' end' : '') + '" data-act="gopage" data-n="' + p.n + '"><b>P.' + p.n + '</b><span>' + esc(E.pageLabel(p)) + '</span>' + (byFolder ? '' : '<em class="fchip">' + esc(E.folderShort(E.folderOf(p))) + '</em>') + '</div>';
+    return modes + tabs + '<div class="row" style="margin-bottom:6px"><input type="text" id="pq" class="grow" placeholder="페이지 번호·본문 검색" value="' + esc(S.q) + '"><button class="pri sm" data-act="addpage" title="' + esc(addTitle) + '">＋</button></div>' +
+      (list.length ? list.map(row).join('')
+        : '<div class="muted" style="padding:8px">' + (q ? '검색 결과 없음' : byFolder ? esc(cur.name) + '가 비어 있어요.<br>＋ 로 첫 페이지를 만들어 보세요.' : '페이지가 없어요.') + '</div>');
   }
   function renderEditor() {
     const pj = proj();
     if (!pj) return go('home');
     const cur = E.pageOf(pj, S.pn);
-    if (cur) S.folder = E.folderOf(cur);              // 다른 폴더의 페이지로 이동하면 탭도 따라간다
-    else {
+    if (cur) S.folder = E.folderOf(cur);              // 다른 폴더의 페이지로 이동하면 폴더 탭도 따라간다
+    else if (S.listMode === 'folder') {
       const first = E.pagesIn(pj, S.folder)[0];
       S.pn = first ? first.n : -1;                    // -1 = 이 폴더에 페이지 없음
+    } else {
+      const all = pj.pages.slice().sort((a, b) => a.n - b.n);
+      S.pn = all.length ? all[0].n : -1;
     }
     $('#main').innerHTML = '<div class="ed' + (S.side ? '' : ' noside') + '"><div class="side" id="side">' + sideHtml(pj) + '</div><div id="pageBox"></div></div>';
     renderPage();
@@ -207,7 +216,7 @@
   function renderPage() {
     const pj = proj(), p = page(), box = $('#pageBox');
     if (!box) return;
-    if (!p) { box.innerHTML = '<div class="card">이 폴더에 페이지가 없어요. 왼쪽의 ＋ 로 추가하세요.' + (window.innerWidth <= 760 ? '<br><span class="muted">(☰ 페이지 버튼으로 목록을 열 수 있어요)</span>' : '') + '</div>'; return; }
+    if (!p) { box.innerHTML = '<div class="card">' + (S.listMode === 'folder' ? '이 폴더에 ' : '') + '페이지가 없어요. 왼쪽의 ＋ 로 추가하세요.' + (window.innerWidth <= 760 ? '<br><span class="muted">(☰ 페이지 버튼으로 목록을 열 수 있어요)</span>' : '') + '</div>'; return; }
     let h = '<div class="card"><div class="row"><h3 style="margin:0" class="grow">P.' + p.n + (p.n === 0 ? ' <span class="muted">(시작)</span>' : '') + '</h3>' +
       '<label class="muted">폴더 <select data-f="folder" style="width:auto;padding:3px 6px">' + E.FOLDERS.map((f) => '<option value="' + f.id + '"' + (f.id === E.folderOf(p) ? ' selected' : '') + '>' + esc(f.name) + '</option>').join('') + '</select></label>' +
       '<label class="muted"><input type="checkbox" data-f="isEnd"' + (p.isEnd ? ' checked' : '') + '> 마지막 페이지</label>' +
@@ -501,6 +510,12 @@
       case 'achvs': showAchvs(); break;
       case 'check': showCheck(); break;
       case 'toggleside': S.side = !S.side; renderEditor(); break;
+      case 'mode': {
+        S.listMode = a.dataset.mode; S.q = '';
+        try { localStorage.setItem(MODE_KEY, S.listMode); } catch (e) { /* 저장 못 해도 동작 */ }
+        if (S.listMode === 'folder' && p) S.folder = E.folderOf(p);
+        renderEditor(); break;
+      }
       case 'folder': {
         S.folder = a.dataset.folder; S.q = '';
         const first = E.pagesIn(pj, S.folder)[0]; S.pn = first ? first.n : -1;
@@ -575,6 +590,7 @@
   });
 
   /* ================= 시작 ================= */
+  try { const m = localStorage.getItem(MODE_KEY); if (m === 'num' || m === 'folder') S.listMode = m; } catch (e) { /* 기본값 사용 */ }
   load();
   render();
 })();

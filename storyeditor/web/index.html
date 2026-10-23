@@ -35,6 +35,12 @@ button:disabled{opacity:.4;cursor:default}
 .tag{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:1px 9px;font-size:12px;color:var(--sub)}
 .ed{display:grid;grid-template-columns:260px 1fr;gap:14px;align-items:start}
 .side{position:sticky;top:64px;max-height:calc(100vh - 140px);overflow-y:auto;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:8px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;background:none;border:0;border-radius:0;padding:7px;color:var(--sub)}
+.seg button.on{background:var(--pri);color:#0b1020;font-weight:700}
+.side .seg{margin:0 0 8px}
+.fchip{margin-left:auto;font-style:normal;font-size:10.5px;color:var(--sub);border:1px solid var(--line);border-radius:10px;padding:0 6px;flex:none}
+.pi.on .fchip{color:#0b1020;border-color:#0b1020}
 .ftabs{display:flex;gap:4px;margin-bottom:8px}
 .ft{flex:1;padding:7px 2px;font-size:12px;border-radius:8px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
 .ft span{opacity:.7;font-size:11px}
