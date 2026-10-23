@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>나만의 이야기 에디터</title>
+<style>
+:root{
+  --bg:#14161f;--bg2:#1b1f2d;--card:#222739;--line:#343b57;--txt:#e9ecf6;--sub:#9aa3c2;
+  --pri:#6d8cff;--pri2:#9db1ff;--ok:#4ade80;--bad:#f87171;--warn:#fbbf24;--purple:#a78bfa;--pbg:rgba(167,139,250,.12);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:15px/1.55 -apple-system,"Noto Sans KR","Malgun Gothic",sans-serif}
+body{display:flex;flex-direction:column}
+header{background:var(--bg2);border-bottom:1px solid var(--line);padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+header .ttl{font-weight:700;font-size:16px;flex:1;min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+main{flex:1;overflow-y:auto;padding:12px 14px 80px}
+input,select,textarea,button{font:inherit;color:inherit}
+input[type=text],input[type=number],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--txt)}
+input[type=number]{width:84px}
+textarea{min-height:170px;resize:vertical;line-height:1.6}
+button{background:var(--line);border:0;border-radius:8px;padding:7px 12px;cursor:pointer}
+button.pri{background:var(--pri);color:#0b1020;font-weight:700}
+button.dng{background:#7f1d1d}
+button.sm{padding:4px 9px;font-size:12px}
+button.ghost{background:none;border:1px solid var(--line)}
+button:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:140px}
+.muted{color:var(--sub);font-size:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.cover{height:54px;border-radius:8px;margin-bottom:8px}
+.tag{display:inline-block;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:1px 9px;font-size:12px;color:var(--sub)}
+.ed{display:grid;grid-template-columns:260px 1fr;gap:14px;align-items:start}
+.side{position:sticky;top:64px;max-height:calc(100vh - 140px);overflow-y:auto;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:8px}
+.pi{padding:7px 8px;border-radius:8px;cursor:pointer;display:flex;gap:6px;align-items:baseline}
+.pi:hover{background:var(--card)}
+.pi.on{background:var(--pri);color:#0b1020}
+.pi b{min-width:34px}
+.pi span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;opacity:.85}
+.pi.end b::after{content:" ■";color:var(--bad)}
+.cc{border:1px solid var(--line);border-radius:12px;padding:10px;margin:10px 0;background:var(--card)}
+.oc{border-left:3px solid var(--pri);padding:6px 0 6px 10px;margin-top:8px}
+.br{border:1px solid var(--purple);background:var(--pbg);border-radius:10px;padding:8px;margin-top:8px}
+.br .oc{border-left-color:var(--purple)}
+.prop{display:flex;gap:6px;align-items:center;margin:6px 0}
+.prop>label{min-width:84px;font-size:12px;color:var(--sub)}
+.x{background:none;color:var(--sub);padding:2px 8px}
+.cnt.over{color:var(--bad)}
+.hint{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--sub);margin:6px 0}
+.chip{display:inline-block;border-radius:12px;padding:2px 10px;margin:2px 4px 2px 0;font-size:13px;background:var(--bg);border:1px solid var(--line)}
+.chip.gain{border-color:var(--ok);color:var(--ok)}
+.chip.lose{border-color:var(--bad);color:var(--bad)}
+.chip.achv{border-color:var(--warn);color:var(--warn)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20;display:flex;align-items:center;justify-content:center;padding:14px}
+.modal>div{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:16px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto}
+.modal.full>div{max-width:680px;height:92vh;display:flex;flex-direction:column}
+.play-body{white-space:pre-wrap;line-height:1.8;font-size:16px;flex:1;overflow-y:auto;padding:6px 2px}
+.status{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:8px}
+.pc{display:block;width:100%;text-align:left;margin:6px 0;padding:11px 12px;background:var(--card);border:1px solid var(--line)}
+.pc:hover:not(:disabled){border-color:var(--pri)}
+.pc small{display:block;color:var(--bad);font-size:11px}
+.sw{display:inline-block;width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;margin-right:4px}
+.sw.on{border-color:#fff}
+.issue{padding:7px 8px;border-bottom:1px solid var(--line);cursor:pointer}
+.issue:hover{background:var(--card)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0b1020;border:1px solid var(--line);padding:8px 16px;border-radius:20px;z-index:40;display:none;font-size:13px;max-width:90vw}
+@media(max-width:760px){
+  .ed{grid-template-columns:1fr}
+  .side{position:static;max-height:46vh}
+  .ed.noside .side{display:none}
+  .tgl-side{display:inline-block!important}
+}
+.tgl-side{display:none}
+</style>
+</head>
+<body>
+<header id="hd"></header>
+<main id="main"></main>
+<div id="modalRoot"></div>
+<div id="toast"></div>
+<input type="file" id="importFile" accept=".json,application/json" style="display:none">
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
