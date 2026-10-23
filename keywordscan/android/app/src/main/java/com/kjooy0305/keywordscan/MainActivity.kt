@@ -26,10 +26,24 @@ class MainActivity : AppCompatActivity() {
     private val fileChooser = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        val uris = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
-        if (uris == null || uris.isEmpty()) {
-            Toast.makeText(this, "선택된 파일이 없어요 (resultCode=${result.resultCode})", Toast.LENGTH_SHORT).show()
+        // parseResult가 일부 기기에서 빈 결과를 돌려줘 clipData/data를 직접 읽는다
+        val data = result.data
+        val list = ArrayList<Uri>()
+        if (result.resultCode == RESULT_OK && data != null) {
+            val clip = data.clipData
+            if (clip != null) {
+                for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { list.add(it) }
+            }
+            if (list.isEmpty()) data.data?.let { list.add(it) }
         }
+        if (list.isEmpty()) {
+            Toast.makeText(
+                this,
+                "선택된 파일이 없어요 (resultCode=${result.resultCode}, data=${data != null}, clip=${data?.clipData?.itemCount})",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        val uris: Array<Uri>? = if (list.isEmpty()) null else list.toTypedArray()
         filePathCallback?.onReceiveValue(uris)
         filePathCallback = null
     }
