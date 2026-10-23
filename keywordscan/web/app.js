@@ -67,6 +67,25 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2600);
   }
+  /* 로딩 오버레이: 파일 확인처럼 시간이 걸리는 작업 동안 표시 */
+  function showLoading(msg) {
+    let el = $('#loading');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'loading';
+      el.innerHTML = '<div class="box"><div class="spin"></div><div class="msg"></div><div class="bar"><i></i></div></div>';
+      document.body.appendChild(el);
+    }
+    el.querySelector('.msg').textContent = msg;
+    el.style.display = 'flex';
+  }
+  function updateLoading(msg, ratio) {
+    const el = $('#loading'); if (!el) return;
+    el.querySelector('.msg').textContent = msg;
+    if (ratio != null) el.querySelector('.bar i').style.width = Math.round(ratio * 100) + '%';
+  }
+  function hideLoading() { const el = $('#loading'); if (el) el.style.display = 'none'; }
+  const nextFrame = () => new Promise((res) => setTimeout(res, 0));
   function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB'; }
   function fmtChars(n) { return n >= 10000 ? (n / 10000).toFixed(1) + '만자' : n + '자'; }
   function modal(html) {
@@ -235,12 +254,16 @@
     handling = true;
     try {
       const all = Array.from(fileList);
+      if (!all.length) return;
+      showLoading('파일 확인 중... (0/' + all.length + ')');
+      await nextFrame();
       const files = all.filter((f) => /\.(txt|epub)$/i.test(f.name));
       if (all.length - files.length) toast('TXT·ePub만 추가할 수 있어요 (' + (all.length - files.length) + '개 제외)');
       const accepted = [];
       let applyAll = null;
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
+        if (i % 5 === 0) { updateLoading('파일 확인 중... (' + i + '/' + files.length + ')', i / files.length); await nextFrame(); }
         const pool = S.novels.map((n) => ({ fileName: n.fileName, size: n.size, totalChars: n.totalChars, addedAt: n.addedAt, id: n.id }))
           .concat(accepted.map((a) => ({ fileName: a.name, pending: true, ref: a })));
         const sims = E.findSimilar(f.name, pool);
@@ -248,7 +271,9 @@
         if (sims.length) {
           let choice = applyAll;
           if (!choice) {
+            hideLoading();
             choice = await askDuplicate(f, sims, files.length - i - 1);
+            showLoading('파일 확인 중... (' + i + '/' + files.length + ')');
             if (choice.all) applyAll = choice;
           }
           const target = sims[0].item;
@@ -273,7 +298,9 @@
       }
       accepted.forEach((a) => enqueue({ kind: 'new', file: a.file, name: a.name, replaceId: a.replaceId, label: a.name }));
       if (accepted.length) { S.tab = 'up'; render(); toast(accepted.length + '개를 대기열에 추가했어요'); }
-    } finally { handling = false; }
+    } catch (e) {
+      toast('파일을 처리하지 못했어요: ' + ((e && e.message) || e));
+    } finally { hideLoading(); handling = false; }
   }
 
   function enqueueRescan(onlyStale) {
