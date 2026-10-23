@@ -9,6 +9,7 @@
   const { Handle, Position, MarkerType } = RF;
   const ReactFlow = RF.default || RF.ReactFlow;
   const NO = 'nodrag nopan';
+  const noop = () => {};
 
   const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n) + '…' : s; };
 
@@ -32,7 +33,7 @@
   }
   // 도착 페이지 노드: 같은 페이지로 이어지는 선택지는 한 노드 안에 줄로 모아 보여준다
   function TargetNode({ data }) {
-    return h('div', { className: 'fn target' + (data.missing ? ' missing' : ''), onClick: () => data.onGo(data.to) },
+    return h('div', { className: 'fn dest' + (data.missing ? ' missing' : ''), onClick: () => data.onGo(data.to) },
       h(Handle, { type: 'target', position: Position.Left, isConnectable: false }),
       h('div', { className: 'fn-tag' }, data.missing ? '⚠ 없는 페이지 — 눌러서 새로 만들기' : data.self ? '현재 페이지로 돌아와요' : '다음 이야기'),
       h('div', { className: 'fn-ttl' }, 'P.' + data.to + (data.title ? ' · ' + clip(data.title, 26) : '')),
@@ -88,7 +89,7 @@
         if (n.type === 'cur') { d.onEditPage = api.editPage; d.onPlay = api.play; }
         if (n.type === 'target') { d.onGo = api.goPage; d.onEdit = api.edit; }
         if (n.type === 'add') d.onAdd = api.add;
-        return Object.assign({}, n, { data: d, draggable: false, selectable: false });
+        return Object.assign({}, n, { data: d, draggable: false });
       });
       const edges = base.edges.map((e) => Object.assign({}, e, {
         markerEnd: { type: MarkerType.ArrowClosed, color: e.source === 'cur' ? '#e8ecff' : '#7d86a8' },
@@ -107,7 +108,7 @@
           nodes: g.nodes, edges: g.edges, nodeTypes,
           fitView: true, fitViewOptions: { padding: 0.12, maxZoom: 1.25 },
           minZoom: 0.2, maxZoom: 2.5,
-          nodesDraggable: false, nodesConnectable: false, elementsSelectable: false,
+          nodesDraggable: false, nodesConnectable: false, elementsSelectable: false, onNodeClick: noop,
           zoomOnScroll: true, zoomOnPinch: true, zoomOnDoubleClick: false, panOnDrag: true, preventScrolling: true,
           proOptions: { hideAttribution: true },
         },
