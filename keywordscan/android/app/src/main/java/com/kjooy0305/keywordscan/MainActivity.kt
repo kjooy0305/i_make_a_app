@@ -27,6 +27,9 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val uris = WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data)
+        if (uris == null || uris.isEmpty()) {
+            Toast.makeText(this, "선택된 파일이 없어요 (resultCode=${result.resultCode})", Toast.LENGTH_SHORT).show()
+        }
         filePathCallback?.onReceiveValue(uris)
         filePathCallback = null
     }
@@ -116,6 +119,7 @@ class MainActivity : AppCompatActivity() {
                     true
                 } catch (e: Exception) {
                     filePathCallback = null
+                    Toast.makeText(this@MainActivity, "파일 선택 창을 열 수 없어요: ${e.message}", Toast.LENGTH_LONG).show()
                     false
                 }
             }

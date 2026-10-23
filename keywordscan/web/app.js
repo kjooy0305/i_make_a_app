@@ -254,10 +254,16 @@
     handling = true;
     try {
       const all = Array.from(fileList);
-      if (!all.length) return;
+      if (!all.length) { toast('선택된 파일이 없어요'); return; }
       showLoading('파일 확인 중... (0/' + all.length + ')');
       await nextFrame();
-      const files = all.filter((f) => /\.(txt|epub)$/i.test(f.name));
+      // 확장자가 없거나 안드로이드가 이름을 다르게 줘도 MIME 형식으로 한 번 더 인정
+      const okFile = (f) => /\.(txt|epub)$/i.test(f.name) || /^text\//i.test(f.type) || /epub/i.test(f.type);
+      const files = all.filter(okFile);
+      if (!files.length) {
+        toast('TXT·ePub 파일이 아니에요: ' + all.slice(0, 2).map((f) => f.name || '(이름 없음)').join(', '));
+        return;
+      }
       if (all.length - files.length) toast('TXT·ePub만 추가할 수 있어요 (' + (all.length - files.length) + '개 제외)');
       const accepted = [];
       let applyAll = null;
@@ -294,6 +300,7 @@
           }
         }
         if (skip) continue;
+        if (!/\.(txt|epub)$/i.test(name)) name += /epub/i.test(f.type) ? '.epub' : '.txt';
         accepted.push({ file: f, name, replaceId });
       }
       accepted.forEach((a) => enqueue({ kind: 'new', file: a.file, name: a.name, replaceId: a.replaceId, label: a.name }));
