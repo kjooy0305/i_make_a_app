@@ -20,6 +20,7 @@ i_make_a_app/
 ├── epubmaker/      ← 네이티브 Android 앱
 ├── choicetheroute/ ← 네이티브 Android 앱 (분기점 기록기)
 ├── apkextractor/   ← 네이티브 Android 앱 (APK 추출기)
+├── stickfighter/   ← 네이티브 Android 앱 (스틱맨 애니메이션, 7.1.1 복원)
 ├── storyeditor/
 │   ├── web/        ← 분기형 이야기 에디터 (웹, 오프라인)
 │   └── test/       ← 엔진 단위 테스트 (node --test test/engine.test.js)
@@ -43,6 +44,7 @@ i_make_a_app/
 | 📖 EpubMaker | Android | .apk | [다운로드](../../releases?q=epubmaker) |
 | ⬡ 분기점 기록기 | Android | .apk | [다운로드](../../releases?q=choicetheroute) |
 | 📦 APK 추출기 | Android | .apk | [다운로드](../../releases?q=apkextractor) |
+| 🥋 Stick Fighter | Android | .apk | [다운로드](../../releases?q=stickfighter) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---

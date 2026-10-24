@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.tweber.stickfighter.activities'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.tweber.stickfighter.activities"
+        minSdk 21
+        targetSdk 34
+        versionCode 47
+        versionName "7.2.0"
+    }
+
+    signingConfigs {
+        release {
+            if (System.getenv("SIGNING_KEY_PATH")) {
+                storeFile file(System.getenv("SIGNING_KEY_PATH"))
+                storePassword System.getenv("SIGNING_STORE_PASS")
+                keyAlias System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword System.getenv("SIGNING_KEY_PASS")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.fragment:fragment:1.6.2'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.cardview:cardview:1.0.0'
+    implementation 'androidx.viewpager:viewpager:1.0.0'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'de.greenrobot:eventbus:2.4.0'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs << "-Xmaxerrs" << "2000" << "-Xlint:none"
+}

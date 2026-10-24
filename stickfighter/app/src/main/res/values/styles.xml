@@ -1,0 +1,71 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+  <style name="MaterialProgressBarHorizontal" parent="@style/Widget.AppCompat.ProgressBar.Horizontal">
+    </style>
+  <style name="EditorMiniFloatingActionButton" parent="">
+    <item name="android:clickable">true</item>
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="elevation">2dp</item>
+    <item name="rippleColor">@color/editor_toolbar_mini_button_ripple</item>
+    <item name="fabSize">mini</item>
+    <item name="backgroundTint">@color/editor_toolbar_mini_button_enabled</item>
+  </style>
+  <style name="EditorFloatingActionButton" parent="">
+    <item name="android:clickable">true</item>
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="elevation">2dp</item>
+    <item name="rippleColor">@color/editor_toolbar_normal_button_ripple</item>
+    <item name="fabSize">normal</item>
+    <item name="backgroundTint">@color/editor_toolbar_normal_button_enabled</item>
+  </style>
+  <style name="VideoSettingValueTextView" parent="">
+    <item name="android:textSize">@dimen/text_size_tiny</item>
+    <item name="android:textStyle">normal</item>
+    <item name="android:textColor">#ff545454</item>
+    <item name="android:gravity">right</item>
+    <item name="android:paddingTop">2dp</item>
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_marginLeft">-32dp</item>
+    <item name="android:layout_marginRight">4dp</item>
+    <item name="android:ems">4</item>
+    <item name="android:layout_alignParentRight">true</item>
+  </style>
+  <style name="FloatingActionButton" parent="">
+    <item name="android:layout_gravity">bottom|right</item>
+    <item name="android:clickable">true</item>
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_margin">16dp</item>
+    <item name="android:layout_alignParentRight">true</item>
+    <item name="android:layout_alignParentBottom">true</item>
+  </style>
+  <style name="VideoDurationTextView" parent="">
+    <item name="android:textSize">@dimen/video_duration_text</item>
+    <item name="android:textColor">@color/video_duration_text</item>
+    <item name="android:layout_width">36dp</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_centerVertical">true</item>
+  </style>
+  <style name="AppTheme" parent="@style/Theme.MaterialComponents.Light.NoActionBar.Bridge">
+    <item name="android:dialogTheme">@style/DialogTheme</item>
+    <item name="colorPrimary">@color/primary</item>
+    <item name="colorPrimaryDark">@color/primary_dark</item>
+    <item name="colorAccent">@color/accent</item>
+    <item name="alertDialogTheme">@style/AppCompatAlertDialogStyle</item>
+  </style>
+  <style name="AppCompatAlertDialogStyle" parent="@style/Theme.AppCompat.Light.Dialog.Alert">
+    <item name="android:textColorPrimary">@color/text_primary</item>
+    <item name="android:background">@color/white</item>
+    <item name="colorAccent">@color/accent</item>
+  </style>
+  <style name="DialogTheme" parent="@style/DialogThemeBase">
+    </style>
+  <style name="DialogThemeBase" parent="@style/Theme.AppCompat.Light.Dialog">
+    <item name="colorPrimary">@color/primary</item>
+    <item name="colorPrimaryDark">@color/primary_dark</item>
+    <item name="colorAccent">@color/accent</item>
+  </style>
+</resources>

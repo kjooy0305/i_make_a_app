@@ -1,0 +1,70 @@
+name: "[Stick Fighter] Build & Release APK"
+
+on:
+  push:
+    tags:
+      - 'stickfighter-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $RUNNER_TEMP/release.p12
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x stickfighter/gradlew
+
+      - name: Build Release APK
+        working-directory: stickfighter
+        env:
+          SIGNING_KEY_PATH: ${{ runner.temp }}/release.p12
+          SIGNING_STORE_PASS: ${{ secrets.SIGNING_STORE_PASS }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK
+        run: |
+          TAG=${{ github.ref_name }}
+          VER=${TAG#stickfighter-}
+          mv stickfighter/app/build/outputs/apk/release/app-release.apk \
+             stickfighter/app/build/outputs/apk/release/StickFighter-${VER}.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "🥋 Stick Fighter ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## 🥋 Stick Fighter
+
+            > **설치 기기:** Android 8.0(API 26) 이상 스마트폰·태블릿
+
+            ### 설치 방법
+            1. 아래 `.apk` 파일 다운로드
+            2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+            3. APK 파일 실행 후 설치
+
+            ### 주요 기능
+            - 스틱맨 프레임 편집과 애니메이션 재생
+            - 커스텀 피규어 만들기
+            - 애니메이션 가져오기(.sfa)·내보내기, MP4 영상으로 저장
+            - 최신 안드로이드(14) 대응, 광고 제거
+          files: stickfighter/app/build/outputs/apk/release/StickFighter-*.apk
+          draft: false
+          prerelease: false

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/progressBarContainer"
+    android:background="#eebcbcbc"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:elevation="5dp">
+    <View
+        android:id="@+id/centerView"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:layout_centerInParent="true"/>
+    <TextView
+        android:textSize="18sp"
+        android:textColor="#ff454545"
+        android:id="@+id/textViewLoadedFramesCount"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:text="@string/loading_frames"
+        android:layout_above="@+id/centerView"
+        android:layout_centerHorizontal="true"/>
+    <ProgressBar
+        android:id="@+id/progressBarLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:indeterminate="false"
+        android:layout_below="@+id/centerView"
+        android:layout_alignLeft="@+id/textViewLoadedFramesCount"
+        android:layout_alignRight="@+id/textViewLoadedFramesCount"
+        android:layout_centerHorizontal="true"
+        style="@style/Widget.AppCompat.ProgressBar.Horizontal"/>
+</RelativeLayout>
