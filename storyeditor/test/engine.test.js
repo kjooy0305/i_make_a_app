@@ -558,3 +558,52 @@ test('스토리 JSON: pick / after / continue 왕복과 잘못된 값 거부', (
   assert.throws(() => E.applyStoryArray(pj2, [{ id: 0, text: 'x', choices: [{ text: 'a', continue: 1 }] }]), /continue/);
   assert.strictEqual(JSON.stringify(pj2), before);
 });
+
+/* ---------- 아이템 세부 태그 / 인벤토리 ---------- */
+test('인벤토리: 상태·아이템 분류, 히든 제외, 부패는 후순위', () => {
+  const pj = E.newProject('t');
+  E.setKeywordMeta(pj, '복통', { kind: 'status' });
+  E.setKeywordMeta(pj, '빵', { tags: { basic: { type: 'food' }, use: { usable: true, priority: 5 } } });
+  E.setKeywordMeta(pj, '상한 빵', { tags: { use: { usable: true, priority: 0 }, spoil: { on: true, late: true } } });
+  const st = E.initState(pj);
+  ['복통', '빵', '상한 빵', '@비밀'].forEach((n) => E.addItem(st, n, 1));
+  const v = E.inventoryView(pj, st);
+  assert.deepStrictEqual(v.statuses.map((r) => r.name), ['복통']);
+  assert.deepStrictEqual(v.items.map((r) => r.name), ['빵', '상한 빵'], '부패(후순위)는 priority 가 낮아도 맨 뒤');
+  assert.strictEqual(v.hiddenCount, 1);
+  assert.strictEqual(E.inventoryView(pj, st, { showHidden: true }).items.length, 3);
+});
+
+test('아이템 사용: 조건·소모·조건부 효과·부패 효과', () => {
+  const pj = E.newProject('t');
+  const hp = pj.stats[0]; hp.max = 10; hp.init = 2;
+  const eff = (o) => Object.assign(E.newEffect(), o);
+  E.setKeywordMeta(pj, '고기', { tags: { use: { usable: true, cond: '!복통', effect: eff({ stats: { hp: 2 } }), rules: [{ cond: '체력<3', effect: eff({ stats: { hp: 1 } }) }] } } });
+  E.setKeywordMeta(pj, '상한 빵', { tags: { use: { usable: true, effect: eff({ stats: { hp: 1 } }) }, spoil: { on: true, effect: eff({ stats: { hp: -2 }, gain: '복통' }) } } });
+  E.setKeywordMeta(pj, '상한 우유', { tags: { use: { usable: true }, spoil: { on: true, block: true } } });
+  E.setKeywordMeta(pj, '돌', {});
+  const st = E.initState(pj);
+  assert.strictEqual(E.useItem(pj, st, '고기').ok, false, '없는 아이템');
+  ['고기', '상한 빵', '상한 우유', '돌'].forEach((n) => E.addItem(st, n, 1));
+  assert.strictEqual(E.useItem(pj, st, '돌').ok, false, '사용 불가 태그');
+  assert.strictEqual(E.useItem(pj, st, '상한 우유').ok, false, '먹을 수 없음');
+  assert.strictEqual(E.have(st, '상한 우유'), 1);
+  let r = E.useItem(pj, st, '상한 빵');
+  assert.ok(r.ok); assert.strictEqual(st.stats.hp, 1, '+1 -2 = 2+1-2'); assert.strictEqual(E.have(st, '복통'), 1); assert.strictEqual(E.have(st, '상한 빵'), 0);
+  r = E.useItem(pj, st, '고기');
+  assert.strictEqual(r.ok, false, '복통이면 못 먹음'); assert.match(r.error, /복통/);
+  E.loseItem(st, '복통', 1);
+  r = E.useItem(pj, st, '고기');
+  assert.ok(r.ok); assert.strictEqual(st.stats.hp, 4, '체력<3 규칙: 1+2+1');
+  assert.strictEqual(E.have(st, '고기'), 0);
+});
+
+test('아이템 태그: 저장/불러오기 정규화, 이름 변경에 메타가 따라감', () => {
+  const pj = E.newProject('t');
+  E.setKeywordMeta(pj, '빵', { tags: { custom: ['a', ' ', 'b'] } });
+  const n = E.normalizeProject(JSON.parse(JSON.stringify(pj)));
+  assert.deepStrictEqual(n.catalog[0].tags.custom, ['a', 'b']);
+  assert.strictEqual(E.tagsOf(n, '없음').use.usable, false);
+  E.renameKeyword(n, '빵', '식빵');
+  assert.strictEqual(E.tagsOf(n, '식빵').custom.length, 2);
+});

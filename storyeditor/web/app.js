@@ -88,7 +88,7 @@
       const pj = proj();
       hd.innerHTML = '<button data-act="home">‹ 목록</button><div class="ttl">' + esc(pj.name) + '</div>' +
         '<button class="tgl-side" data-act="toggleside">☰ 페이지</button>' +
-        '<button data-act="flow">🔀 분기도</button><button data-act="achvs">🏆 업적</button><button data-act="check">검사</button><button data-act="settings">⚙</button><button class="pri" data-act="play0">▶ 미리보기</button>';
+        '<button data-act="flow">🔀 분기도</button><button data-act="items">🎒 아이템</button><button data-act="achvs">🏆 업적</button><button data-act="check">검사</button><button data-act="settings">⚙</button><button class="pri" data-act="play0">▶ 미리보기</button>';
     }
   }
   function render() {
@@ -467,12 +467,12 @@
   function renderPlay(keepScroll) {
     const { pj, st, fx } = PV, p = E.pageOf(pj, st.page);
     const prevTop = keepScroll ? (PV.m.el.querySelector('.play-scroll') || {}).scrollTop || 0 : 0;
-    const items = Object.keys(st.items).filter((k) => !k.startsWith('@')).map((k) => esc(k) + (st.items[k] > 1 ? ' ×' + st.items[k] : ''));
+    const inv = E.inventoryView(pj, st, { showHidden: PV.hid });
     const canFs = !!(document.fullscreenEnabled && PV.m.el.requestFullscreen);
     let h = '<div class="row pv-head"><b class="ttl">' + esc(pj.name) + ' <span class="muted">P.' + st.page + ' · 미리보기 (저장 안 됨)</span></b><button class="sm" data-pv="restart">처음부터</button>' + (canFs ? '<button class="sm" data-pv="fs" title="브라우저 전체 화면 켜기/끄기">' + (document.fullscreenElement ? '⤢ 축소' : '⛶ 전체 화면') + '</button>' : '') + '<button class="sm" data-pv="close">닫기</button></div>' +
       '<div class="status">' + pj.stats.map((s) => '<span>' + esc(s.name) + ' <b>' + st.stats[s.id] + (s.max ? '/' + s.max : '') + '</b></span>').join('') +
-      (st.run ? '<span class="chip rand">🎲 ' + st.run.index + '/' + st.run.total + (st.run.queue.length ? '' : st.run.after ? ' · 마지막' : ' · 마지막') + '</span>' : '') + '<span class="grow muted">🎒 ' + (items.length ? items.join(', ') : '없음') + '</span><span class="muted">🏆 ' + st.achv.length + '/' + pj.achievements.length + '</span></div>';
-    h += '<div class="play-scroll"><div class="play-body">' + (p.body.trim() ? esc(p.body) : '<span class="muted">(본문이 비어 있어요)</span>') + '</div>';
+      (st.run ? '<span class="chip rand">🎲 ' + st.run.index + '/' + st.run.total + (st.run.queue.length ? '' : st.run.after ? ' · 마지막' : ' · 마지막') + '</span>' : '') + '<button class="sm grow-l" data-pv="inv">🎒 인벤토리 ' + inv.total + (inv.statuses.length ? ' · 상태 ' + inv.statuses.length : '') + (PV.inv ? ' ▴' : ' ▾') + '</button><span class="muted">🏆 ' + st.achv.length + '/' + pj.achievements.length + '</span></div>';
+    h += '<div class="play-scroll">' + (PV.inv ? invHtml(inv) : '') + '<div class="play-body">' + (p.body.trim() ? esc(p.body) : '<span class="muted">(본문이 비어 있어요)</span>') + '</div>';
     if (fx.length) h += '<div>' + fx.map((f) => '<span class="chip ' + f.kind + '">' + esc(f.kind === 'lose' ? '− ' + f.text : f.kind === 'gain' ? '+ ' + f.text : f.kind === 'rand' ? '🎲 ' + f.text : '🏆 ' + f.text.replace('업적 달성: ', '')) + '</span>').join('') + '</div>';
     if (p.isEnd && E.canContinue(st)) {
       const more = st.run.queue.length;
@@ -486,6 +486,17 @@
     h += '</div>';                                    // .play-scroll: 본문 + 효과 칩 + 선택지가 한 덩어리로 같이 스크롤
     PV.m.el.firstChild.innerHTML = h;
     const sc = PV.m.el.querySelector('.play-scroll'); if (sc) sc.scrollTop = prevTop;
+  }
+  function invHtml(inv) {
+    const { pj } = PV;
+    const row = (r) => '<div class="ir' + (r.late ? ' late' : '') + '"><span class="ki">' + esc(r.icon || (r.kind === 'status' ? '🩺' : '🎒')) + '</span><div class="grow"><b>' + esc(r.base) + '</b>' + (r.count > 1 && r.tags.basic.stack ? ' ×' + r.count : '') + (r.hidden ? ' <em class="fchip" style="margin:0">숨김</em>' : '') + (r.late ? ' <span class="chip lose" style="margin:0">⚠ 부패</span>' : '') +
+      (r.desc ? '<div class="muted">' + esc(r.desc) + '</div>' : '') +
+      (r.chips.length ? '<div>' + r.chips.map((c) => '<span class="tag">' + esc(c) + '</span> ').join('') + '</div>' : '') +
+      (r.useError ? '<small class="bad">' + esc(r.useError) + '</small>' : '') + '</div>' +
+      (r.tags.use.usable && r.kind === 'item' ? '<button class="sm' + (r.canUse ? ' pri' : '') + '" data-pv="use" data-name="' + esc(r.name) + '"' + (r.canUse ? '' : ' disabled') + '>사용</button>' : '') + '</div>';
+    return '<div class="card inv"><div class="row" style="justify-content:space-between"><b>🎒 인벤토리</b><label class="muted"><input type="checkbox" data-pv="hid"' + (PV.hid ? ' checked' : '') + '> 숨김 항목도 보기 (테스트)</label></div>' +
+      '<div class="muted" style="margin:6px 0 2px">상태</div>' + (inv.statuses.length ? inv.statuses.map(row).join('') : '<div class="muted">없음</div>') +
+      '<div class="muted" style="margin:8px 0 2px">아이템 <span>(먹는 순서대로)</span></div>' + (inv.items.length ? inv.items.map(row).join('') : '<div class="muted">없음</div>') + '</div>';
   }
   function closePlay() {
     if (!PV) return;
@@ -504,6 +515,12 @@
       return;
     }
     if (a === 'restart') { const st = E.initState(PV.pj); st.page = 0; PV.st = st; PV.fx = []; renderPlay(); return; }
+    if (a === 'inv') { PV.inv = !PV.inv; renderPlay(true); return; }
+    if (a === 'hid') { PV.hid = b.checked; renderPlay(true); return; }
+    if (a === 'use') {
+      const r = E.useItem(PV.pj, PV.st, b.dataset.name);
+      PV.fx = r.fx; if (!r.ok) toast(r.error); renderPlay(true); return;
+    }
     if (a === 'cont') {
       const r = E.continueRun(PV.pj, PV.st);
       PV.fx = r.fx;
@@ -665,6 +682,124 @@
     });
   }
 
+  /* ================= 아이템 목록 / 세부 태그 ================= */
+  function showItems(openName) {
+    const pj = proj();
+    let cur = openName || null, tab = 'all';
+    const m = modal('', 'wide');
+    const box = m.el.firstChild;
+    const entryOf = (name) => E.keywordEntries(pj).find((e) => e.name === name);
+    const usageText = (u) => ['얻기 ' + u.gain, '잃기 ' + u.lose, '조건 ' + u.cond].filter((x, i) => [u.gain, u.lose, u.cond][i]).join(' · ') || '쓰이는 곳 없음';
+    const effectHtml = (path, ef) => '<div class="efx">' + pj.stats.map((s) => '<label class="efs">' + esc(s.name) + '<input type="number" data-p="' + path + '.stats.' + s.id + '" data-t="num" value="' + (Number(ef.stats[s.id]) || 0) + '"></label>').join('') + '</div>' +
+      '<div class="prop"><label>얻기</label><input type="text" data-p="' + path + '.gain" value="' + esc(ef.gain) + '" placeholder="예: 복통, 빈 깡통"></div>' +
+      '<div class="prop"><label>잃기</label><input type="text" data-p="' + path + '.lose" value="' + esc(ef.lose) + '" placeholder="예: 허기"></div>';
+    const folder = (icon, title, inner, open, sub) => '<details class="tf' + (sub ? ' sub' : '') + '"' + (open ? ' open' : '') + '><summary>' + icon + ' ' + esc(title) + '</summary><div class="tfb">' + inner + '</div></details>';
+
+    function listHtml() {
+      const all = E.keywordEntries(pj).filter((e) => tab === 'all' || e.kind === tab);
+      const tabs = '<div class="seg" style="margin:8px 0">' + [['all', '전체'], ['item', '아이템'], ['status', '상태']].map((t) => '<button data-tab="' + t[0] + '" class="' + (tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>').join('') + '</div>';
+      const rows = all.map((e) => '<div class="kr" data-open="' + esc(e.name) + '"><span class="ki">' + esc(e.icon || (e.kind === 'status' ? '🩺' : '🎒')) + '</span><div class="grow"><b>' + esc(e.name) + '</b>' + (e.hidden ? ' <em class="fchip" style="margin:0">숨김</em>' : '') +
+        '<div class="muted">' + (e.kind === 'status' ? '상태' : '아이템') + ' · ' + esc(usageText(e.usage)) + '</div>' +
+        (e.kind === 'item' ? '<div>' + E.tagChips(e.tags).map((c) => '<span class="tag">' + esc(c) + '</span> ').join('') + '</div>' : '') + '</div></div>').join('');
+      return '<div class="row" style="justify-content:space-between"><h3 style="margin:0">🎒 아이템 · 상태 목록</h3><button class="pri sm" data-x="1">닫기</button></div>' +
+        '<div class="muted">페이지에서 쓰인 아이템·상태는 자동으로 나타나요. 눌러서 세부 태그(사용·부패·조건 등)를 설정하세요.</div>' + tabs +
+        '<div class="row" style="margin-bottom:6px"><input type="text" id="kwNew" class="grow" placeholder="새 아이템/상태 이름 (예: 빵)"><button class="pri sm" data-newkw="item">＋ 아이템</button><button class="sm" data-newkw="status">＋ 상태</button></div>' +
+        (rows || '<div class="muted" style="padding:10px">아직 없어요. 위에서 이름을 입력해 추가하거나, 선택지의 “얻기”에 이름을 쓰면 자동으로 나타나요.</div>');
+    }
+
+    function detailHtml(e) {
+      const t = e.tags, isItem = e.kind === 'item';
+      let h = '<div class="row"><button class="sm" data-back="1">← 목록</button><h3 style="margin:0" class="grow">' + esc(e.icon) + ' ' + esc(e.base) + (e.hidden ? ' <span class="muted">(숨김)</span>' : '') + '</h3><button class="sm" data-x="1">닫기</button></div>';
+      h += '<div class="muted" style="margin:4px 0">' + esc(usageText(e.usage)) + (e.usage.pages.length ? ' · P.' + e.usage.pages.slice(0, 12).join(', ') + (e.usage.pages.length > 12 ? ' …' : '') : '') + '</div>';
+      h += '<div class="prop"><label>이름</label><input type="text" id="kwName" value="' + esc(e.name) + '"><button class="sm" data-rename="1">이름 변경</button></div>';
+      h += '<div class="muted" style="margin:-2px 0 6px">이름을 바꾸면 모든 페이지의 얻기·잃기·조건이 함께 바뀌어요. 앞에 @ 를 붙이면 인벤토리에 안 보이는 숨김이에요.</div>';
+      h += '<div class="prop"><label>종류</label><div class="seg grow"><button data-kind="item" class="' + (isItem ? 'on' : '') + '">아이템</button><button data-kind="status" class="' + (!isItem ? 'on' : '') + '">상태</button></div></div>';
+      h += '<div class="prop"><label>아이콘</label><input type="text" data-m="icon" value="' + esc(e.icon) + '" placeholder="이모지 1개 (선택)" style="max-width:120px"></div>';
+      h += '<div class="prop"><label>설명</label><input type="text" data-m="desc" value="' + esc(e.desc) + '" placeholder="인벤토리에 보일 설명"></div>';
+      h += '<div class="tfroot">';
+      if (isItem) {
+        h += folder('📁', '기본', '<div class="prop"><label>분류</label><select data-p="basic.type">' + E.ITEM_TYPES.map((x) => '<option value="' + x.id + '"' + (t.basic.type === x.id ? ' selected' : '') + '>' + x.name + '</option>').join('') + '</select></div>' +
+          '<label class="ck"><input type="checkbox" data-p="basic.stack" data-t="bool"' + (t.basic.stack ? ' checked' : '') + '> 같은 아이템은 개수로 묶어서 표시</label>', true);
+        let use = '<label class="ck"><input type="checkbox" data-p="use.usable" data-t="bool" data-re="1"' + (t.use.usable ? ' checked' : '') + '> 인벤토리에서 직접 사용할 수 있음 (먹기·쓰기)</label>';
+        if (t.use.usable) {
+          use += '<label class="ck"><input type="checkbox" data-p="use.consume" data-t="bool"' + (t.use.consume ? ' checked' : '') + '> 사용하면 1개 사라짐</label>' +
+            '<div class="prop"><label>사용 조건</label><input type="text" data-p="use.cond" value="' + esc(t.use.cond) + '" placeholder="예: 체력<5, !배부름, 물 (비우면 항상)"></div>' +
+            '<div class="prop"><label>우선순위</label><input type="number" data-p="use.priority" data-t="num" value="' + t.use.priority + '" style="max-width:100px"><span class="muted">작을수록 먼저 먹어요</span></div>' +
+            folder('📁', '기본 효과', effectHtml('use.effect', t.use.effect), true, true) +
+            folder('📁', '조건부 효과 (' + t.use.rules.length + ')', t.use.rules.map((r, i) => '<div class="rule"><div class="prop"><label>만약</label><input type="text" data-p="use.rules.' + i + '.cond" value="' + esc(r.cond) + '" placeholder="예: 체력<3 , 불 , !독"><button class="sm dng" data-delrule="' + i + '">삭제</button></div>' + effectHtml('use.rules.' + i + '.effect', r.effect) + '</div>').join('') +
+              '<button class="sm" data-addrule="1">＋ 조건부 효과 추가</button><div class="muted" style="margin-top:4px">사용할 때 조건이 맞는 규칙의 효과가 기본 효과에 더해져요.</div>', true, true);
+        }
+        h += folder('📁', '사용' + (t.use.usable ? '' : ' (꺼짐)'), use, true);
+        let sp = '<label class="ck"><input type="checkbox" data-p="spoil.on" data-t="bool" data-re="1"' + (t.spoil.on ? ' checked' : '') + '> 부패 태그 (상한 상태)</label>';
+        if (t.spoil.on) {
+          sp += '<label class="ck"><input type="checkbox" data-p="spoil.late" data-t="bool"' + (t.spoil.late ? ' checked' : '') + '> 후순위로 먹기 (인벤토리에서 맨 뒤)</label>' +
+            '<label class="ck"><input type="checkbox" data-p="spoil.block" data-t="bool"' + (t.spoil.block ? ' checked' : '') + '> 아예 먹을 수 없음</label>' +
+            folder('📁', '부패 효과 (먹었을 때 추가)', effectHtml('spoil.effect', t.spoil.effect) + '<div class="muted">예: 체력 −2, 얻기에 “복통” 상태를 적어두면 아픈 상태가 돼요.</div>', true, true);
+        }
+        h += folder('📁', '부패' + (t.spoil.on ? '' : ' (꺼짐)'), sp, true);
+      }
+      h += folder('📁', '사용자 태그 (' + t.custom.length + ')', '<div>' + t.custom.map((c, i) => '<span class="chip">#' + esc(c) + ' <button class="x" data-deltag="' + i + '">×</button></span>').join('') + '</div>' +
+        '<div class="row"><input type="text" id="kwTag" class="grow" placeholder="예: 보존식, 약, 무거움"><button class="sm" data-addtag="1">추가</button></div>', t.custom.length > 0);
+      h += '</div><div class="row" style="justify-content:space-between;margin-top:12px"><button class="sm" data-hide="1">' + (e.hidden ? '👁 보임으로 변환' : '🙈 숨김으로 변환') + '</button>' +
+        '<button class="sm dng" data-delmeta="1">설정 지우기</button></div>';
+      return h;
+    }
+
+    function paint() {
+      const sc = box.scrollTop;
+      const e = cur && entryOf(cur);
+      if (cur && !e) cur = null;
+      box.innerHTML = e ? detailHtml(e) : listHtml();
+      box.scrollTop = e ? sc : 0;
+    }
+    const ensure = () => { const em = E.setKeywordMeta(pj, cur, {}); em.tags = E.normTags(em.tags); return em; };
+    const setPath = (obj, path, v) => { const ks = path.split('.'); let o = obj; ks.slice(0, -1).forEach((k) => { o = o[k]; }); o[ks[ks.length - 1]] = v; };
+
+    m.el.addEventListener('input', (ev) => {
+      const t = ev.target;
+      if (t.dataset.m) { E.setKeywordMeta(pj, cur, { [t.dataset.m]: t.value }); touch(); return; }
+      if (t.dataset.p && t.type !== 'checkbox' && t.tagName !== 'SELECT') {
+        const em = ensure(); setPath(em.tags, t.dataset.p, t.dataset.t === 'num' ? Number(t.value) || 0 : t.value); touch();
+      }
+    });
+    m.el.addEventListener('change', (ev) => {
+      const t = ev.target;
+      if (!t.dataset.p || !(t.type === 'checkbox' || t.tagName === 'SELECT')) return;
+      const em = ensure(); setPath(em.tags, t.dataset.p, t.type === 'checkbox' ? t.checked : t.value); touch();
+      if (t.dataset.re || t.tagName === 'SELECT') paint();
+    });
+    m.el.addEventListener('click', (ev) => {
+      const g = (a) => ev.target.closest('[' + a + ']');
+      if (g('data-x')) { m.close(); renderPage(); return; }
+      let b;
+      if ((b = g('data-tab'))) { tab = b.dataset.tab; paint(); return; }
+      if ((b = g('data-open'))) { cur = b.dataset.open; paint(); return; }
+      if (g('data-back')) { cur = null; paint(); return; }
+      if ((b = g('data-newkw'))) {
+        const name = $('#kwNew', m.el).value.trim(), bad = E.checkKwName(name);
+        if (bad) { toast(bad); return; }
+        E.setKeywordMeta(pj, name, { kind: b.dataset.newkw }); touch(); cur = name; paint(); return;
+      }
+      if (!cur) return;
+      if (g('data-rename')) {
+        const to = $('#kwName', m.el).value.trim();
+        try { const r = E.renameKeyword(pj, cur, to); touch(); cur = to; paint(); toast(r.tokens + '곳의 이름을 바꿨어요'); } catch (err) { toast(err.message); }
+        return;
+      }
+      if (g('data-hide')) { const to = E.isHiddenKw(cur) ? E.baseKw(cur) : '@' + cur; try { E.toggleHiddenKw(pj, cur); touch(); cur = to; paint(); } catch (err) { toast(err.message); } return; }
+      if ((b = g('data-kind'))) { E.setKeywordMeta(pj, cur, { kind: b.dataset.kind }); touch(); paint(); return; }
+      if (g('data-addrule')) { ensure().tags.use.rules.push(E.newRule()); touch(); paint(); return; }
+      if ((b = g('data-delrule'))) { ensure().tags.use.rules.splice(+b.dataset.delrule, 1); touch(); paint(); return; }
+      if (g('data-addtag')) {
+        const v = $('#kwTag', m.el).value.trim().replace(/^#/, ''); if (!v) return;
+        const em = ensure(); if (!em.tags.custom.includes(v)) em.tags.custom.push(v); touch(); paint(); return;
+      }
+      if ((b = g('data-deltag'))) { ensure().tags.custom.splice(+b.dataset.deltag, 1); touch(); paint(); return; }
+      if (g('data-delmeta')) { E.removeKeywordMeta(pj, cur); touch(); cur = null; paint(); toast('설정을 지웠어요 (페이지에서 쓰이는 이름은 목록에 남아요)'); }
+    });
+    paint();
+  }
+
   /* ================= 클릭 / 입력 이벤트 ================= */
   document.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-act]');
@@ -712,6 +847,7 @@
       case 'flowexit': S.view = 'edit'; render(); break;
       case 'json': showJson(); break;
       case 'achvs': showAchvs(); break;
+      case 'items': showItems(); break;
       case 'check': showCheck(); break;
       case 'toggleside': S.side = !S.side; renderEditor(); break;
       case 'mode': {

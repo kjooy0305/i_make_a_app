@@ -90,6 +90,22 @@ button:disabled{opacity:.4;cursor:default}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20;display:flex;align-items:center;justify-content:center;padding:14px}
 .modal>div{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:16px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto}
 /* 플레이 화면: 창이 아니라 화면 전체. 읽기 좋은 폭(720px)으로 가운데 정렬하되 스크롤바는 화면 끝에 둔다 */
+.modal.wide>div{max-width:720px}
+.kr,.ir{display:flex;gap:10px;align-items:flex-start;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--card);margin:6px 0}
+.kr{cursor:pointer}.kr:hover{border-color:var(--pri)}
+.ki{font-size:20px;line-height:1.3;flex:none}
+.ir.late{border-color:var(--bad)}
+.ir small.bad{color:var(--bad);display:block;font-size:11px}
+.tf{border:1px solid var(--line);border-radius:10px;margin:8px 0;background:var(--bg)}
+.tf>summary{cursor:pointer;padding:8px 10px;font-weight:700}
+.tf.sub{background:var(--card)}
+.tfb{padding:0 10px 10px}
+.rule{border-left:3px solid var(--purple);padding-left:8px;margin:8px 0}
+.efx{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.efs{font-size:12px;color:var(--sub);display:flex;flex-direction:column;width:76px}
+.ck{display:flex;gap:8px;align-items:center;margin:6px 0;font-size:13px}
+.ck input{width:auto}
+.grow-l{margin-left:auto}
 .modal.full{padding:0;background:var(--bg);align-items:stretch;justify-content:stretch;z-index:25;--pvx:max(16px,calc((100vw - 720px) / 2))}
 .modal.full>div{max-width:none;width:100%;height:100%;max-height:none;border:0;border-radius:0;background:transparent;padding:0;display:flex;flex-direction:column;overflow:hidden}
 .modal.full .pv-head{padding:max(10px,env(safe-area-inset-top)) max(var(--pvx),env(safe-area-inset-right)) 4px max(var(--pvx),env(safe-area-inset-left));flex:none;flex-wrap:nowrap}

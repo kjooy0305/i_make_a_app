@@ -37,7 +37,7 @@
     return {
       id: uid('p'), name: name || '새 이야기', tag: tag || '', color: color || 0,
       createdAt: Date.now(), updatedAt: Date.now(),
-      stats: defaultStats(), achievements: [], groups: [], pages: [newPage(0)],
+      stats: defaultStats(), achievements: [], groups: [], catalog: [], pages: [newPage(0)],
     };
   }
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -58,6 +58,199 @@
       out.push({ name: t, qty, hidden: t.startsWith('@') });
     });
     return out;
+  }
+
+
+  /* ---------- 키워드(아이템·상태) 목록 ----------
+   * 아이템/상태는 모두 "키워드 문자열"이다. 이름이 같아도 앞에 @ 가 붙은 것(히든)은 다른 키워드로 취급한다.
+   *   '열쇠'(보임) ≠ '@열쇠'(숨김). 인벤토리에는 보임 키워드만 나오고, 변환(rename)으로 서로 바꿀 수 있다.
+   * pj.catalog = [{ name, kind: 'item'|'status', desc, icon }] 은 설명·분류 정보(선택). 프로젝트에서 쓰이는 키워드는 등록하지 않아도 목록에 자동으로 나타난다. */
+  const KINDS = [{ id: 'item', name: '아이템' }, { id: 'status', name: '상태' }];
+  const isHiddenKw = (n) => String(n).startsWith('@');
+  const baseKw = (n) => String(n).replace(/^@/, '');
+  const TOKEN = /^(\s*)(!?)\s*(.*?)(\s*\*\s*\d+)?(\s*)$/;
+  const BAD_KW = /[,*!<>=]/;
+
+  // "a, b*2, !c" 의 키워드 토큰을 fn(이름) 으로 바꾼다. 상태 비교(돈>=100)는 건드리지 않는다.
+  function mapKeywords(str, fn) {
+    return String(str == null ? '' : str).split(',').map((raw) => {
+      const m = TOKEN.exec(raw);
+      if (!m || !m[3]) return raw;
+      return m[1] + m[2] + fn(m[3]) + (m[4] || '') + m[5];
+    }).join(',');
+  }
+  function statTerm(pj, name) { const c = CMP.exec(name); return !!(c && findStat(pj, c[1].trim())); }
+
+  // 프로젝트 전체를 훑어 키워드가 쓰인 곳을 cb(이름, 역할, 페이지 번호) 로 알려준다. 역할: gain | lose | cond
+  function eachKeyword(pj, cb) {
+    pj.pages.forEach((p) => p.choices.forEach((c) => {
+      [c.show, c.enable].forEach((str) => { if (str) mapKeywords(str, (n) => { if (!statTerm(pj, n)) cb(n, 'cond', p.n); return n; }); });
+      [c.base].concat(c.branches || []).forEach((o) => {
+        if (o.gain) parseItems(o.gain).forEach((it) => cb(it.name, 'gain', p.n));
+        if (o.lose) parseItems(o.lose).forEach((it) => cb(it.name, 'lose', p.n));
+      });
+      if (c.branchType === 'item') (c.branches || []).forEach((b) => { if (b.when) mapKeywords(b.when, (n) => { if (!statTerm(pj, n)) cb(n, 'cond', p.n); return n; }); });
+    }));
+  }
+  function scanKeywords(pj) {
+    const map = new Map();
+    eachKeyword(pj, (name, role, n) => {
+      const u = map.get(name) || { gain: 0, lose: 0, cond: 0, pages: new Set() };
+      u[role]++; u.pages.add(n); map.set(name, u);
+    });
+    return map;
+  }
+
+  /* ---------- 아이템 세부 태그 (폴더 구조) ----------
+   * catalog 항목의 tags = {
+   *   basic:  { type: food|tool|gear|material|etc, stack: bool }                        // 폴더 "기본"
+   *   use:    { usable, consume, priority, cond, effect:{stats,gain,lose}, rules:[{cond,effect}] }   // 폴더 "사용" (+ 하위 "조건부 효과")
+   *   spoil:  { on, block, late, effect:{stats,gain,lose} }                               // 폴더 "부패"
+   *   custom: ['보존식', ...]                                                             // 폴더 "사용자 태그"
+   * }
+   * 사용 순서: 부패(late)가 아닌 것 먼저, 그 안에서 priority 가 작은 것부터. */
+  const ITEM_TYPES = [
+    { id: 'food', name: '음식' }, { id: 'tool', name: '도구' }, { id: 'gear', name: '장비' },
+    { id: 'material', name: '재료' }, { id: 'etc', name: '기타' },
+  ];
+  const newEffect = () => ({ stats: {}, gain: '', lose: '' });
+  const newRule = () => ({ id: uid('r'), cond: '', effect: newEffect() });
+  const effectOf = (e) => ({ stats: Object.assign({}, e && e.stats), gain: String((e && e.gain) || ''), lose: String((e && e.lose) || '') });
+  function normTags(t) {
+    t = t || {};
+    const b = t.basic || {}, u = t.use || {}, sp = t.spoil || {};
+    return {
+      basic: { type: ITEM_TYPES.some((x) => x.id === b.type) ? b.type : 'etc', stack: b.stack !== false },
+      use: {
+        usable: !!u.usable, consume: u.consume !== false, priority: Number(u.priority) || 0, cond: String(u.cond || ''),
+        effect: effectOf(u.effect),
+        rules: (Array.isArray(u.rules) ? u.rules : []).map((r) => ({ id: r.id || uid('r'), cond: String(r.cond || ''), effect: effectOf(r.effect) })),
+      },
+      spoil: { on: !!sp.on, block: !!sp.block, late: sp.late !== false, effect: effectOf(sp.effect) },
+      custom: (Array.isArray(t.custom) ? t.custom : []).map((x) => String(x).trim()).filter(Boolean),
+    };
+  }
+  const tagsOf = (pj, name) => { const m = (pj.catalog || []).find((e) => e.name === name); return normTags(m && m.tags); };
+  // 세부 태그를 한 줄 요약 칩으로 (목록·인벤토리 표시용)
+  function tagChips(t) {
+    const out = [];
+    const ty = ITEM_TYPES.find((x) => x.id === t.basic.type);
+    if (t.basic.type !== 'etc') out.push(ty.name);
+    if (t.use.usable) out.push('사용 가능');
+    if (t.use.cond) out.push('조건: ' + t.use.cond);
+    if (t.use.rules.length) out.push('조건부 효과 ' + t.use.rules.length);
+    if (t.spoil.on) out.push(t.spoil.block ? '부패(먹을 수 없음)' : '부패' + (t.spoil.late ? '·후순위' : ''));
+    t.custom.forEach((c) => out.push('#' + c));
+    return out;
+  }
+  const effectEmpty = (e) => !e.gain && !e.lose && !Object.keys(e.stats).some((k) => Number(e.stats[k]));
+  // 아이템 사용: 조건 확인 → 소모 → 기본 효과 → 조건 맞는 추가 효과 → 부패 효과. { ok, fx, error }
+  function useItem(pj, st, name) {
+    const t = tagsOf(pj, name), fx = [];
+    if (!have(st, name)) return { ok: false, fx, error: '갖고 있지 않아요' };
+    if (!t.use.usable) return { ok: false, fx, error: '사용할 수 없는 아이템이에요' };
+    if (t.spoil.on && t.spoil.block) return { ok: false, fx, error: '상해서 먹을 수 없어요' };
+    const miss = t.use.cond ? missingTerms(pj, st, t.use.cond) : [];
+    if (miss.length) return { ok: false, fx, error: '필요: ' + miss.join(', ') };
+    const rules = t.use.rules.filter((r) => checkCond(pj, st, r.cond));     // 소모·효과 적용 전에 판정
+    if (t.use.consume) loseItem(st, name, 1);
+    const run = (e) => applyOutcome(pj, st, Object.assign({}, e, { achv: '' })).forEach((f) => fx.push(f));
+    run(t.use.effect);
+    rules.forEach((r) => run(r.effect));
+    if (t.spoil.on) run(t.spoil.effect);
+    return { ok: true, fx };
+  }
+
+  // 목록용 항목: 쓰이는 키워드 + 등록만 된 키워드. 이름순(@ 없는 것 다음 @ 있는 것)으로 정렬
+  function keywordEntries(pj) {
+    const scan = scanKeywords(pj);
+    const meta = new Map((pj.catalog || []).map((e) => [e.name, e]));
+    const names = Array.from(new Set(Array.from(scan.keys()).concat(Array.from(meta.keys()))));
+    const out = names.map((name) => {
+      const m = meta.get(name), u = scan.get(name);
+      return {
+        name, base: baseKw(name), hidden: isHiddenKw(name), kind: m && m.kind === 'status' ? 'status' : 'item', desc: (m && m.desc) || '', icon: (m && m.icon) || '', registered: !!m, tags: normTags(m && m.tags),
+        usage: { gain: u ? u.gain : 0, lose: u ? u.lose : 0, cond: u ? u.cond : 0, pages: u ? Array.from(u.pages).sort((a, b) => a - b) : [] },
+      };
+    });
+    const have = new Set(names);
+    out.forEach((e) => { e.pair = have.has(e.hidden ? e.base : '@' + e.name); });   // 같은 이름의 보임/숨김 짝이 있음
+    out.sort((a, b) => a.base.localeCompare(b.base, 'ko') || (a.hidden - b.hidden));
+    return out;
+  }
+  // 수치 상태값(체력·돈 …)이 쓰인 곳 수
+  function statUsage(pj) {
+    const out = {};
+    pj.stats.forEach((s) => { out[s.id] = { effect: 0, cond: 0 }; });
+    pj.pages.forEach((p) => p.choices.forEach((c) => {
+      [c.show, c.enable].forEach((str) => String(str || '').split(',').forEach((t) => {
+        const m = CMP.exec(t.trim().replace(/^!/, '')), s = m && findStat(pj, m[1].trim());
+        if (s) out[s.id].cond++;
+      }));
+      [c.base].concat(c.branches || []).forEach((o) => Object.keys(o.stats || {}).forEach((id) => { if (o.stats[id] && out[id]) out[id].effect++; }));
+    }));
+    return out;
+  }
+  function checkKwName(name) {
+    const n = String(name == null ? '' : name).trim();
+    if (!n || n === '@') return '이름을 입력하세요';
+    if (BAD_KW.test(n.replace(/^@/, '')) || n.indexOf('@', 1) >= 0) return '이름에는 쉼표(,) * ! < > = 와 가운데 @ 를 쓸 수 없어요';
+    return '';
+  }
+  function setKeywordMeta(pj, name, patch) {
+    pj.catalog = pj.catalog || [];
+    let m = pj.catalog.find((e) => e.name === name);
+    if (!m) { m = { name, kind: 'item', desc: '', icon: '' }; pj.catalog.push(m); }
+    if (patch.kind) m.kind = patch.kind === 'status' ? 'status' : 'item';
+    if (patch.desc != null) m.desc = String(patch.desc);
+    if (patch.icon != null) m.icon = String(patch.icon).slice(0, 4);
+    if (patch.tags) m.tags = normTags(patch.tags);
+    return m;
+  }
+  function removeKeywordMeta(pj, name) { pj.catalog = (pj.catalog || []).filter((e) => e.name !== name); }
+  // 프로젝트 전체에서 키워드 이름을 바꾼다 (얻기/잃기/노출·활성 조건/아이템 분기). 이미 있는 이름이면 합친다.
+  function renameKeyword(pj, from, to) {
+    to = String(to).trim();
+    const bad = checkKwName(to);
+    if (bad) throw new Error(bad);
+    if (to === from) return { tokens: 0, merged: false };
+    let tokens = 0;
+    const fn = (n) => { if (n === from) { tokens++; return to; } return n; };
+    pj.pages.forEach((p) => p.choices.forEach((c) => {
+      if (c.show) c.show = mapKeywords(c.show, fn);
+      if (c.enable) c.enable = mapKeywords(c.enable, fn);
+      [c.base].concat(c.branches || []).forEach((o) => { o.gain = mapKeywords(o.gain, fn); o.lose = mapKeywords(o.lose, fn); });
+      if (c.branchType === 'item') (c.branches || []).forEach((b) => { b.when = mapKeywords(b.when, fn); });
+    }));
+    const cat = pj.catalog || (pj.catalog = []);
+    const src = cat.find((e) => e.name === from), dst = cat.find((e) => e.name === to);
+    if (src && dst) { if (!dst.desc) dst.desc = src.desc; if (!dst.icon) dst.icon = src.icon; removeKeywordMeta(pj, from); }
+    else if (src) src.name = to;
+    return { tokens, merged: !!(src && dst) };
+  }
+  // 보임 ↔ 숨김 변환: 열쇠 ↔ @열쇠
+  function toggleHiddenKw(pj, name) { return renameKeyword(pj, name, isHiddenKw(name) ? baseKw(name) : '@' + name); }
+
+  // 인게임 인벤토리: 수치 상태 / 상태 키워드 / 아이템. 히든(@)은 기본적으로 제외(opts.showHidden 으로 테스트용 표시)
+  // 아이템은 "먹는 순서"대로: 부패(후순위)는 맨 뒤, 그 안에서 priority 가 작은 것부터
+  function inventoryView(pj, st, opts) {
+    const showHidden = !!(opts && opts.showHidden);
+    const meta = new Map((pj.catalog || []).map((e) => [e.name, e]));
+    const all = Object.keys(st.items).map((name) => {
+      const m = meta.get(name) || {}, t = normTags(m.tags), kind = m.kind === 'status' ? 'status' : 'item';
+      const r = { name, base: baseKw(name), count: st.items[name], kind, desc: m.desc || '', icon: m.icon || '', hidden: isHiddenKw(name), tags: t, chips: kind === 'item' ? tagChips(t) : t.custom.map((c) => '#' + c) };
+      r.spoiled = kind === 'item' && t.spoil.on;
+      r.late = r.spoiled && t.spoil.late;
+      const u = kind === 'item' ? useItem(pj, JSON.parse(JSON.stringify(st)), name) : { ok: false, error: '' };
+      r.canUse = u.ok; r.useError = u.ok ? '' : (kind === 'item' && t.use.usable ? u.error : '');
+      return r;
+    }).sort((a, b) => (a.late - b.late) || (a.tags.use.priority - b.tags.use.priority) || a.base.localeCompare(b.base, 'ko') || (a.hidden - b.hidden));
+    const rows = all.filter((r) => showHidden || !r.hidden);
+    return {
+      stats: pj.stats.map((s) => ({ id: s.id, name: s.name, value: st.stats[s.id], max: s.max })),
+      statuses: rows.filter((r) => r.kind === 'status'), items: rows.filter((r) => r.kind === 'item'),
+      hiddenCount: all.filter((r) => r.hidden).length, total: rows.length,
+    };
   }
 
   /* ---------- 상태 ---------- */
@@ -576,6 +769,7 @@
     pj.stats = Array.isArray(raw.stats) && raw.stats.length ? raw.stats : defaultStats();
     pj.achievements = Array.isArray(raw.achievements) ? raw.achievements : [];
     pj.groups = Array.isArray(raw.groups) ? raw.groups : [];
+    pj.catalog = Array.isArray(raw.catalog) ? raw.catalog.filter((e) => e && typeof e.name === 'string' && e.name) : [];
     pj.pages = raw.pages.map((p) => Object.assign(newPage(p.n | 0), p, {
       choices: (p.choices || []).map((c) => Object.assign(newChoice(0), c, { base: Object.assign(newOutcome(0), c.base), branches: (c.branches || []).map((b) => Object.assign(newOutcome(0), b)) })),
     }));
@@ -589,6 +783,7 @@
     lastPageNo, pageOf, parseItems, initState, have, addItem, loseItem,
     checkCond, missingTerms, branchSum, baseProb, resolveChoice, applyOutcome,
     visibleChoices, choose, validate, normalizeProject,
+    KINDS, ITEM_TYPES, newEffect, newRule, normTags, tagsOf, tagChips, effectEmpty, useItem, isHiddenKw, baseKw, mapKeywords, eachKeyword, scanKeywords, keywordEntries, statUsage, checkKwName, setKeywordMeta, removeKeywordMeta, renameKeyword, toggleHiddenKw, inventoryView,
     FLOW, parentsOf, pageLabel, destinationsOf, buildFlow, toStoryArray, applyStoryArray,
   };
 });
