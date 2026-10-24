@@ -10,7 +10,7 @@
   'use strict';
 
   const ID = 'tutorial';
-  const VERSION = 2;
+  const VERSION = 3;
 
   /* ---------- 만들기 도우미 ---------- */
   // 선택지 결과 하나를 만든다. spec: { to | group | random:{pool,min,max,after:{page}|{group}} | cont, gain, lose, achv, stats }
@@ -263,12 +263,12 @@
 
     /* ───── 9. 인벤토리와 아이템 태그 (보너스) ───── */
     [80, { title: '9단원 · 인벤토리', group: 'l9', body:
-      '🎒 9단원 · 인벤토리와 아이템 태그 (보너스)\n\n【게임 화면】 위쪽 상태줄의 “🎒 인벤토리” 버튼을 누르면 상태(예: 복통)와 아이템이 나뉘어 보여요. 아이템은 “먹는 순서대로” 정렬되고, 부패한 것은 맨 뒤에 ⚠ 표시가 붙어요. 사용할 수 있는 아이템에는 [사용] 버튼이 있어요. (@로 시작하는 히든은 숨김)\n\n【편집기】 위쪽 “🎒 아이템”에서 아이템·상태 목록을 열어 항목을 누르면 세부 태그를 폴더로 설정해요.\n📁 기본 — 분류(음식/도구…)\n📁 사용 — 사용 가능, 사용 조건, 우선순위, 기본 효과, 조건부 효과(여러 조건)\n📁 부패 — 후순위, 먹을 수 없음, 먹었을 때 추가 효과(아픔 등)\n📁 사용자 태그 — 자유 태그\n\n아래에서 배낭을 챙기고 인벤토리를 열어 보세요!' }, [
+      '🎒 9단원 · 인벤토리와 아이템 태그 (보너스)\n\n【게임 화면】 위쪽 상태줄의 “🎒 인벤토리” 버튼을 누르면 상태(예: 복통)와 아이템이 나뉘어 보여요. 아이템은 “먹는 순서대로” 정렬되고, 부패한 것은 맨 뒤에 ⚠ 표시가 붙어요. 사용할 수 있는 아이템에는 [사용] 버튼이 있어요. (@로 시작하는 히든은 숨김)\n\n【편집기】 위쪽 “🎒 아이템”에서 아이템·상태 목록을 열어 항목을 누르면 세부 태그를 폴더로 설정해요.\n📁 기본 — 분류(음식/도구…)\n📁 사용 — 사용 가능, 사용 조건, 우선순위, 기본 효과, 조건부 효과(여러 조건)\n📁 부패 — 후순위, 먹을 수 없음, 먹었을 때 추가 효과(아픔 등)\n📁 사용자 태그 — 자유 태그\n\n📁 조건부 설명 — 조건에 따라 설명이 바뀜 (위에서부터 맞는 첫 설명)\n“플레이 중 태그 숨기기”를 켜면 인벤토리에서 태그 칩이 안 보여요.\n\n아래에서 배낭을 챙기고 인벤토리를 열어 보세요!' }, [
       { text: '배낭을 챙긴다 (아이템 여러 개, 체력 -3)', to: 81, gain: '빵, 상한 빵, 말린 고기, 상한 우유, 소화제, 허기', stats: { hp: -3 } },
       { text: '허브로 돌아가기', to: 0 },
     ]],
     [81, { title: '인벤토리 체험', group: 'l9', body:
-      '🍞 배낭에 아이템이 들어왔어요. “🎒 인벤토리”를 열어 아래를 확인해 보세요.\n\n• 빵 — 먹으면 체력 +1. “허기” 상태일 때는 조건부 효과로 체력 +1 더, 허기도 사라져요.\n• 말린 고기 — 사용 조건 “!복통” (복통 중엔 못 먹음, [사용]이 비활성). 체력이 3보다 낮을 때는 조건부 효과로 +1 더.\n• 상한 빵 — 부패 태그. 맨 뒤로 정렬되고(후순위), 먹으면 체력 -2에 “복통” 상태가 생겨요.\n• 상한 우유 — 부패 + “먹을 수 없음”이라 [사용]이 안 눌려요.\n• 소화제 — 먹으면 “복통” 상태를 없애요.\n\n💡 상한 빵을 먹어 복통이 걸린 뒤 말린 고기가 비활성이 되는 걸 보고, 소화제로 고쳐 보세요.' }, [
+      '🍞 배낭에 아이템이 들어왔어요. “🎒 인벤토리”를 열어 아래를 확인해 보세요.\n\n• 빵 — 먹으면 체력 +1. “허기” 상태일 때는 조건부 효과로 체력 +1 더, 허기도 사라져요.\n• 말린 고기 — 사용 조건 “!복통” (복통 중엔 못 먹음, [사용]이 비활성). 체력이 3보다 낮을 때는 조건부 효과로 +1 더.\n• 상한 빵 — 부패 태그. 맨 뒤로 정렬되고(후순위), 먹으면 체력 -2에 “복통” 상태가 생겨요.\n• 상한 우유 — 부패 + “먹을 수 없음”이라 [사용]이 안 눌려요.\n• 빵 설명 — “허기” 상태일 땐 설명이 “배가 고플 때 먹으면 더 든든하다.”로 바뀌어요 (조건부 설명).\n• 말린 고기 — 태그 숨기기가 켜져 있어 태그 칩이 안 보여요.\n• 소화제 — 먹으면 “복통” 상태를 없애요.\n\n💡 상한 빵을 먹어 복통이 걸린 뒤 말린 고기가 비활성이 되는 걸 보고, 소화제로 고쳐 보세요.' }, [
       { text: '허브로 돌아간다', to: 0 },
     ]],
 
@@ -289,8 +289,8 @@
     // 아이템·상태 목록(세부 태그) 예시
     const eff = (o) => Object.assign(E.newEffect(), o);
     const item = (name, desc, icon, tags) => E.setKeywordMeta(pj, name, { kind: 'item', desc, icon, tags });
-    item('빵', '평범한 빵.', '🍞', { basic: { type: 'food' }, use: { usable: true, priority: 0, effect: eff({ stats: { hp: 1 } }), rules: [{ cond: '허기', effect: eff({ stats: { hp: 1 }, lose: '허기' }) }] } });
-    item('말린 고기', '오래 두고 먹는 고기. 속이 아플 땐 못 먹는다.', '🥩', { basic: { type: 'food' }, use: { usable: true, priority: 1, cond: '!복통', effect: eff({ stats: { hp: 2 } }), rules: [{ cond: '체력<3', effect: eff({ stats: { hp: 1 } }) }] }, custom: ['보존식'] });
+    item('빵', '평범한 빵.', '🍞', { descs: [{ cond: '허기', text: '배가 고플 때 먹으면 더 든든하다.' }], basic: { type: 'food' }, use: { usable: true, priority: 0, effect: eff({ stats: { hp: 1 } }), rules: [{ cond: '허기', effect: eff({ stats: { hp: 1 }, lose: '허기' }) }] } });
+    item('말린 고기', '오래 두고 먹는 고기. 속이 아플 땐 못 먹는다.', '🥩', { basic: { type: 'food', hideTags: true }, use: { usable: true, priority: 1, cond: '!복통', effect: eff({ stats: { hp: 2 } }), rules: [{ cond: '체력<3', effect: eff({ stats: { hp: 1 } }) }] }, custom: ['보존식'] });
     item('상한 빵', '곰팡이가 폈다. 먹으면 탈이 난다.', '🥖', { basic: { type: 'food' }, use: { usable: true, priority: 0, effect: eff({ stats: { hp: 1 } }) }, spoil: { on: true, late: true, effect: eff({ stats: { hp: -2 }, gain: '복통' }) } });
     item('상한 우유', '시큼한 냄새. 도저히 못 먹겠다.', '🥛', { basic: { type: 'food' }, use: { usable: true }, spoil: { on: true, block: true } });
     item('소화제', '복통을 가라앉힌다.', '💊', { basic: { type: 'tool' }, use: { usable: true, effect: eff({ lose: '복통' }) } });
@@ -342,6 +342,8 @@
     '아이템 태그: 조건부 효과': (pj) => (pj.catalog || []).some((e) => E.normTags(e.tags).use.rules.length),
     '아이템 태그: 부패(후순위·부작용)': (pj) => (pj.catalog || []).some((e) => { const t = E.normTags(e.tags).spoil; return t.on && t.late && !E.effectEmpty(t.effect); }),
     '아이템 태그: 먹을 수 없음': (pj) => (pj.catalog || []).some((e) => { const t = E.normTags(e.tags).spoil; return t.on && t.block; }),
+    '아이템 태그: 조건부 설명': (pj) => (pj.catalog || []).some((e) => E.normTags(e.tags).descs.length),
+    '아이템 태그: 플레이 중 태그 숨김': (pj) => (pj.catalog || []).some((e) => E.normTags(e.tags).basic.hideTags),
     '아이템 태그: 사용자 태그': (pj) => (pj.catalog || []).some((e) => E.normTags(e.tags).custom.length),
     '다음 이야기로(마지막 페이지)': (pj) => pj.pages.some((p) => E.folderOf(p) === 'random' && p.isEnd),
   };

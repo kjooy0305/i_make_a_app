@@ -716,7 +716,7 @@
       h += '<div class="prop"><label>종류</label><div class="seg grow"><button data-kind="item" class="' + (isItem ? 'on' : '') + '">아이템</button><button data-kind="status" class="' + (!isItem ? 'on' : '') + '">상태</button></div></div>';
       h += '<div class="prop"><label>아이콘</label><input type="text" data-m="icon" value="' + esc(e.icon) + '" placeholder="이모지 1개 (선택)" style="max-width:120px"></div>';
       h += '<div class="prop"><label>설명</label><input type="text" data-m="desc" value="' + esc(e.desc) + '" placeholder="인벤토리에 보일 설명"></div>';
-      h += '<div class="tfroot">';
+      h += '<div class="tfroot"><label class="ck"><input type="checkbox" data-p="basic.hideTags" data-t="bool"' + (t.basic.hideTags ? ' checked' : '') + '> 플레이 중 태그(칩)를 인벤토리에 보이지 않게 하기</label>';
       if (isItem) {
         h += folder('📁', '기본', '<div class="prop"><label>분류</label><select data-p="basic.type">' + E.ITEM_TYPES.map((x) => '<option value="' + x.id + '"' + (t.basic.type === x.id ? ' selected' : '') + '>' + x.name + '</option>').join('') + '</select></div>' +
           '<label class="ck"><input type="checkbox" data-p="basic.stack" data-t="bool"' + (t.basic.stack ? ' checked' : '') + '> 같은 아이템은 개수로 묶어서 표시</label>', true);
@@ -738,6 +738,8 @@
         }
         h += folder('📁', '부패' + (t.spoil.on ? '' : ' (꺼짐)'), sp, true);
       }
+      h += folder('📁', '조건부 설명 (' + t.descs.length + ')', t.descs.map((d, i) => '<div class="rule"><div class="prop"><label>만약</label><input type="text" data-p="descs.' + i + '.cond" value="' + esc(d.cond) + '" placeholder="예: 복통, 체력<3 (비우면 항상)"><button class="sm" data-updesc="' + i + '">▲</button><button class="sm dng" data-deldesc="' + i + '">삭제</button></div><textarea data-p="descs.' + i + '.text" rows="2" placeholder="이 조건일 때 보일 설명">' + esc(d.text) + '</textarea></div>').join('') +
+        '<button class="sm" data-adddesc="1">＋ 조건부 설명 추가</button><div class="muted" style="margin-top:4px">위에서부터 조건이 맞는 첫 설명이 위의 기본 설명 대신 인벤토리에 보여요. (▲로 순서 변경)</div>', true);
       h += folder('📁', '사용자 태그 (' + t.custom.length + ')', '<div>' + t.custom.map((c, i) => '<span class="chip">#' + esc(c) + ' <button class="x" data-deltag="' + i + '">×</button></span>').join('') + '</div>' +
         '<div class="row"><input type="text" id="kwTag" class="grow" placeholder="예: 보존식, 약, 무거움"><button class="sm" data-addtag="1">추가</button></div>', t.custom.length > 0);
       h += '</div><div class="row" style="justify-content:space-between;margin-top:12px"><button class="sm" data-hide="1">' + (e.hidden ? '👁 보임으로 변환' : '🙈 숨김으로 변환') + '</button>' +
@@ -788,6 +790,9 @@
       }
       if (g('data-hide')) { const to = E.isHiddenKw(cur) ? E.baseKw(cur) : '@' + cur; try { E.toggleHiddenKw(pj, cur); touch(); cur = to; paint(); } catch (err) { toast(err.message); } return; }
       if ((b = g('data-kind'))) { E.setKeywordMeta(pj, cur, { kind: b.dataset.kind }); touch(); paint(); return; }
+      if (g('data-adddesc')) { ensure().tags.descs.push(E.newDesc()); touch(); paint(); return; }
+      if ((b = g('data-deldesc'))) { ensure().tags.descs.splice(+b.dataset.deldesc, 1); touch(); paint(); return; }
+      if ((b = g('data-updesc'))) { const d = ensure().tags.descs, i = +b.dataset.updesc; if (i > 0) { [d[i - 1], d[i]] = [d[i], d[i - 1]]; touch(); paint(); } return; }
       if (g('data-addrule')) { ensure().tags.use.rules.push(E.newRule()); touch(); paint(); return; }
       if ((b = g('data-delrule'))) { ensure().tags.use.rules.splice(+b.dataset.delrule, 1); touch(); paint(); return; }
       if (g('data-addtag')) {

@@ -607,3 +607,15 @@ test('아이템 태그: 저장/불러오기 정규화, 이름 변경에 메타�
   E.renameKeyword(n, '빵', '식빵');
   assert.strictEqual(E.tagsOf(n, '식빵').custom.length, 2);
 });
+
+test('조건부 설명 / 태그 숨김', () => {
+  const pj = E.newProject('t');
+  E.setKeywordMeta(pj, '빵', { desc: '기본', tags: { use: { usable: true }, basic: { hideTags: true }, descs: [{ cond: '복통', text: '속이 아파 못 먹겠다' }, { cond: '', text: '둘째' }] } });
+  const st = E.initState(pj); E.addItem(st, '빵', 1);
+  let r = E.inventoryView(pj, st).items[0];
+  assert.strictEqual(r.desc, '둘째'); assert.deepStrictEqual(r.chips, []);
+  E.setKeywordMeta(pj, '복통', { kind: 'status' }); E.addItem(st, '복통', 1);
+  assert.strictEqual(E.inventoryView(pj, st).items[0].desc, '속이 아파 못 먹겠다');
+  E.setKeywordMeta(pj, '빵', { tags: { descs: [] } });
+  assert.strictEqual(E.inventoryView(pj, st).items[0].desc, '기본');
+});

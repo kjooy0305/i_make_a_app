@@ -106,6 +106,8 @@
    *   basic:  { type: food|tool|gear|material|etc, stack: bool }                        // 폴더 "기본"
    *   use:    { usable, consume, priority, cond, effect:{stats,gain,lose}, rules:[{cond,effect}] }   // 폴더 "사용" (+ 하위 "조건부 효과")
    *   spoil:  { on, block, late, effect:{stats,gain,lose} }                               // 폴더 "부패"
+   *   descs:  [{ cond, text }]   // 조건부 설명: 위에서부터 조건이 맞는 첫 설명이 기본 설명을 대신한다
+   *   basic.hideTags: 플레이 중(인벤토리)에 태그 칩을 숨김
    *   custom: ['보존식', ...]                                                             // 폴더 "사용자 태그"
    * }
    * 사용 순서: 부패(late)가 아닌 것 먼저, 그 안에서 priority 가 작은 것부터. */
@@ -114,21 +116,29 @@
     { id: 'material', name: '재료' }, { id: 'etc', name: '기타' },
   ];
   const newEffect = () => ({ stats: {}, gain: '', lose: '' });
+  const newDesc = () => ({ id: uid('d'), cond: '', text: '' });
   const newRule = () => ({ id: uid('r'), cond: '', effect: newEffect() });
   const effectOf = (e) => ({ stats: Object.assign({}, e && e.stats), gain: String((e && e.gain) || ''), lose: String((e && e.lose) || '') });
   function normTags(t) {
     t = t || {};
     const b = t.basic || {}, u = t.use || {}, sp = t.spoil || {};
     return {
-      basic: { type: ITEM_TYPES.some((x) => x.id === b.type) ? b.type : 'etc', stack: b.stack !== false },
+      basic: { type: ITEM_TYPES.some((x) => x.id === b.type) ? b.type : 'etc', stack: b.stack !== false, hideTags: !!b.hideTags },
       use: {
         usable: !!u.usable, consume: u.consume !== false, priority: Number(u.priority) || 0, cond: String(u.cond || ''),
         effect: effectOf(u.effect),
         rules: (Array.isArray(u.rules) ? u.rules : []).map((r) => ({ id: r.id || uid('r'), cond: String(r.cond || ''), effect: effectOf(r.effect) })),
       },
       spoil: { on: !!sp.on, block: !!sp.block, late: sp.late !== false, effect: effectOf(sp.effect) },
+      descs: (Array.isArray(t.descs) ? t.descs : []).map((d) => ({ id: d.id || uid('d'), cond: String(d.cond || ''), text: String(d.text || '') })),
       custom: (Array.isArray(t.custom) ? t.custom : []).map((x) => String(x).trim()).filter(Boolean),
     };
+  }
+  // 조건부 설명: 현재 상태에서 조건이 맞는 첫 설명, 없으면 기본 설명
+  function descFor(pj, st, name, base, tags) {
+    const t = tags || tagsOf(pj, name);
+    const d = t.descs.find((x) => x.text.trim() && checkCond(pj, st, x.cond));
+    return d ? d.text : base;
   }
   const tagsOf = (pj, name) => { const m = (pj.catalog || []).find((e) => e.name === name); return normTags(m && m.tags); };
   // 세부 태그를 한 줄 요약 칩으로 (목록·인벤토리 표시용)
@@ -238,7 +248,7 @@
     const meta = new Map((pj.catalog || []).map((e) => [e.name, e]));
     const all = Object.keys(st.items).map((name) => {
       const m = meta.get(name) || {}, t = normTags(m.tags), kind = m.kind === 'status' ? 'status' : 'item';
-      const r = { name, base: baseKw(name), count: st.items[name], kind, desc: m.desc || '', icon: m.icon || '', hidden: isHiddenKw(name), tags: t, chips: kind === 'item' ? tagChips(t) : t.custom.map((c) => '#' + c) };
+      const r = { name, base: baseKw(name), count: st.items[name], kind, desc: descFor(pj, st, name, m.desc || '', t), icon: m.icon || '', hidden: isHiddenKw(name), tags: t, chips: t.basic.hideTags ? [] : kind === 'item' ? tagChips(t) : t.custom.map((c) => '#' + c) };
       r.spoiled = kind === 'item' && t.spoil.on;
       r.late = r.spoiled && t.spoil.late;
       const u = kind === 'item' ? useItem(pj, JSON.parse(JSON.stringify(st)), name) : { ok: false, error: '' };
@@ -783,7 +793,7 @@
     lastPageNo, pageOf, parseItems, initState, have, addItem, loseItem,
     checkCond, missingTerms, branchSum, baseProb, resolveChoice, applyOutcome,
     visibleChoices, choose, validate, normalizeProject,
-    KINDS, ITEM_TYPES, newEffect, newRule, normTags, tagsOf, tagChips, effectEmpty, useItem, isHiddenKw, baseKw, mapKeywords, eachKeyword, scanKeywords, keywordEntries, statUsage, checkKwName, setKeywordMeta, removeKeywordMeta, renameKeyword, toggleHiddenKw, inventoryView,
+    KINDS, ITEM_TYPES, newDesc, descFor, newEffect, newRule, normTags, tagsOf, tagChips, effectEmpty, useItem, isHiddenKw, baseKw, mapKeywords, eachKeyword, scanKeywords, keywordEntries, statUsage, checkKwName, setKeywordMeta, removeKeywordMeta, renameKeyword, toggleHiddenKw, inventoryView,
     FLOW, parentsOf, pageLabel, destinationsOf, buildFlow, toStoryArray, applyStoryArray,
   };
 });
