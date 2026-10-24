@@ -189,12 +189,12 @@
     ];
     [p0, p1, p2, p3, p4, p5].forEach((pg) => { pg.group = 'g_main'; });
     const r1 = P(6, '복도 구석에서 길고양이가 울고 있다. 품에 안아 올리자 목걸이에서 작은 열쇠가 떨어졌다.', { folder: 'random', group: 'g_cat' });
-    r1.choices = [C('열쇠를 들고 복도로 돌아간다', 3)];
+    r1.choices = [C('열쇠를 챙기고 다음으로', 3)]; r1.choices[0].base.mode = 'continue';
     r1.choices[0].base.gain = '고양이 열쇠'; r1.choices[0].base._p = ['gain'];
     const r2 = P(7, '어둠 속에서 낯선 상인이 손짓한다. “이 지도, 싸게 줄게.”', { folder: 'random', group: 'g_shop' });
-    r2.choices = [C('지도를 받고 돌아간다', 3)];
+    r2.choices = [C('지도를 받고 다음으로', 3)]; r2.choices[0].base.mode = 'continue';
     r2.choices[0].base.gain = '낡은 지도'; r2.choices[0].base._p = ['gain'];
-    const odd = C('수상한 소리를 따라간다', 3); odd.base.mode = 'random';
+    const odd = C('수상한 소리를 따라간다', 3); odd.base.mode = 'random'; odd.base.pick = { min: 1, max: 2 }; odd.base.after = { mode: 'page', next: 4, group: '' };
     p3.choices.push(odd);
     pj.pages = [p0, p1, p2, p3, p4, p5, r1, r2];
     gamble.base.achv = 'a_end'; gamble.base._p = ['achv'];
@@ -283,10 +283,23 @@
   }
 
 
-  // 선택지 결과의 이동 방식: 페이지 번호 / 스토리 묶음 / 랜덤 이벤트
+
+  // 랜덤 이벤트: 뽑을 개수(범위)와 모두 끝난 뒤 이어지는 곳
+  function pickAfterHtml(pj, o, d) {
+    const pk = E.pickRange(o), a = o.after && o.after.mode ? o.after : { mode: 'none', next: 0, group: '' };
+    const n = E.randomEntries(pj, o).length;
+    let h = '<div class="rrow"><label class="muted">뽑을 개수</label><input type="number" min="1" ' + d + ' data-f="pickmin" value="' + pk.min + '"><span>~</span><input type="number" min="1" ' + d + ' data-f="pickmax" value="' + pk.max + '"><span class="muted">개' + (pk.min === pk.max ? '' : ' (매번 이 범위에서 무작위)') + (pk.max > n && n ? ' · ⚠ 후보가 ' + n + '개뿐이라 최대 ' + n + '개' : '') + ' · 겹치지 않게</span></div>';
+    h += '<div class="rrow"><label class="muted">모두 끝나면</label><select ' + d + ' data-f="aftermode" style="width:auto"><option value="none"' + (a.mode === 'none' ? ' selected' : '') + '>이어지는 곳 없음 (마지막 이야기가 끝나면 종료)</option><option value="page"' + (a.mode === 'page' ? ' selected' : '') + '>페이지로 이어짐</option><option value="group"' + (a.mode === 'group' ? ' selected' : '') + '>스토리 묶음으로 이어짐</option></select>';
+    if (a.mode === 'page') h += '<label class="muted">P.</label><input type="number" min="0" ' + d + ' data-f="afternext" value="' + esc(a.next) + '">';
+    if (a.mode === 'group') h += '<select class="grow" ' + d + ' data-f="aftergroup"><option value="">(묶음 선택)</option>' + E.FOLDERS.map((f) => { const gs = E.groupsIn(pj, f.id); return gs.length ? '<optgroup label="' + esc(f.name) + '">' + gs.map((g) => '<option value="' + g.id + '"' + (g.id === a.group ? ' selected' : '') + '>' + esc(g.name) + '</option>').join('') + '</optgroup>' : ''; }).join('') + '</select>';
+    return h + '</div><div class="muted" style="margin:0 0 0 4px">각 이야기는 <b>마지막 페이지</b>로 끝내거나, 끝에 <b>“다음 이야기로”</b> 선택지를 두면 다음 차례로 넘어가요.</div>';
+  }
+
+  // 선택지 결과의 이동 방식: 페이지 번호 / 스토리 묶음 / 랜덤 이벤트 / 다음 이야기로
   function destHtml(pj, o, d) {
     const m = o.mode || 'page';
-    let h = '<div class="row"><label class="muted">이동</label><select ' + d + ' data-f="mode" style="width:auto"><option value="page"' + (m === 'page' ? ' selected' : '') + '>페이지 번호</option><option value="group"' + (m === 'group' ? ' selected' : '') + '>스토리 묶음</option><option value="random"' + (m === 'random' ? ' selected' : '') + '>🎲 랜덤 이벤트</option></select>';
+    let h = '<div class="row"><label class="muted">이동</label><select ' + d + ' data-f="mode" style="width:auto"><option value="page"' + (m === 'page' ? ' selected' : '') + '>페이지 번호</option><option value="group"' + (m === 'group' ? ' selected' : '') + '>스토리 묶음</option><option value="random"' + (m === 'random' ? ' selected' : '') + '>🎲 랜덤 이벤트</option><option value="continue"' + (m === 'continue' ? ' selected' : '') + '>⏭ 다음 이야기로</option></select>';
+    if (m === 'continue') return h + '</div><div class="muted" style="margin:2px 0 0 4px">진행 중인 랜덤 이벤트에서 뽑힌 <b>다음 이야기</b>로 넘어가요. 모두 끝났으면 랜덤 이벤트에서 정한 “이어지는 곳”으로 가요. (효과·아이템은 그대로 적용돼요)</div></div>';
     if (m === 'page') h += '<label class="muted">P.</label><input type="number" min="0" ' + d + ' data-f="next" value="' + esc(o.next) + '">';
     if (m === 'group') {
       const sel = E.groupOf(pj, o.group), st = sel ? E.groupStart(pj, sel) : null;
@@ -297,7 +310,8 @@
     if (m === 'random') {
       const rg = E.groupsIn(pj, 'random'), n = E.randomEntries(pj, o).length;
       h += '</div><div class="pool">' + (rg.length ? rg.map((g) => '<label><input type="checkbox" ' + d + ' data-f="pool" data-g="' + g.id + '"' + ((o.pool || []).includes(g.id) ? ' checked' : '') + '> ' + esc(g.name) + ' <span class="muted">(' + E.pagesOfGroup(pj, g.id).length + ')</span></label>').join('') : '<div class="muted">랜덤 이벤트 폴더에 묶음이 없어요.</div>') + '</div>' +
-        '<div class="muted" style="margin:2px 0 0 4px">' + ((o.pool || []).length ? '체크한 묶음' : '체크 없음 = 랜덤 이벤트 폴더 전체(묶음 + 묶음 없는 페이지)') + ' 중 하나가 무작위로 나와요 · 현재 후보 ' + n + '개' + (n ? '' : ' ⚠');
+        '<div class="muted" style="margin:2px 0 0 4px">' + ((o.pool || []).length ? '체크한 묶음' : '체크 없음 = 랜덤 이벤트 폴더 전체(묶음 + 묶음 없는 페이지)') + ' 중에서 뽑아요 · 현재 후보 ' + n + '개' + (n ? '' : ' ⚠') + '</div>' + pickAfterHtml(pj, o, d) + '</div>';
+      return h;
     }
     return h + '</div>';
   }
@@ -358,7 +372,7 @@
 
   function targetOutcome(c, bi) { return bi < 0 ? c.base : c.branches[bi]; }
 
-  function onField(el) {
+  function onField(el, ev) {
     const p = page(); if (!p) return;
     const f = el.dataset.f;
     if (el.dataset.ci === undefined) {
@@ -386,6 +400,15 @@
       const o = targetOutcome(c, bi); if (!o) return;
       if (f === 'mode') { o.mode = el.value; touch(); renderPage(); return; }
       else if (f === 'group') { o.group = el.value; touch(); renderPage(); return; }
+      else if (f === 'pickmin' || f === 'pickmax') {
+        o.pick = o.pick || { min: 1, max: 1 };
+        o.pick[f === 'pickmin' ? 'min' : 'max'] = Math.max(1, parseInt(el.value, 10) || 1);
+        if (o.pick.min > o.pick.max) { if (f === 'pickmin') o.pick.max = o.pick.min; else o.pick.min = o.pick.max; }
+        touch(); if (ev === 'change') renderPage(); return;
+      }
+      else if (f === 'aftermode') { o.after = o.after || { mode: 'none', next: 0, group: '' }; o.after.mode = el.value; touch(); renderPage(); return; }
+      else if (f === 'afternext') { o.after = o.after || { mode: 'page', next: 0, group: '' }; o.after.next = Math.max(0, parseInt(el.value, 10) || 0); touch(); return; }
+      else if (f === 'aftergroup') { o.after = o.after || { mode: 'group', next: 0, group: '' }; o.after.group = el.value; touch(); return; }
       else if (f === 'pool') {
         const box = el.closest('.oc');
         o.pool = Array.from(box.querySelectorAll('[data-f=pool]')).filter((x) => x.checked).map((x) => x.dataset.g);
@@ -429,10 +452,13 @@
     const items = Object.keys(st.items).filter((k) => !k.startsWith('@')).map((k) => esc(k) + (st.items[k] > 1 ? ' ×' + st.items[k] : ''));
     let h = '<div class="row"><b class="grow">' + esc(pj.name) + ' <span class="muted">P.' + st.page + ' · 미리보기 (저장 안 됨)</span></b><button class="sm" data-pv="restart">처음부터</button><button class="sm" data-pv="close">닫기</button></div>' +
       '<div class="status">' + pj.stats.map((s) => '<span>' + esc(s.name) + ' <b>' + st.stats[s.id] + (s.max ? '/' + s.max : '') + '</b></span>').join('') +
-      '<span class="grow muted">🎒 ' + (items.length ? items.join(', ') : '없음') + '</span><span class="muted">🏆 ' + st.achv.length + '/' + pj.achievements.length + '</span></div>';
+      (st.run ? '<span class="chip rand">🎲 ' + st.run.index + '/' + st.run.total + (st.run.queue.length ? '' : st.run.after ? ' · 마지막' : ' · 마지막') + '</span>' : '') + '<span class="grow muted">🎒 ' + (items.length ? items.join(', ') : '없음') + '</span><span class="muted">🏆 ' + st.achv.length + '/' + pj.achievements.length + '</span></div>';
     h += '<div class="play-body">' + (p.body.trim() ? esc(p.body) : '<span class="muted">(본문이 비어 있어요)</span>') + '</div>';
     if (fx.length) h += '<div>' + fx.map((f) => '<span class="chip ' + f.kind + '">' + esc(f.kind === 'lose' ? '− ' + f.text : f.kind === 'gain' ? '+ ' + f.text : f.kind === 'rand' ? '🎲 ' + f.text : '🏆 ' + f.text.replace('업적 달성: ', '')) + '</span>').join('') + '</div>';
-    if (p.isEnd) {
+    if (p.isEnd && E.canContinue(st)) {
+      const more = st.run.queue.length;
+      h += '<div class="card" style="text-align:center"><div class="muted" style="margin-bottom:8px">— 이야기 끝 —</div><button class="pri" data-pv="cont">' + (more ? '다음 이야기로 ▶ (' + (st.run.index + 1) + '/' + st.run.total + ')' : '이어서 ▶') + '</button></div>';
+    } else if (p.isEnd) {
       h += '<div class="card" style="text-align:center"><div class="muted" style="margin-bottom:8px">— 끝 —</div><button class="pri" data-pv="restart">다시 시작</button> <button data-pv="close">종료</button></div>';
     } else {
       const vis = E.visibleChoices(pj, st, p);
@@ -446,6 +472,12 @@
     const a = b.dataset.pv;
     if (a === 'close') { PV.m.close(); PV = null; return; }
     if (a === 'restart') { const st = E.initState(PV.pj); st.page = 0; PV.st = st; PV.fx = []; renderPlay(); return; }
+    if (a === 'cont') {
+      const r = E.continueRun(PV.pj, PV.st);
+      PV.fx = r.fx;
+      if (r.error) toast(r.error);
+      renderPlay(); return;
+    }
     if (a === 'choice') {
       const p = E.pageOf(PV.pj, PV.st.page);
       const ch = p && p.choices.find((c) => c.id === b.dataset.id); if (!ch) return;
@@ -522,6 +554,14 @@
         const b = p.choices[ci].base; const set = new Set(b.pool || []);
         if (on) set.add(id); else set.delete(id);
         b.pool = Array.from(set); touch(); flowRefresh();
+      },
+      setPick(ci, min, max) { const p = page(); if (!p || !p.choices[ci]) return; const b = p.choices[ci].base; b.pick = { min: Math.max(1, min || 1), max: Math.max(1, max || 1) }; if (b.pick.min > b.pick.max) b.pick.max = b.pick.min; touch(); flowRefresh(); },
+      setAfter(ci, mode, val) {
+        const p = page(); if (!p || !p.choices[ci]) return; const b = p.choices[ci].base;
+        b.after = b.after || { mode: 'none', next: 0, group: '' }; b.after.mode = mode;
+        if (mode === 'page') b.after.next = Math.max(0, parseInt(val, 10) || 0);
+        if (mode === 'group') b.after.group = val || '';
+        touch(); flowRefresh();
       },
       setNext(ci, n) { const p = page(); if (p && p.choices[ci] && n >= 0) { p.choices[ci].base.next = n; p.choices[ci].base.mode = 'page'; touch(); flowRefresh(); } },
       newPageFor(ci) {
@@ -711,7 +751,7 @@
       const k = t.dataset.act === 'tglshow' ? 'show' : 'enable';
       c[k] = t.checked ? '' : null; touch(); renderPage(); return;
     }
-    if (t.dataset.f) onField(t);
+    if (t.dataset.f) onField(t, 'change');
   });
   document.addEventListener('input', (e) => {
     const t = e.target;

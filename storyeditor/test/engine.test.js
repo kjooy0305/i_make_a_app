@@ -418,3 +418,143 @@ test('가져오기: 옛 프로젝트(묶음 없음, mode 없음)도 정상 동�
   assert.strictEqual(st.page, 1);
   assert.deepStrictEqual(E.validate(pj), []);
 });
+
+/* ---------- 랜덤 이벤트 여러 개 뽑기 → 이어지는 곳 ---------- */
+// 순서가 정해진 난수열: 호출할 때마다 다음 값을 돌려준다
+const seq = (...vals) => { let i = 0; return () => vals[Math.min(i++, vals.length - 1)]; };
+function runProj() {
+  const pj = groupProj();
+  // 랜덤 폴더에 묶음 2개 더 → 후보 5개(고양이/상인/B/C + 묶음 없는 P.14)
+  pj.groups.push({ id: 'gR3', name: '폐건물', folder: 'random', start: null }, { id: 'gR4', name: '시장', folder: 'random', start: null });
+  pj.pages.push(E.newPage(15, 'random', 'gR3'), E.newPage(16, 'random', 'gR4'));
+  pj.pages.push(E.newPage(30, 'main', ''));      // 이어지는 곳
+  pj.pages.find((p) => p.n === 30).body = '이어지는 이야기';
+  pj.pages.forEach((p) => { if (!p.body) p.body = '본문' + p.n; });
+  return pj;
+}
+const rc = (o) => { const c = E.newChoice(0); c.text = 'r'; Object.assign(c.base, { mode: 'random' }, o); return c; };
+
+test('여러 개 뽑기: 개수 고정(3)이면 겹치지 않게 3개, 첫 이야기로 이동', () => {
+  const pj = runProj(), st = E.initState(pj);
+  const c = rc({ pick: { min: 3, max: 3 }, after: { mode: 'page', next: 30, group: '' } });
+  const r = E.choose(pj, st, c, 0, seq(0, 0, 0));          // 항상 남은 후보의 첫 번째 → 10, 12, 14... 순서
+  assert.strictEqual(r.error, undefined);
+  assert.strictEqual(r.run, 3);
+  assert.strictEqual(st.page, 10);
+  assert.strictEqual(st.run.total, 3);
+  assert.deepStrictEqual(st.run.queue.map((e) => e.to), [12, 15]);
+  assert.ok(r.fx.some((f) => /\(1\/3\)/.test(f.text)));
+});
+
+test('여러 개 뽑기: 끝날 때까지 한 번씩 이어 가고 마지막에 지정한 곳으로', () => {
+  const pj = runProj(), st = E.initState(pj);
+  const c = rc({ pick: { min: 3, max: 3 }, after: { mode: 'page', next: 30, group: '' } });
+  E.choose(pj, st, c, 0, seq(0, 0, 0));
+  assert.strictEqual(E.canContinue(st), true);
+  const seen = [st.page];
+  let guard = 0;
+  while (E.canContinue(st) && guard++ < 10) { const r = E.continueRun(pj, st); assert.strictEqual(r.error, undefined); seen.push(st.page); }
+  assert.deepStrictEqual(seen, [10, 12, 15, 30], '3개를 차례로 본 뒤 P.30');
+  assert.strictEqual(st.run, null);
+  assert.strictEqual(E.canContinue(st), false);
+});
+
+test('개수 범위 1~3: 난수에 따라 1/2/3개, 후보가 적으면 후보 수까지만', () => {
+  const pj = runProj();
+  const c = rc({ pick: { min: 1, max: 3 } });
+  const total = (r) => { const st = E.initState(pj); return E.choose(pj, st, c, 0, seq(r, 0, 0)).run; };
+  assert.strictEqual(total(0), 1);
+  assert.strictEqual(total(0.4), 2);
+  assert.strictEqual(total(0.99), 3);
+  // 후보 1개만 지정한 풀에서 1~3 → 1개
+  const c2 = rc({ pool: ['gR2'], pick: { min: 1, max: 3 } });
+  const st = E.initState(pj);
+  assert.strictEqual(E.choose(pj, st, c2, 0, seq(0.99, 0, 0)).run, 1);
+  // 무작위로 많이 돌려도 항상 1~3, 겹치지 않음
+  for (let i = 0; i < 300; i++) {
+    const s2 = E.initState(pj); const r = E.choose(pj, s2, c, 0);
+    const ids = [s2.page].concat(s2.run ? s2.run.queue.map((e) => e.to) : []);
+    assert.ok(r.run >= 1 && r.run <= 3 && ids.length === r.run && new Set(ids).size === ids.length);
+  }
+});
+
+test('이어지는 곳이 없으면 마지막 이야기 뒤에서 끝, 1개 뽑기 + 이어지는 곳 없음은 옛 동작 그대로', () => {
+  const pj = runProj();
+  const st = E.initState(pj);
+  E.choose(pj, st, rc({ pick: { min: 2, max: 2 } }), 0, seq(0, 0));
+  assert.strictEqual(E.canContinue(st), true);
+  E.continueRun(pj, st);
+  assert.strictEqual(E.canContinue(st), false, '남은 이야기도 이어지는 곳도 없음');
+  assert.match(E.continueRun(pj, st).error, /이어갈|진행 중/);
+  const st2 = E.initState(pj);
+  E.choose(pj, st2, rc({}), 0, 0.5);                       // 기본값(1개, 이어지는 곳 없음)
+  assert.strictEqual(st2.run, null);
+});
+
+test('이어지는 곳을 묶음으로: 묶음의 시작 페이지', () => {
+  const pj = runProj(), st = E.initState(pj);
+  E.choose(pj, st, rc({ pool: ['gR1'], pick: { min: 1, max: 1 }, after: { mode: 'group', next: 0, group: 'gA' } }), 0, 0);
+  assert.strictEqual(st.page, 10);
+  assert.strictEqual(E.canContinue(st), true, '1개만 뽑아도 이어지는 곳이 있으면 진행 상태 유지');
+  assert.strictEqual(E.continueRun(pj, st).error, undefined);
+  assert.strictEqual(st.page, 1);
+});
+
+test('"다음 이야기로" 이동 방식: 효과를 적용하고 다음 이야기로', () => {
+  const pj = runProj(), st = E.initState(pj);
+  E.choose(pj, st, rc({ pick: { min: 2, max: 2 }, after: { mode: 'page', next: 30, group: '' } }), 0, seq(0, 0));
+  const cont = E.newChoice(0); cont.text = '계속'; cont.base.mode = 'continue'; cont.base.gain = '기념품';
+  const r = E.choose(pj, st, cont);
+  assert.strictEqual(r.error, undefined);
+  assert.strictEqual(st.page, 12);
+  assert.strictEqual(E.have(st, '기념품'), 1);
+  E.choose(pj, st, cont);
+  assert.strictEqual(st.page, 30, '마지막엔 이어지는 곳');
+  assert.match(E.choose(pj, st, cont).error, /진행 중/, '더 이어갈 게 없으면 오류');
+});
+
+test('검사/상위 페이지/분기도: 이어지는 곳과 개수 반영', () => {
+  const pj = runProj();
+  const c = rc({ pick: { min: 1, max: 9 }, after: { mode: 'page', next: 30, group: '' } });
+  pj.pages[0].choices = [c];
+  assert.ok(E.parentsOf(pj, 30).includes(0), '이어지는 곳의 상위 페이지');
+  assert.ok(E.validate(pj).some((x) => /뽑을 개수.*후보가 적어요/.test(x.msg)));
+  c.base.after = { mode: 'page', next: 999, group: '' };
+  assert.ok(E.validate(pj).some((x) => /이어지는 곳을 찾을 수 없어요/.test(x.msg)));
+  c.base.after = { mode: 'page', next: 30, group: '' }; c.base.pick = { min: 1, max: 3 };
+  const g = E.buildFlow(pj, 0, []);
+  const rn = g.nodes.find((n) => n.type === 'rand');
+  assert.deepStrictEqual(rn.data.pick, { min: 1, max: 3 });
+  assert.strictEqual(rn.data.after.to, 30);
+  const k = E.newChoice(0); k.text = 'k'; k.base.mode = 'continue'; pj.pages[0].choices.push(k);
+  assert.ok(E.buildFlow(pj, 0, []).nodes.some((n) => n.type === 'cont'));
+  // 같은 풀이라도 개수/이어지는 곳이 다르면 별도 노드
+  const c2 = rc({ pick: { min: 1, max: 1 } }); pj.pages[0].choices.push(c2);
+  assert.strictEqual(E.buildFlow(pj, 0, []).nodes.filter((n) => n.type === 'rand').length, 2);
+});
+
+test('스토리 JSON: pick / after / continue 왕복과 잘못된 값 거부', () => {
+  const pj = runProj();
+  const a = rc({ pool: ['gR1', 'gR2'], pick: { min: 1, max: 3 }, after: { mode: 'group', next: 0, group: 'gA' } }); a.text = 'A';
+  const b = rc({ pick: { min: 2, max: 2 }, after: { mode: 'page', next: 30, group: '' } }); b.text = 'B';
+  const k = E.newChoice(0); k.text = 'K'; k.base.mode = 'continue';
+  pj.pages[0].choices = [a, b, k];
+  const arr = E.toStoryArray(pj);
+  assert.deepStrictEqual(arr[0].choices[0], { text: 'A', random: ['길고양이', '낯선 상인'], pick: [1, 3], after: { group: '1장 창고' } });
+  assert.deepStrictEqual(arr[0].choices[1], { text: 'B', random: true, pick: [2, 2], after: { to: 30 } });
+  assert.deepStrictEqual(arr[0].choices[2], { text: 'K', continue: true });
+  // 라운드트립: 다른 프로젝트에 적용
+  const pj2 = runProj(); pj2.pages[0].choices = [E.newChoice(0), E.newChoice(0), E.newChoice(0)];
+  E.applyStoryArray(pj2, JSON.parse(JSON.stringify(arr)));
+  const c0 = pj2.pages[0].choices;
+  assert.strictEqual(c0[0].base.mode, 'random');
+  assert.deepStrictEqual(c0[0].base.pick, { min: 1, max: 3 });
+  assert.deepStrictEqual(c0[0].base.after, { mode: 'group', next: 0, group: 'gA' });
+  assert.deepStrictEqual(c0[1].base.after, { mode: 'page', next: 30, group: '' });
+  assert.strictEqual(c0[2].base.mode, 'continue');
+  const before = JSON.stringify(pj2);
+  assert.throws(() => E.applyStoryArray(pj2, [{ id: 0, text: 'x', choices: [{ text: 'a', random: true, pick: [3, 1] }] }]), /pick/);
+  assert.throws(() => E.applyStoryArray(pj2, [{ id: 0, text: 'x', choices: [{ text: 'a', random: true, after: { group: '없는' } }] }]), /after/);
+  assert.throws(() => E.applyStoryArray(pj2, [{ id: 0, text: 'x', choices: [{ text: 'a', continue: 1 }] }]), /continue/);
+  assert.strictEqual(JSON.stringify(pj2), before);
+});

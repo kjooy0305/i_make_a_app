@@ -49,9 +49,22 @@
     return h('div', { className: 'fn rand' + (data.empty ? ' missing' : '') },
       h(Handle, { type: 'target', position: Position.Left, isConnectable: false }),
       h('div', { className: 'fn-tag' }, '랜덤 이벤트'),
-      h('div', { className: 'fn-ttl' }, data.empty ? '⚠ 후보가 없어요' : '🎲 ' + data.entries.length + '개 중 하나가 무작위로'),
+      h('div', { className: 'fn-ttl' }, data.empty ? '⚠ 후보가 없어요' : '🎲 ' + data.entries.length + '개 중 ' + (data.pick.min === data.pick.max ? data.pick.max + '개' : data.pick.min + '~' + data.pick.max + '개') + ' 무작위로'),
       h('div', { className: 'fn-ents ' + NO }, data.entries.map((e, i) =>
         h('button', { key: i, className: 'fn-ent', title: 'P.' + e.to + ' 로 이동', onClick: () => data.onGo(e.to) }, clip(e.label, 22) + ' · P.' + e.to))),
+      data.after ? h('button', { className: 'fn-after ' + NO + (data.after.missing ? ' bad' : ''), disabled: data.after.missing, title: '모두 끝나면 이어지는 곳', onClick: () => data.onGo(data.after.to) }, '↪ 모두 끝나면 → ' + clip(data.after.label, 20) + (data.after.missing ? '' : ' · P.' + data.after.to)) : h('div', { className: 'fn-sub' }, '이어지는 곳 없음 — 마지막 이야기가 끝나면 종료'),
+      h('div', { className: 'fn-items' }, data.items.map((it, i) =>
+        h('div', { key: i, className: 'fn-item' },
+          h('div', { className: 'fn-itxt' }, h('span', null, it.text || '(선택지 텍스트 없음)'), it.tags.concat(it.flags).map((t, k) => h('span', { key: k, className: 'fn-chip' }, t))),
+          h('button', { className: 'fn-ed ' + NO, title: '이 선택지 편집', onClick: (e) => { e.stopPropagation(); data.onEdit(it.ci); } }, '✎')))));
+  }
+  // "다음 이야기로" 노드: 진행 중인 랜덤 이벤트의 다음 차례로 이동 (실제 목적지는 플레이 중에 정해짐)
+  function ContNode({ data }) {
+    return h('div', { className: 'fn cont' },
+      h(Handle, { type: 'target', position: Position.Left, isConnectable: false }),
+      h('div', { className: 'fn-tag' }, '랜덤 이벤트 진행'),
+      h('div', { className: 'fn-ttl' }, '⏭ 다음 이야기로'),
+      h('div', { className: 'fn-sub' }, '남은 이야기 → 모두 끝나면 이어지는 곳'),
       h('div', { className: 'fn-items' }, data.items.map((it, i) =>
         h('div', { key: i, className: 'fn-item' },
           h('div', { className: 'fn-itxt' }, h('span', null, it.text || '(선택지 텍스트 없음)'), it.tags.concat(it.flags).map((t, k) => h('span', { key: k, className: 'fn-chip' }, t))),
@@ -65,7 +78,7 @@
   function EndNode() {
     return h('div', { className: 'fn end' }, h(Handle, { type: 'target', position: Position.Left, isConnectable: false }), '— 끝 —', h('div', { className: 'fn-sub' }, '마지막 페이지라 선택지가 없어요'));
   }
-  const nodeTypes = { prev: PrevNode, cur: CurNode, target: TargetNode, rand: RandNode, add: AddNode, end: EndNode };
+  const nodeTypes = { prev: PrevNode, cur: CurNode, target: TargetNode, rand: RandNode, cont: ContNode, add: AddNode, end: EndNode };
 
   /* ---------- 분기 편집 패널 ---------- */
   function EditPanel({ pj, cur, ci, api }) {
@@ -74,6 +87,8 @@
     const pages = pj.pages.slice().sort((a, b) => a.n - b.n);
     const known = pages.some((p) => p.n === Number(c.base.next));
     const mode = c.base.mode || 'page';
+    const pk = E.pickRange(c.base);
+    const after = c.base.after && c.base.after.mode ? c.base.after : { mode: 'none', next: 0, group: '' };
     return h('div', { className: 'fe-panel', key: cur + ':' + ci },
       h('div', { className: 'row' }, h('b', { className: 'grow' }, 'P.' + cur + ' · 분기 #' + (ci + 1) + ' 편집'),
         h('button', { onClick: () => api.closeEdit() }, '닫기')),
@@ -82,7 +97,7 @@
       h('div', { className: 'muted', style: { marginTop: 8 } }, '이동 방식'),
       h('div', { className: 'row' },
         h('select', { defaultValue: mode, onChange: (e) => api.setMode(ci, e.target.value) },
-          h('option', { value: 'page' }, '페이지 번호'), h('option', { value: 'group' }, '스토리 묶음'), h('option', { value: 'random' }, '🎲 랜덤 이벤트'))),
+          h('option', { value: 'page' }, '페이지 번호'), h('option', { value: 'group' }, '스토리 묶음'), h('option', { value: 'random' }, '🎲 랜덤 이벤트'), h('option', { value: 'continue' }, '⏭ 다음 이야기로'))),
       mode === 'page' ? h('div', { className: 'row', style: { marginTop: 6 } },
         h('select', { className: 'grow', defaultValue: String(c.base.next), onChange: (e) => api.setNext(ci, parseInt(e.target.value, 10)) },
           !known ? h('option', { value: String(c.base.next) }, 'P.' + c.base.next + ' (없는 페이지)') : null,
@@ -95,7 +110,17 @@
       mode === 'random' ? h('div', { style: { marginTop: 6 } },
         h('div', { className: 'pool' }, E.groupsIn(pj, 'random').length ? E.groupsIn(pj, 'random').map((g) =>
           h('label', { key: g.id }, h('input', { type: 'checkbox', defaultChecked: (c.base.pool || []).includes(g.id), onChange: (e) => api.togglePool(ci, g.id, e.target.checked) }), ' ' + g.name)) : h('div', { className: 'muted' }, '랜덤 이벤트 폴더에 묶음이 없어요.')),
-        h('div', { className: 'muted' }, (c.base.pool || []).length ? '체크한 묶음 중 하나' : '체크 없음 = 랜덤 이벤트 폴더 전체 중 하나', ' · 후보 ' + E.randomEntries(pj, c.base).length + '개')) : null,
+        h('div', { className: 'muted' }, (c.base.pool || []).length ? '체크한 묶음 중에서' : '체크 없음 = 랜덤 이벤트 폴더 전체 중에서', ' 뽑아요 · 후보 ' + E.randomEntries(pj, c.base).length + '개'),
+        h('div', { className: 'row', style: { marginTop: 6 } }, h('span', { className: 'muted' }, '뽑을 개수'),
+          h('input', { type: 'number', min: 1, defaultValue: pk.min, onChange: (e) => api.setPick(ci, parseInt(e.target.value, 10), pk.max) }), '~',
+          h('input', { type: 'number', min: 1, defaultValue: pk.max, onChange: (e) => api.setPick(ci, pk.min, parseInt(e.target.value, 10)) }), h('span', { className: 'muted' }, '개')),
+        h('div', { className: 'row', style: { marginTop: 6 } }, h('span', { className: 'muted' }, '모두 끝나면'),
+          h('select', { defaultValue: after.mode, onChange: (e) => api.setAfter(ci, e.target.value, e.target.value === 'page' ? after.next : after.group) },
+            h('option', { value: 'none' }, '이어지는 곳 없음'), h('option', { value: 'page' }, '페이지로'), h('option', { value: 'group' }, '스토리 묶음으로')),
+          after.mode === 'page' ? h('input', { type: 'number', min: 0, defaultValue: after.next, onChange: (e) => api.setAfter(ci, 'page', e.target.value) }) : null,
+          after.mode === 'group' ? h('select', { className: 'grow', defaultValue: after.group || '', onChange: (e) => api.setAfter(ci, 'group', e.target.value) },
+            h('option', { value: '' }, '(묶음 선택)'), (pj.groups || []).map((g) => h('option', { key: g.id, value: g.id }, g.name))) : null)) : null,
+      mode === 'continue' ? h('div', { className: 'muted', style: { marginTop: 6 } }, '진행 중인 랜덤 이벤트의 다음 이야기로 이동해요. 모두 끝났으면 “이어지는 곳”으로 가요.') : null,
       h('div', { className: 'row', style: { marginTop: 10 } },
         h('button', { disabled: ci === 0, onClick: () => api.move(ci, -1) }, '▲ 위로'),
         h('button', { disabled: ci === page.choices.length - 1, onClick: () => api.move(ci, 1) }, '▼ 아래로'),
@@ -112,7 +137,7 @@
         const d = Object.assign({}, n.data);
         if (n.type === 'prev') d.onBack = api.back;
         if (n.type === 'cur') { d.onEditPage = api.editPage; d.onPlay = api.play; }
-        if (n.type === 'target' || n.type === 'rand') { d.onGo = api.goPage; d.onEdit = api.edit; }
+        if (n.type === 'target' || n.type === 'rand' || n.type === 'cont') { d.onGo = api.goPage; d.onEdit = api.edit; }
         if (n.type === 'add') d.onAdd = api.add;
         return Object.assign({}, n, { data: d, draggable: false });
       });

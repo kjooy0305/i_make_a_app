@@ -27,7 +27,7 @@
       { id: 'money', name: '돈', init: 0, max: 0 },
     ];
   }
-  const newOutcome = (next) => ({ next, mode: 'page', group: '', pool: [], gain: '', lose: '', achv: '', stats: {} });
+  const newOutcome = (next) => ({ next, mode: 'page', group: '', pool: [], pick: { min: 1, max: 1 }, after: { mode: 'none', next: 0, group: '' }, gain: '', lose: '', achv: '', stats: {} });
   const newChoice = (next) => ({
     id: uid('c'), text: '', show: null, enable: null,
     base: newOutcome(next), branchType: null, branches: [],
@@ -64,7 +64,7 @@
   function initState(pj) {
     const stats = {};
     pj.stats.forEach((s) => { stats[s.id] = s.init; });
-    return { page: 0, items: {}, stats, achv: [], log: [] };
+    return { page: 0, items: {}, stats, achv: [], log: [], run: null };
   }
   const have = (st, name) => st.items[name] || 0;
   function addItem(st, name, qty) {
@@ -135,7 +135,13 @@
   function targetsOf(pj, o) {
     const m = o.mode || 'page';
     if (m === 'group') { const g = groupOf(pj, o.group); const st = g ? groupStart(pj, g) : null; return st == null ? [] : [st]; }
-    if (m === 'random') return randomEntries(pj, o).map((e) => e.to);
+    if (m === 'random') {
+      const out = randomEntries(pj, o).map((e) => e.to);
+      const a = afterOf(o), d = a && resolveDest(pj, { mode: a.mode, next: a.next, group: a.group });
+      if (d && !out.includes(d.to)) out.push(d.to);
+      return out;
+    }
+    if (m === 'continue') return [];
     return [Number(o.next)];
   }
   // 실제 이동 지점 결정. rand01: 0 이상 1 미만 (랜덤 이벤트에서만 사용)
@@ -149,6 +155,58 @@
     }
     if (m === 'group') { const g = groupOf(pj, o.group); const st = g ? groupStart(pj, g) : null; return st == null ? null : { to: st, label: g.name, group: g.id }; }
     return { to: Number(o.next), label: '', group: '' };
+  }
+
+
+  /* ---------- 랜덤 이벤트 진행: 후보에서 여러 개를 겹치지 않게 뽑아 차례로 → 끝나면 지정한 곳으로 ----------
+   * outcome.pick = { min, max } 개수 범위(매번 이 범위에서 무작위), outcome.after = { mode:'none'|'page'|'group', next, group }
+   * 진행 상태는 st.run = { queue: 남은 이야기, total, index, after } */
+  const toInt = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 1 ? n : d; };
+  function pickRange(o) {
+    const min = toInt(o.pick && o.pick.min, 1);
+    return { min, max: Math.max(min, toInt(o.pick && o.pick.max, min)) };
+  }
+  function afterOf(o) {
+    const a = o.after;
+    return a && (a.mode === 'page' || a.mode === 'group') ? { mode: a.mode, next: a.next, group: a.group || '' } : null;
+  }
+  const makeRng = (r) => (typeof r === 'function' ? r : () => (r == null ? Math.random() : r));
+
+  function buildRun(pj, o, rng) {
+    const entries = randomEntries(pj, o);
+    if (!entries.length) return null;
+    const { min, max } = pickRange(o);
+    const cap = Math.min(max, entries.length), lo = Math.min(min, cap);
+    const n = lo === cap ? cap : lo + Math.min(cap - lo, Math.floor(rng() * (cap - lo + 1)));
+    const pool = entries.slice(), order = [];
+    for (let i = 0; i < n; i++) order.push(pool.splice(Math.min(pool.length - 1, Math.floor(rng() * pool.length)), 1)[0]);
+    return { order, after: afterOf(o) };
+  }
+  const canContinue = (st) => !!(st && st.run && (st.run.queue.length || st.run.after));
+
+  // 다음 이야기로: 남은 이야기가 있으면 그 이야기, 없으면 지정한 이어지는 곳
+  function continueRun(pj, st) {
+    const run = st.run, fx = [];
+    if (!run) return { fx, error: '진행 중인 랜덤 이벤트가 없어요' };
+    if (run.queue.length) {
+      const e = run.queue.shift();
+      run.index++;
+      const t = pageOf(pj, e.to);
+      if (!t) return { fx, error: 'P.' + e.to + ' 페이지가 없어요' };
+      st.page = t.n;
+      fx.push({ kind: 'rand', text: '랜덤 이벤트 (' + run.index + '/' + run.total + '): ' + e.label });
+      return { fx, dest: e };
+    }
+    if (run.after) {
+      const d = resolveDest(pj, { mode: run.after.mode, next: run.after.next, group: run.after.group });
+      st.run = null;
+      if (!d || !pageOf(pj, d.to)) return { fx, error: '이어지는 곳을 찾을 수 없어요' };
+      st.page = d.to;
+      fx.push({ kind: 'rand', text: '랜덤 이벤트 끝 — 이어지는 이야기' + (d.label ? ': ' + d.label : '') });
+      return { fx, dest: d, finished: true };
+    }
+    st.run = null;
+    return { fx, error: '이어갈 이야기가 없어요' };
   }
 
   /* ---------- 선택지 결과 계산 ---------- */
@@ -215,16 +273,32 @@
   }
 
   // 선택지를 눌렀을 때: 결과 선택 → 효과 적용 → 이동. 이동할 곳이 없으면 error.
-  // rand: 확률 분기용(0~100), rand2: 랜덤 이벤트용(0~1) — 테스트에서 주입
+  // rand: 확률 분기용(0~100), rand2: 랜덤 이벤트용 난수(0~1 숫자 또는 () => 0~1 함수) — 테스트에서 주입
   function choose(pj, st, ch, rand, rand2) {
     const o = resolveChoice(pj, st, ch, rand);
     const fx = applyOutcome(pj, st, o);
-    const d = resolveDest(pj, o, rand2);
     const m = o.mode || 'page';
-    if (!d) return { fx, error: m === 'group' ? '연결된 스토리 묶음에 페이지가 없어요' : m === 'random' ? '랜덤 이벤트 목록이 비어 있어요' : 'P.' + o.next + ' 페이지가 없어요' };
+    if (m === 'continue') {
+      const r = continueRun(pj, st);
+      r.fx.forEach((f) => fx.push(f));
+      return r.error ? { fx, error: r.error } : { fx, outcome: o, dest: r.dest };
+    }
+    if (m === 'random') {
+      const run = buildRun(pj, o, makeRng(rand2));
+      if (!run) return { fx, error: '랜덤 이벤트 목록이 비어 있어요' };
+      const first = run.order[0];
+      const target = pageOf(pj, first.to);
+      if (!target) return { fx, error: 'P.' + first.to + ' 페이지가 없어요' };
+      const total = run.order.length;
+      st.run = total > 1 || run.after ? { queue: run.order.slice(1), total, index: 1, after: run.after } : null;
+      fx.push({ kind: 'rand', text: '랜덤 이벤트' + (total > 1 ? ' (1/' + total + ')' : '') + ': ' + first.label });
+      st.page = target.n;
+      return { fx, outcome: o, dest: first, run: total };
+    }
+    const d = resolveDest(pj, o, null);
+    if (!d) return { fx, error: m === 'group' ? '연결된 스토리 묶음에 페이지가 없어요' : 'P.' + o.next + ' 페이지가 없어요' };
     const target = pageOf(pj, d.to);
     if (!target) return { fx, error: 'P.' + d.to + ' 페이지가 없어요' };
-    if (m === 'random') fx.push({ kind: 'rand', text: '랜덤 이벤트: ' + d.label });
     st.page = target.n;
     return { fx, outcome: o, dest: d };
   }
@@ -258,7 +332,16 @@
             if (!g) warn(p.n, where + ': 연결된 스토리 묶음이 없어요');
             else if (groupStart(pj, g) == null) warn(p.n, where + ': 스토리 묶음 “' + g.name + '”에 페이지가 없어요');
           }
-          if (m === 'random' && !randomEntries(pj, o).length) warn(p.n, where + ': 랜덤 이벤트 목록이 비어 있어요');
+          if (m === 'random') {
+            const n = randomEntries(pj, o).length;
+            if (!n) warn(p.n, where + ': 랜덤 이벤트 목록이 비어 있어요');
+            else if (pickRange(o).max > n) warn(p.n, where + ': 뽑을 개수(최대 ' + pickRange(o).max + ')보다 후보가 적어요 (후보 ' + n + '개까지만 나와요)');
+            const a = afterOf(o);
+            if (a) {
+              const d = resolveDest(pj, { mode: a.mode, next: a.next, group: a.group });
+              if (!d || !pageOf(pj, d.to)) warn(p.n, where + ': 랜덤 이벤트가 끝난 뒤 이어지는 곳을 찾을 수 없어요');
+            }
+          }
           if (o.achv && !pj.achievements.some((a) => a.id === o.achv)) warn(p.n, tag + ': 삭제된 업적이 연결돼 있어요');
         });
         if (c.branchType === 'prob' && branchSum(c) > 100) warn(p.n, tag + ': 확률 합이 100%를 넘어요');
@@ -290,7 +373,15 @@
     const out = [];
     const one = (o, tag) => {
       const m = o.mode || 'page';
-      if (m === 'random') out.push({ rand: true, key: 'rand:' + poolKey(o), entries: randomEntries(pj, o), tag });
+      if (m === 'continue') out.push({ cont: true, key: 'cont', tag });
+      else if (m === 'random') {
+        const pick = pickRange(o), a = afterOf(o), ad = a ? resolveDest(pj, { mode: a.mode, next: a.next, group: a.group }) : null;
+        out.push({
+          rand: true, entries: randomEntries(pj, o), tag, pick,
+          after: a ? { to: ad ? ad.to : -1, label: ad ? (ad.label || pageLabel(pageOf(pj, ad.to))) : '(없음)', missing: !ad || !pageOf(pj, ad.to) } : null,
+          key: 'rand:' + poolKey(o) + ':' + pick.min + '-' + pick.max + ':' + (a ? a.mode + (a.mode === 'group' ? a.group : a.next) : '-'),
+        });
+      }
       else if (m === 'group') {
         const g = groupOf(pj, o.group), st = g ? groupStart(pj, g) : null;
         out.push({ to: st == null ? -1 : st, tag, groupName: g ? g.name : '', groupMissing: st == null, groupId: o.group });
@@ -302,7 +393,7 @@
   }
 
   // 노드 높이 추정치 (실제 크기는 화면에서 측정되므로 겹치지 않을 만큼만 넉넉히)
-  const H = { prev: 58, cur: 160, target: (rows) => 62 + rows * 34, rand: (rows, entries) => 86 + rows * 34 + entries * 26, add: 46, end: 66, gap: 26 };
+  const H = { prev: 58, cur: 160, target: (rows) => 62 + rows * 34, rand: (rows, entries, extra) => 86 + rows * 34 + entries * 26 + (extra || 0), add: 46, end: 66, cont: (rows) => 62 + rows * 34, gap: 26 };
   function stackY(heights) {
     const total = heights.reduce((a, b) => a + b, 0) + H.gap * Math.max(0, heights.length - 1);
     let y = -total / 2;
@@ -343,10 +434,11 @@
       if (c.enable) flags.push('활성 조건');
       const seenHere = new Set();
       destinationsOf(pj, c).forEach((d) => {
-        const key = d.rand ? d.key : d.groupMissing ? 'missing-group:' + d.groupId : 'to-' + d.to;
+        const key = d.rand || d.cont ? d.key : d.groupMissing ? 'missing-group:' + d.groupId : 'to-' + d.to;
         let g = byKey.get(key);
         if (!g) {
-          if (d.rand) g = { kind: 'rand', key, entries: d.entries.map((e) => ({ label: e.label, to: e.to })), empty: !d.entries.length, items: [] };
+          if (d.cont) g = { kind: 'cont', key, items: [] };
+          else if (d.rand) g = { kind: 'rand', key, entries: d.entries.map((e) => ({ label: e.label, to: e.to })), empty: !d.entries.length, pick: d.pick, after: d.after, items: [] };
           else {
             const target = pageOf(pj, d.to);
             g = { kind: 'page', key, to: d.to, title: target ? pageLabel(target) : '', folder: target ? folderShort(folderOf(target)) : '', groupName: groupNameOf(pj, target), missing: !target, missingGroup: !!d.groupMissing, self: d.to === page.n, items: [] };
@@ -362,11 +454,11 @@
       });
     });
 
-    const heights = groups.map((g) => (g.kind === 'rand' ? H.rand(g.items.length, g.entries.length) : H.target(g.items.length))).concat([H.add]);
+    const heights = groups.map((g) => (g.kind === 'rand' ? H.rand(g.items.length, g.entries.length, 56 + (g.after ? 30 : 0)) : g.kind === 'cont' ? H.cont(g.items.length) : H.target(g.items.length))).concat([H.add]);
     const ys = stackY(heights);
     groups.forEach((g, i) => {
-      const id = g.kind === 'rand' ? 'rand-' + g.key : g.missingGroup ? g.key : 'to-' + g.to;
-      nodes.push({ id, type: g.kind === 'rand' ? 'rand' : 'target', position: { x: X3, y: ys[i] }, data: g });
+      const id = g.kind === 'rand' ? 'rand-' + g.key : g.kind === 'cont' ? 'cont' : g.missingGroup ? g.key : 'to-' + g.to;
+      nodes.push({ id, type: g.kind === 'rand' ? 'rand' : g.kind === 'cont' ? 'cont' : 'target', position: { x: X3, y: ys[i] }, data: g });
       const choiceCount = new Set(g.items.map((x) => x.ci)).size;
       edges.push({
         id: 'e-' + id, source: 'cur', target: id, type: 'default',
@@ -393,9 +485,14 @@
       else o.choices = p.choices.map((c) => {
         const b = c.base, m = b.mode || 'page';
         if (m === 'group') { const g = groupOf(pj, b.group); return g ? { text: c.text, group: g.name } : { text: c.text, to: Number(b.next) }; }
+        if (m === 'continue') return { text: c.text, continue: true };
         if (m === 'random') {
           const names = (b.pool || []).map((id) => (groupOf(pj, id) || {}).name).filter(Boolean);
-          return { text: c.text, random: names.length ? names : true };
+          const o = { text: c.text, random: names.length ? names : true };
+          const pk = pickRange(b), a = afterOf(b);
+          if (pk.min !== 1 || pk.max !== 1) o.pick = [pk.min, pk.max];
+          if (a) { const ag = a.mode === 'group' ? groupOf(pj, a.group) : null; o.after = a.mode === 'group' ? (ag ? { group: ag.name } : { to: Number(a.next) }) : { to: Number(a.next) }; }
+          return o;
         }
         return { text: c.text, to: Number(b.next) };
       });
@@ -421,8 +518,13 @@
       (it.choices || []).forEach((c, j) => {
         const w = 'id ' + it.id + ' 선택지 ' + (j + 1) + ': ';
         if (!c || typeof c !== 'object') throw new Error(w + '객체가 아니에요');
+        if (c.continue != null && c.continue !== true) throw new Error(w + 'continue 는 true 여야 해요');
         if (c.random != null) {
+          if (c.pick != null && !(Array.isArray(c.pick) && c.pick.length === 2 && c.pick.every((n) => Number.isInteger(n) && n >= 1) && c.pick[0] <= c.pick[1])) throw new Error(w + 'pick 은 [최소, 최대] (1 이상, 최소 ≤ 최대) 형태여야 해요');
+          if (c.after != null && !(c.after && ((Number.isInteger(c.after.to) && c.after.to >= 0) || (typeof c.after.group === 'string' && known.has(c.after.group))))) throw new Error(w + 'after 는 { to: 번호 } 또는 { group: 묶음이름 } 이어야 해요');
           if (c.random !== true && !(Array.isArray(c.random) && c.random.length && c.random.every((n) => known.has(n)))) throw new Error(w + 'random 은 true 이거나 존재하는 묶음 이름 배열이어야 해요');
+        } else if (c.continue === true) {
+          // 다음 이야기로 — 추가 검사 없음
         } else if (c.group != null) {
           if (!known.has(c.group)) throw new Error(w + '스토리 묶음 “' + c.group + '” 을 찾을 수 없어요');
         } else if (!Number.isInteger(c.to) || c.to < 0) throw new Error(w + 'to 는 0 이상의 정수여야 해요 (또는 group / random)');
@@ -451,7 +553,12 @@
         const ch = p.choices[j] || newChoice(0);
         ch.text = String(c.text || '');
         const b = ch.base;
-        if (c.random != null) { b.mode = 'random'; b.pool = c.random === true ? [] : c.random.map((n) => gid(n, 'random')); }
+        if (c.continue === true) b.mode = 'continue';
+        else if (c.random != null) {
+          b.mode = 'random'; b.pool = c.random === true ? [] : c.random.map((n) => gid(n, 'random'));
+          b.pick = c.pick ? { min: c.pick[0], max: c.pick[1] } : { min: 1, max: 1 };
+          b.after = c.after ? (typeof c.after.group === 'string' ? { mode: 'group', next: 0, group: gid(c.after.group, 'main') } : { mode: 'page', next: c.after.to, group: '' }) : { mode: 'none', next: 0, group: '' };
+        }
         else if (c.group != null) { b.mode = 'group'; b.group = gid(c.group, 'main'); }
         else { b.mode = 'page'; b.next = c.to; }
         return ch;
@@ -476,7 +583,8 @@
 
   return {
     BODY_MAX, FOLDERS, folderOf, folderShort, pagesIn,
-    groupOf, groupsIn, pagesOfGroup, groupStart, groupNameOf, randomEntries, targetsOf, resolveDest, uid, clone, defaultStats, newOutcome, newChoice, newPage, newProject,
+    groupOf, groupsIn, pagesOfGroup, groupStart, groupNameOf, randomEntries, targetsOf, resolveDest,
+    pickRange, afterOf, buildRun, canContinue, continueRun, uid, clone, defaultStats, newOutcome, newChoice, newPage, newProject,
     lastPageNo, pageOf, parseItems, initState, have, addItem, loseItem,
     checkCond, missingTerms, branchSum, baseProb, resolveChoice, applyOutcome,
     visibleChoices, choose, validate, normalizeProject,
