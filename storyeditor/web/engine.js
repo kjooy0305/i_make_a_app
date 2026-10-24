@@ -572,6 +572,7 @@
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.pages)) throw new Error('올바른 프로젝트 파일이 아니에요');
     const pj = Object.assign(newProject(), raw);
     pj.id = uid('p');
+    delete pj.tutorialVersion;                       // 가져온 프로젝트는 항상 일반 프로젝트
     pj.stats = Array.isArray(raw.stats) && raw.stats.length ? raw.stats : defaultStats();
     pj.achievements = Array.isArray(raw.achievements) ? raw.achievements : [];
     pj.groups = Array.isArray(raw.groups) ? raw.groups : [];

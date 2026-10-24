@@ -20,6 +20,17 @@
     }
     catch (e) { S.memOnly = true; }
   }
+  // 튜토리얼은 항상 있다. 저장된 버전이 낮으면 새 내용으로 교체한다 (기능이 추가되면 VERSION 이 올라감)
+  function ensureTutorial() {
+    const T = window.STutorial;
+    if (!T) return;
+    const i = S.projects.findIndex((p) => p.id === T.ID);
+    if (i >= 0 && (S.projects[i].tutorialVersion || 0) >= T.VERSION) return;
+    const t = T.build();
+    if (i >= 0) { t.createdAt = S.projects[i].createdAt || t.createdAt; S.projects[i] = t; S.tutUpdated = true; }
+    else S.projects.unshift(t);
+    saveNow();
+  }
   let saveTimer;
   function save() {
     clearTimeout(saveTimer);
@@ -94,14 +105,19 @@
     if (!S.projects.length) {
       h += '<div class="card" style="text-align:center;padding:30px 14px"><div style="font-size:15px">아직 프로젝트가 없어요</div><div class="muted" style="margin:6px 0 14px">페이지와 선택지를 이어서 나만의 분기형 이야기를 써 보세요.</div><button class="pri" data-act="newproj">＋ 새 프로젝트</button> <button data-act="sample">예시 프로젝트 만들기</button></div>';
     } else {
-      h += '<div class="grid">' + S.projects.slice().sort((a, b) => b.updatedAt - a.updatedAt).map((p) =>
-        '<div class="card" style="margin:0"><div class="cover" style="background:' + COLORS[p.color % COLORS.length] + '"></div>' +
-        '<div class="row"><b class="grow" style="word-break:break-all">' + esc(p.name) + '</b>' + (p.tag ? '<span class="tag">' + esc(p.tag) + '</span>' : '') + '</div>' +
-        '<div class="muted">페이지 ' + p.pages.length + '개 · 업적 ' + p.achievements.length + '개 · ' + fmtDate(p.updatedAt) + '</div>' +
-        '<div class="row" style="margin-top:10px"><button class="pri sm" data-act="open" data-id="' + p.id + '">편집</button><button class="sm" data-act="play" data-id="' + p.id + '">▶ 미리보기</button>' +
-        '<button class="sm" data-act="export" data-id="' + p.id + '">내보내기</button><button class="sm" data-act="dup" data-id="' + p.id + '">복제</button><button class="sm dng" data-act="delproj" data-id="' + p.id + '">삭제</button></div></div>'
-      ).join('') + '</div>';
+      const isTut = (p) => p.id === (window.STutorial && window.STutorial.ID);
+      const order = S.projects.slice().sort((a, b) => (isTut(b) - isTut(a)) || (b.updatedAt - a.updatedAt));
+      h += '<div class="grid">' + order.map((p) => {
+        const tut = isTut(p);
+        return '<div class="card' + (tut ? ' tut' : '') + '" style="margin:0"><div class="cover" style="background:' + COLORS[p.color % COLORS.length] + '"></div>' +
+          '<div class="row"><b class="grow" style="word-break:break-all">' + esc(p.name) + '</b>' + (p.tag ? '<span class="tag">' + esc(p.tag) + '</span>' : '') + '</div>' +
+          '<div class="muted">페이지 ' + p.pages.length + '개 · 업적 ' + p.achievements.length + '개 · ' + (tut ? '고정 예시 · 기능이 추가되면 자동 갱신' : fmtDate(p.updatedAt)) + '</div>' +
+          '<div class="row" style="margin-top:10px">' + (tut ? '<button class="pri sm" data-act="play" data-id="' + p.id + '">▶ 튜토리얼 시작</button><button class="sm" data-act="open" data-id="' + p.id + '">편집기로 보기</button>' : '<button class="pri sm" data-act="open" data-id="' + p.id + '">편집</button><button class="sm" data-act="play" data-id="' + p.id + '">▶ 미리보기</button>') +
+          '<button class="sm" data-act="export" data-id="' + p.id + '">내보내기</button><button class="sm" data-act="dup" data-id="' + p.id + '">' + (tut ? '복제해서 실험' : '복제') + '</button>' +
+          (tut ? '<button class="sm" data-act="tutreset" data-id="' + p.id + '">원래대로</button>' : '<button class="sm dng" data-act="delproj" data-id="' + p.id + '">삭제</button>') + '</div></div>';
+      }).join('') + '</div>';
     }
+    h += '<div class="muted" style="margin-top:14px;text-align:center">처음이라면 위의 📘 튜토리얼부터 시작해 보세요 · <button class="sm ghost" data-act="sample">＋ 간단한 예시 프로젝트 추가</button></div>';
     $('#main').innerHTML = h;
   }
 
@@ -256,7 +272,8 @@
       const all = pj.pages.slice().sort((a, b) => a.n - b.n);
       S.pn = all.length ? all[0].n : -1;
     }
-    $('#main').innerHTML = '<div class="ed' + (S.side ? '' : ' noside') + '"><div class="side" id="side">' + sideHtml(pj) + '</div><div id="pageBox"></div></div>';
+    const tutBar = window.STutorial && pj.id === window.STutorial.ID ? '<div class="hint tutbar">📘 고정 튜토리얼이에요. 기능이 추가되면 새 내용으로 자동 갱신되고, 고친 내용은 사라져요. 실험은 홈에서 “복제해서 실험”을 쓰세요.</div>' : '';
+    $('#main').innerHTML = tutBar + '<div class="ed' + (S.side ? '' : ' noside') + '"><div class="side" id="side">' + sideHtml(pj) + '</div><div id="pageBox"></div></div>';
     renderPage();
   }
   function renderSide() { const pj = proj(); const el = $('#side'); if (pj && el) { const sc = el.scrollTop; el.innerHTML = sideHtml(pj); el.scrollTop = sc; } }
@@ -653,10 +670,20 @@
       case 'import': $('#importFile').click(); break;
       case 'dup': {
         const t = S.projects.find((x) => x.id === id); if (!t) break;
-        const c = E.clone(t); c.id = E.uid('p'); c.name = t.name + ' (복사)'; c.createdAt = c.updatedAt = Date.now();
+        const c = E.clone(t); c.id = E.uid('p'); c.name = (t.tutorialVersion ? '튜토리얼 실험' : t.name + ' (복사)'); c.tag = t.tutorialVersion ? '' : c.tag; delete c.tutorialVersion; c.createdAt = c.updatedAt = Date.now();
         S.projects.push(c); saveNow(); render(); toast('복제했어요'); break;
       }
+      case 'tutreset': {
+        const T = window.STutorial;
+        if (T && await ask('📘 튜토리얼을 원래 내용으로 되돌릴까요?\n지금까지 고친 내용은 사라져요. (내 작품에는 영향이 없어요)', '되돌리기')) {
+          const i = S.projects.findIndex((x) => x.id === T.ID); const t = T.build();
+          if (i >= 0) S.projects[i] = t; else S.projects.unshift(t);
+          saveNow(); render(); toast('튜토리얼을 원래대로 되돌렸어요');
+        }
+        break;
+      }
       case 'delproj': {
+        if (id === (window.STutorial && window.STutorial.ID)) { toast('튜토리얼은 삭제할 수 없어요. “원래대로”로 복구하거나 “복제해서 실험”을 쓰세요'); break; }
         const t = S.projects.find((x) => x.id === id);
         if (t && await ask('“' + t.name + '” 프로젝트를 삭제할까요?\n되돌릴 수 없어요.', '삭제')) { S.projects = S.projects.filter((x) => x.id !== id); saveNow(); render(); }
         break;
@@ -762,5 +789,7 @@
   /* ================= 시작 ================= */
   try { const m = localStorage.getItem(MODE_KEY); if (m === 'num' || m === 'folder') S.listMode = m; } catch (e) { /* 기본값 사용 */ }
   load();
+  ensureTutorial();
   render();
+  if (S.tutUpdated) toast('📘 튜토리얼이 새 내용으로 갱신됐어요');
 })();

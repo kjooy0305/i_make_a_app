@@ -41,6 +41,8 @@ button:disabled{opacity:.4;cursor:default}
 .side .seg{margin:0 0 8px}
 .fchip{margin-left:auto;font-style:normal;font-size:10.5px;color:var(--sub);border:1px solid var(--line);border-radius:10px;padding:0 6px;flex:none}
 .pi.on .fchip{color:#0b1020;border-color:#0b1020}
+.card.tut{border-color:var(--pri);background:linear-gradient(135deg,rgba(109,140,255,.16),var(--card) 60%)}
+.tutbar{margin:0 0 10px;border:1px dashed var(--pri);color:var(--pri2)}
 .gh{display:flex;gap:6px;align-items:center;padding:6px 6px;margin-top:6px;border-radius:8px;background:var(--card);cursor:pointer}
 .gh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .gh em{font-style:normal;font-size:11px;color:var(--sub)}
@@ -154,6 +156,7 @@ main.flowmode{display:flex;flex-direction:column;padding-bottom:12px;overflow-y:
 <script src="vendor/react-dom.production.min.js"></script>
 <script src="vendor/reactflow.min.js"></script>
 <script src="engine.js"></script>
+<script src="tutorial.js"></script>
 <script src="flow.js"></script>
 <script src="app.js"></script>
 </body>
