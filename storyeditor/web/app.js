@@ -470,7 +470,7 @@
     let h = '<div class="row"><b class="grow">' + esc(pj.name) + ' <span class="muted">P.' + st.page + ' · 미리보기 (저장 안 됨)</span></b><button class="sm" data-pv="restart">처음부터</button><button class="sm" data-pv="close">닫기</button></div>' +
       '<div class="status">' + pj.stats.map((s) => '<span>' + esc(s.name) + ' <b>' + st.stats[s.id] + (s.max ? '/' + s.max : '') + '</b></span>').join('') +
       (st.run ? '<span class="chip rand">🎲 ' + st.run.index + '/' + st.run.total + (st.run.queue.length ? '' : st.run.after ? ' · 마지막' : ' · 마지막') + '</span>' : '') + '<span class="grow muted">🎒 ' + (items.length ? items.join(', ') : '없음') + '</span><span class="muted">🏆 ' + st.achv.length + '/' + pj.achievements.length + '</span></div>';
-    h += '<div class="play-body">' + (p.body.trim() ? esc(p.body) : '<span class="muted">(본문이 비어 있어요)</span>') + '</div>';
+    h += '<div class="play-scroll"><div class="play-body">' + (p.body.trim() ? esc(p.body) : '<span class="muted">(본문이 비어 있어요)</span>') + '</div>';
     if (fx.length) h += '<div>' + fx.map((f) => '<span class="chip ' + f.kind + '">' + esc(f.kind === 'lose' ? '− ' + f.text : f.kind === 'gain' ? '+ ' + f.text : f.kind === 'rand' ? '🎲 ' + f.text : '🏆 ' + f.text.replace('업적 달성: ', '')) + '</span>').join('') + '</div>';
     if (p.isEnd && E.canContinue(st)) {
       const more = st.run.queue.length;
@@ -481,8 +481,9 @@
       const vis = E.visibleChoices(pj, st, p);
       h += vis.length ? vis.map((v) => '<button class="pc" data-pv="choice" data-id="' + v.choice.id + '"' + (v.enabled ? '' : ' disabled') + '>' + esc(v.choice.text || '(텍스트 없음)') + (v.enabled ? '' : '<small>필요: ' + esc(v.missing.join(', ')) + '</small>') + '</button>').join('') : '<div class="muted">보이는 선택지가 없어요.</div>';
     }
+    h += '</div>';                                    // .play-scroll: 본문 + 효과 칩 + 선택지가 한 덩어리로 같이 스크롤
     PV.m.el.firstChild.innerHTML = h;
-    const body = PV.m.el.querySelector('.play-body'); if (body) body.scrollTop = 0;
+    const sc = PV.m.el.querySelector('.play-scroll'); if (sc) sc.scrollTop = 0;
   }
   function onPlayClick(e) {
     const b = e.target.closest('[data-pv]'); if (!b || !PV) return;
