@@ -19,6 +19,7 @@ i_make_a_app/
 ├── randomread/     ← 네이티브 Android 앱
 ├── epubmaker/      ← 네이티브 Android 앱
 ├── choicetheroute/ ← 네이티브 Android 앱 (분기점 기록기)
+├── apkextractor/   ← 네이티브 Android 앱 (APK 추출기)
 ├── storyeditor/
 │   ├── web/        ← 분기형 이야기 에디터 (웹, 오프라인)
 │   └── test/       ← 엔진 단위 테스트 (node --test test/engine.test.js)
@@ -41,6 +42,7 @@ i_make_a_app/
 | 📚 RandomRead | Android | .apk | [다운로드](../../releases?q=randomread) |
 | 📖 EpubMaker | Android | .apk | [다운로드](../../releases?q=epubmaker) |
 | ⬡ 분기점 기록기 | Android | .apk | [다운로드](../../releases?q=choicetheroute) |
+| 📦 APK 추출기 | Android | .apk | [다운로드](../../releases?q=apkextractor) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---
@@ -285,7 +287,7 @@ git tag shortkey-v1.0.1 && git push origin shortkey-v1.0.1
 - **분기** — 확률 기준(합 100%, 나머지는 기본 설정) / 보유 아이템 기준(위에서부터 차례로 판정)
 - **분기도 (ReactFlow)** — 이전 이야기(회색) → 선택한 이야기(굵은 테두리) → 도착 페이지(클릭 버튼) 3열 페이지 단위 화면. 같은 페이지로 모이는 선택지는 한 노드에 합쳐 표시. 휠·핀치·구석 버튼으로 확대/축소, ✎로 선택지 수정, ＋로 새 분기·새 페이지를 이어 붙임
 - **스토리 JSON** — `[{ id, title, group, folder, text, choices:[{ text, to | group | random }], end }]` 배열로 한 번에 보기·추가·수정 (`group`: 묶음 이름, `random`: true 또는 묶음 이름 배열, `pick`: [최소, 최대], `after`: { to } 또는 { group }, `continue`: true)
-- **업적**, **미리보기**(저장 안 됨, 특정 페이지부터 시작 가능), **검사**(빈 본문·끊긴 링크·확률 초과 등)
+- **업적**, **미리보기**(화면 전체로 열리는 플레이 화면, ⛶ 브라우저 전체 화면 전환·Esc로 닫기)(저장 안 됨, 특정 페이지부터 시작 가능), **검사**(빈 본문·끊긴 링크·확률 초과 등)
 - 사용 라이브러리(`web/vendor/`에 포함, 오프라인 동작): React 18.3.1, ReactFlow 11.11.4
 - 데이터는 브라우저 localStorage에 저장됩니다. 중요한 작품은 내보내기로 백업하세요.
 

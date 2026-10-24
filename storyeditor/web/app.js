@@ -464,10 +464,12 @@
     PV.m.el.addEventListener('click', onPlayClick);
     renderPlay();
   }
-  function renderPlay() {
+  function renderPlay(keepScroll) {
     const { pj, st, fx } = PV, p = E.pageOf(pj, st.page);
+    const prevTop = keepScroll ? (PV.m.el.querySelector('.play-scroll') || {}).scrollTop || 0 : 0;
     const items = Object.keys(st.items).filter((k) => !k.startsWith('@')).map((k) => esc(k) + (st.items[k] > 1 ? ' ×' + st.items[k] : ''));
-    let h = '<div class="row"><b class="grow">' + esc(pj.name) + ' <span class="muted">P.' + st.page + ' · 미리보기 (저장 안 됨)</span></b><button class="sm" data-pv="restart">처음부터</button><button class="sm" data-pv="close">닫기</button></div>' +
+    const canFs = !!(document.fullscreenEnabled && PV.m.el.requestFullscreen);
+    let h = '<div class="row pv-head"><b class="ttl">' + esc(pj.name) + ' <span class="muted">P.' + st.page + ' · 미리보기 (저장 안 됨)</span></b><button class="sm" data-pv="restart">처음부터</button>' + (canFs ? '<button class="sm" data-pv="fs" title="브라우저 전체 화면 켜기/끄기">' + (document.fullscreenElement ? '⤢ 축소' : '⛶ 전체 화면') + '</button>' : '') + '<button class="sm" data-pv="close">닫기</button></div>' +
       '<div class="status">' + pj.stats.map((s) => '<span>' + esc(s.name) + ' <b>' + st.stats[s.id] + (s.max ? '/' + s.max : '') + '</b></span>').join('') +
       (st.run ? '<span class="chip rand">🎲 ' + st.run.index + '/' + st.run.total + (st.run.queue.length ? '' : st.run.after ? ' · 마지막' : ' · 마지막') + '</span>' : '') + '<span class="grow muted">🎒 ' + (items.length ? items.join(', ') : '없음') + '</span><span class="muted">🏆 ' + st.achv.length + '/' + pj.achievements.length + '</span></div>';
     h += '<div class="play-scroll"><div class="play-body">' + (p.body.trim() ? esc(p.body) : '<span class="muted">(본문이 비어 있어요)</span>') + '</div>';
@@ -483,12 +485,24 @@
     }
     h += '</div>';                                    // .play-scroll: 본문 + 효과 칩 + 선택지가 한 덩어리로 같이 스크롤
     PV.m.el.firstChild.innerHTML = h;
-    const sc = PV.m.el.querySelector('.play-scroll'); if (sc) sc.scrollTop = 0;
+    const sc = PV.m.el.querySelector('.play-scroll'); if (sc) sc.scrollTop = prevTop;
   }
+  function closePlay() {
+    if (!PV) return;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    PV.m.close(); PV = null;
+  }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && PV && !document.fullscreenElement) closePlay(); });
+  document.addEventListener('fullscreenchange', () => { if (PV) renderPlay(true); });   // 버튼 글자(전체 화면/축소) 갱신
   function onPlayClick(e) {
     const b = e.target.closest('[data-pv]'); if (!b || !PV) return;
     const a = b.dataset.pv;
-    if (a === 'close') { PV.m.close(); PV = null; return; }
+    if (a === 'close') { closePlay(); return; }
+    if (a === 'fs') {
+      const el = PV.m.el;
+      if (document.fullscreenElement) document.exitFullscreen(); else el.requestFullscreen().catch(() => toast('이 브라우저에서는 전체 화면을 켤 수 없어요'));
+      return;
+    }
     if (a === 'restart') { const st = E.initState(PV.pj); st.page = 0; PV.st = st; PV.fx = []; renderPlay(); return; }
     if (a === 'cont') {
       const r = E.continueRun(PV.pj, PV.st);

@@ -89,7 +89,14 @@ button:disabled{opacity:.4;cursor:default}
 .chip.achv{border-color:var(--warn);color:var(--warn)}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20;display:flex;align-items:center;justify-content:center;padding:14px}
 .modal>div{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:16px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto}
-.modal.full>div{max-width:680px;height:92vh;display:flex;flex-direction:column}
+/* 플레이 화면: 창이 아니라 화면 전체. 읽기 좋은 폭(720px)으로 가운데 정렬하되 스크롤바는 화면 끝에 둔다 */
+.modal.full{padding:0;background:var(--bg);align-items:stretch;justify-content:stretch;z-index:25;--pvx:max(16px,calc((100vw - 720px) / 2))}
+.modal.full>div{max-width:none;width:100%;height:100%;max-height:none;border:0;border-radius:0;background:transparent;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.modal.full .pv-head{padding:max(10px,env(safe-area-inset-top)) max(var(--pvx),env(safe-area-inset-right)) 4px max(var(--pvx),env(safe-area-inset-left));flex:none;flex-wrap:nowrap}
+.modal.full .pv-head .ttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modal.full .status{padding:2px max(var(--pvx),env(safe-area-inset-right)) 8px max(var(--pvx),env(safe-area-inset-left));margin:0 0 6px;flex:none}
+.modal.full .play-scroll{padding:0 max(var(--pvx),env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(var(--pvx),env(safe-area-inset-left))}
+.modal.full .play-body{font-size:17px;line-height:1.85;padding-top:10px}
 .play-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:6px}
 .play-body{white-space:pre-wrap;line-height:1.8;font-size:16px;padding:6px 2px 12px}
 .status{display:flex;gap:12px;flex-wrap:wrap;font-size:13px;border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:8px}
