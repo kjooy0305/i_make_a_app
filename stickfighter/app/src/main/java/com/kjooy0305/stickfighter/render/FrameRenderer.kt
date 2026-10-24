@@ -27,13 +27,21 @@ class Fit(val scale: Float, val offsetX: Float, val offsetY: Float) {
 
 /** 한 장면을 캔버스에 그린다. 편집기, 썸네일, 재생, 영상이 모두 이 그리기를 쓴다. */
 class FrameRenderer {
+    companion object {
+        const val GUIDE_COLOR = 0xFF8A8F98.toInt()
+        const val GUIDE_ALPHA = 110
+    }
+
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
 
-    /** 도화지(0,0)-(width,height)를 fit에 맞춰 그린다. */
-    fun draw(canvas: Canvas, animation: Animation, frame: Frame, fit: Fit) {
+    /**
+     * 도화지(0,0)-(width,height)를 fit에 맞춰 그린다.
+     * guide가 있으면 그 장면을 회색 밑그림으로 먼저 깔아 준다(편집기에서 이전 장면 참고용).
+     */
+    fun draw(canvas: Canvas, animation: Animation, frame: Frame, fit: Fit, guide: Frame? = null) {
         val save = canvas.save()
         canvas.translate(fit.offsetX, fit.offsetY)
         canvas.scale(fit.scale, fit.scale)
@@ -41,10 +49,21 @@ class FrameRenderer {
         paint.color = animation.background
         canvas.drawRect(0f, 0f, animation.width, animation.height, paint)
         canvas.clipRect(0f, 0f, animation.width, animation.height)
+        if (guide != null && guide.figures.isNotEmpty()) {
+            // 겹친 선이 더 진해지지 않도록 한 겹으로 그린 뒤 통째로 흐리게 합친다.
+            val layer = canvas.saveLayerAlpha(0f, 0f, animation.width, animation.height, GUIDE_ALPHA)
+            drawFigures(canvas, guide, GUIDE_COLOR)
+            canvas.restoreToCount(layer)
+        }
+        drawFigures(canvas, frame, null)
+        canvas.restoreToCount(save)
+    }
+
+    private fun drawFigures(canvas: Canvas, frame: Frame, forceColor: Int?) {
         for (figure in frame.figures) {
             for (p in Kinematics.layout(figure)) {
                 val s = p.segment
-                paint.color = s.color
+                paint.color = forceColor ?: s.color
                 val w = s.thickness * figure.scale
                 when (s.shape) {
                     Shape.LINE -> {
@@ -61,7 +80,6 @@ class FrameRenderer {
                 }
             }
         }
-        canvas.restoreToCount(save)
     }
 
     /** 썸네일 등으로 쓸 작은 비트맵. */

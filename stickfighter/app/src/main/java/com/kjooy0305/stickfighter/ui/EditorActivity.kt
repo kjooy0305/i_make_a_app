@@ -17,6 +17,9 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.kjooy0305.stickfighter.R
 import com.kjooy0305.stickfighter.data.Repository
@@ -48,6 +51,12 @@ class EditorActivity : AppCompatActivity(), EditorView.Listener {
     private var selectedFigure: Long? = null
     private var selectedSegment: Int? = null
 
+    private lateinit var preview: PreviewWindow
+    private var onionEnabled = true
+    private var framesVisible = true
+    private var previewVisible = false
+    private var toolsHidden = false
+
     private class Snapshot(val frames: List<Frame>, val index: Int)
     private val undoStack = ArrayDeque<Snapshot>()
 
@@ -69,6 +78,8 @@ class EditorActivity : AppCompatActivity(), EditorView.Listener {
         b = ActivityEditorBinding.inflate(layoutInflater)
         setContentView(b.root)
         repo = Repository(filesDir)
+        enterFullscreen()
+        onionEnabled = getSharedPreferences("editor", MODE_PRIVATE).getBoolean("onion", true)
 
         figureMode = intent.hasExtra(EXTRA_FIGURE)
         if (figureMode) {
@@ -108,6 +119,20 @@ class EditorActivity : AppCompatActivity(), EditorView.Listener {
         b.addItem.setOnClickListener { if (figureMode) addPart() else addFigure() }
         b.removeItem.setOnClickListener { if (figureMode) removePart() else removeFigure() }
 
+        preview = PreviewWindow(b.previewWindow.root).also { it.onClose = { setPreviewVisible(false) } }
+        b.zoomIn.setOnClickListener { b.editorView.zoomIn() }
+        b.zoomOut.setOnClickListener { b.editorView.zoomOut() }
+        b.zoomFit.setOnClickListener { b.editorView.fitToScreen() }
+        b.onionButton.setOnClickListener {
+            onionEnabled = !onionEnabled
+            getSharedPreferences("editor", MODE_PRIVATE).edit().putBoolean("onion", onionEnabled).apply()
+            refreshAll()
+        }
+        b.framesButton.setOnClickListener { framesVisible = !framesVisible; applyLayoutState() }
+        b.previewButton.setOnClickListener { setPreviewVisible(!previewVisible) }
+        b.hideUiButton.setOnClickListener { toolsHidden = true; applyLayoutState() }
+        b.showUiButton.setOnClickListener { toolsHidden = false; applyLayoutState() }
+
         if (figureMode) {
             b.playButton.visibility = View.GONE
             b.moreButton.visibility = View.GONE
@@ -116,10 +141,24 @@ class EditorActivity : AppCompatActivity(), EditorView.Listener {
             b.addItem.setImageResource(R.drawable.ic_add)
             b.sizeUp.visibility = View.GONE
             b.sizeDown.visibility = View.GONE
-            b.frameStrip.visibility = View.GONE
+            framesVisible = false
+            b.onionButton.visibility = View.GONE
+            b.framesButton.visibility = View.GONE
+            b.previewButton.visibility = View.GONE
         }
         setMode(EditMode.POSE)
         refreshAll()
+        applyLayoutState()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        preview.resume()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        preview.pause()
     }
 
     override fun onPause() {
@@ -132,6 +171,52 @@ class EditorActivity : AppCompatActivity(), EditorView.Listener {
         super.onDestroy()
         cancelVideo = true
         worker.shutdown()
+    }
+
+    // ---- 전체 화면과 창 ----
+
+    private fun enterFullscreen() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, b.root).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enterFullscreen()
+    }
+
+    private fun setPreviewVisible(value: Boolean) {
+        previewVisible = value
+        applyLayoutState()
+    }
+
+    /** 막대와 창의 보이기 상태를 한꺼번에 맞춘다. 맞춤 크기는 막대가 덮지 않는 영역으로 잡는다. */
+    private fun applyLayoutState() {
+        val show = if (toolsHidden) View.GONE else View.VISIBLE
+        b.topBar.visibility = show
+        b.toolScroll.visibility = show
+        b.zoomColumn.visibility = show
+        b.hintText.visibility = show
+        val stripShown = framesVisible && !toolsHidden && !figureMode
+        b.frameStrip.visibility = if (stripShown) View.VISIBLE else View.GONE
+        b.showUiButton.visibility = if (toolsHidden) View.VISIBLE else View.GONE
+        if (previewVisible && !toolsHidden && !figureMode) {
+            if (!preview.isShowing) preview.show()
+        } else if (preview.isShowing) {
+            preview.hide()
+        }
+        b.framesButton.isSelected = framesVisible
+        b.previewButton.isSelected = previewVisible
+        val d = resources.displayMetrics.density
+        b.editorView.setContentInsets(
+            if (toolsHidden) 0f else 44f * d,
+            if (toolsHidden) 0f else 44f * d,
+            if (toolsHidden) 0f else 52f * d,
+            if (stripShown) 80f * d else 0f
+        )
     }
 
     // ---- 상태 ----
@@ -152,6 +237,9 @@ class EditorActivity : AppCompatActivity(), EditorView.Listener {
         }
         b.editorView.animation = anim
         b.editorView.frame = frame()
+        b.editorView.guideFrame = if (onionEnabled && !figureMode && frameIndex > 0) anim.frames[frameIndex - 1] else null
+        b.onionButton.isSelected = onionEnabled
+        preview.update(anim, frameIndex)
         b.editorView.selectedFigureId = selectedFigure
         b.editorView.selectedSegmentId = selectedSegment
         strip.submit(anim, frameIndex)
@@ -211,6 +299,7 @@ class EditorActivity : AppCompatActivity(), EditorView.Listener {
         val frames = anim.frames.toMutableList()
         frames[frameIndex] = frame
         anim = anim.copy(frames = frames)
+        preview.update(anim, frameIndex)
         scheduleSave()
     }
 

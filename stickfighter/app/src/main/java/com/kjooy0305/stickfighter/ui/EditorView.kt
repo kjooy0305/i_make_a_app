@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import androidx.core.content.ContextCompat
 import com.kjooy0305.stickfighter.R
@@ -17,6 +18,7 @@ import com.kjooy0305.stickfighter.model.Pt
 import com.kjooy0305.stickfighter.model.Shape
 import com.kjooy0305.stickfighter.render.Fit
 import com.kjooy0305.stickfighter.render.FrameRenderer
+import com.kjooy0305.stickfighter.render.ViewTransform
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
@@ -41,6 +43,15 @@ class EditorView @JvmOverloads constructor(context: Context, attrs: AttributeSet
 
     var listener: Listener? = null
     var animation: Animation = Animation("", "")
+        set(value) {
+            val paperChanged = field.ratio != value.ratio
+            field = value
+            if (paperChanged) transform.setPaper(value.width, value.height)
+            invalidate()
+        }
+
+    /** 이전 장면을 회색 밑그림으로 보여 줄 때 쓴다. null이면 그리지 않는다. */
+    var guideFrame: Frame? = null
         set(value) { field = value; invalidate() }
     var frame: Frame = Frame()
         set(value) { field = value; invalidate() }
@@ -52,6 +63,51 @@ class EditorView @JvmOverloads constructor(context: Context, attrs: AttributeSet
         set(value) { field = value; invalidate() }
 
     private val renderer = FrameRenderer()
+    private val transform = ViewTransform().apply { setPaper(1000f, 562.5f) }
+    private var multiTouch = false
+    private var panning = false
+    private var lastX = 0f
+    private var lastY = 0f
+    private var lastFocusX = 0f
+    private var lastFocusY = 0f
+    private var pendingHit: Figure? = null
+
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(d: ScaleGestureDetector): Boolean {
+            lastFocusX = d.focusX
+            lastFocusY = d.focusY
+            return true
+        }
+
+        override fun onScale(d: ScaleGestureDetector): Boolean {
+            transform.zoomAround(d.focusX, d.focusY, d.scaleFactor)
+            transform.panBy(d.focusX - lastFocusX, d.focusY - lastFocusY)
+            lastFocusX = d.focusX
+            lastFocusY = d.focusY
+            invalidate()
+            return true
+        }
+    })
+
+    init {
+        scaleDetector.isQuickScaleEnabled = false
+    }
+
+    val zoomLevel: Float get() = transform.zoom
+
+    fun zoomIn() { transform.zoomCenter(1.4f); invalidate() }
+    fun zoomOut() { transform.zoomCenter(1f / 1.4f); invalidate() }
+    fun fitToScreen() { transform.fit(); invalidate() }
+
+    /** 도구 막대가 덮는 영역. 맞춤 크기는 이 안쪽에 들어오게 잡는다. */
+    fun setContentInsets(left: Float, top: Float, right: Float, bottom: Float) {
+        transform.setInsets(left, top, right, bottom, 8f * density)
+        invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        transform.setView(w.toFloat(), h.toFloat())
+    }
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = 0xFFFFFFFF.toInt() }
     private val density = resources.displayMetrics.density
@@ -66,11 +122,11 @@ class EditorView @JvmOverloads constructor(context: Context, attrs: AttributeSet
     private var gestureStarted = false
     private var moved = false
 
-    private fun fit(): Fit = Fit.of(width.toFloat(), height.toFloat(), animation, 12f * density)
+    private fun fit(): Fit = transform.toFit()
 
     override fun onDraw(canvas: Canvas) {
         val fit = fit()
-        renderer.draw(canvas, animation, frame, fit)
+        renderer.draw(canvas, animation, frame, fit, guideFrame)
         val figure = selectedFigure() ?: return
         val r = 9f * density
         for (dot in dots(figure)) {
@@ -151,6 +207,22 @@ class EditorView @JvmOverloads constructor(context: Context, attrs: AttributeSet
     }
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        scaleDetector.onTouchEvent(e)
+        when (e.actionMasked) {
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                // 손가락이 둘이 되면 고치던 동작을 끝내고 확대·이동만 한다.
+                if (gestureStarted) listener?.onGestureEnd()
+                gestureStarted = false
+                active = null
+                multiTouch = true
+                return true
+            }
+            MotionEvent.ACTION_POINTER_UP -> return true
+        }
+        if (multiTouch) {
+            if (e.actionMasked == MotionEvent.ACTION_UP || e.actionMasked == MotionEvent.ACTION_CANCEL) multiTouch = false
+            return true
+        }
         val fit = fit()
         val lx = fit.toLogicalX(e.x)
         val ly = fit.toLogicalY(e.y)
@@ -158,8 +230,11 @@ class EditorView @JvmOverloads constructor(context: Context, attrs: AttributeSet
             MotionEvent.ACTION_DOWN -> {
                 parent?.requestDisallowInterceptTouchEvent(true)
                 downX = e.x; downY = e.y
+                lastX = e.x; lastY = e.y
                 moved = false
+                panning = false
                 gestureStarted = false
+                pendingHit = null
                 val dot = hitDot(e.x, e.y)
                 if (dot != null) {
                     active = dot.kind
@@ -173,16 +248,23 @@ class EditorView @JvmOverloads constructor(context: Context, attrs: AttributeSet
                     }
                 } else {
                     active = null
-                    val hit = figureAt(lx, ly, 14f * density / fit.scale)
-                    selectedFigureId = hit?.id
-                    selectedSegmentId = null
-                    listener?.onSelectionChanged(hit?.id, null)
+                    // 선택은 손을 뗄 때 정한다. 끌면 화면 이동이 되기 때문이다.
+                    pendingHit = figureAt(lx, ly, 14f * density / fit.scale)
                 }
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                val kind = active ?: return true
                 if (!moved && hypot(e.x - downX, e.y - downY) > 8f * density) moved = true
+                val kind = active
+                if (kind == null) {
+                    if (moved) {
+                        panning = true
+                        transform.panBy(e.x - lastX, e.y - lastY)
+                        invalidate()
+                    }
+                    lastX = e.x; lastY = e.y
+                    return true
+                }
                 if (!moved) return true
                 if (kind == Kind.MODIFY || kind == Kind.FLIP) return true
                 val figure = frame.figures.firstOrNull { it.id == activeFigure } ?: return true
@@ -212,15 +294,22 @@ class EditorView @JvmOverloads constructor(context: Context, attrs: AttributeSet
                     }
                 } else if (gestureStarted) {
                     listener?.onGestureEnd()
+                } else if (kind == null && !panning && !moved) {
+                    val hit = pendingHit
+                    selectedFigureId = hit?.id
+                    selectedSegmentId = null
+                    listener?.onSelectionChanged(hit?.id, null)
                 }
                 active = null
                 gestureStarted = false
+                pendingHit = null
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (gestureStarted) listener?.onGestureEnd()
                 active = null
                 gestureStarted = false
+                pendingHit = null
                 return true
             }
         }

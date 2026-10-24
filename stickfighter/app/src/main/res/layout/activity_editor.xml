@@ -1,21 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/editorBack"
-    android:orientation="vertical">
+    android:background="@color/editorBack">
+
+    <!-- 화면 전체가 편집 영역이다. 아래의 막대와 창은 그 위에 얹힌다. -->
+    <com.kjooy0305.stickfighter.ui.EditorView
+        android:id="@+id/editorView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <TextView
+        android:id="@+id/hintText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="64dp"
+        android:layout_marginTop="52dp"
+        android:background="#99000000"
+        android:maxWidth="420dp"
+        android:padding="6dp"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp" />
 
     <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="@color/editorBar"
+        android:layout_height="44dp"
+        android:layout_gravity="top"
+        android:background="@drawable/panel_bg"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <ImageButton
             android:id="@+id/backButton"
             style="@style/ToolButton"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/close"
             android:src="@drawable/ic_back" />
 
@@ -27,69 +48,90 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/onPrimary"
-            android:textSize="17sp"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
         <ImageButton
             android:id="@+id/undoButton"
             style="@style/ToolButton"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/undo"
             android:src="@drawable/ic_undo" />
 
         <ImageButton
+            android:id="@+id/onionButton"
+            style="@style/ToolButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/tool_bg"
+            android:contentDescription="@string/guide_toggle"
+            android:src="@drawable/ic_layers" />
+
+        <ImageButton
+            android:id="@+id/framesButton"
+            style="@style/ToolButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/tool_bg"
+            android:contentDescription="@string/frames_window"
+            android:src="@drawable/ic_frames" />
+
+        <ImageButton
+            android:id="@+id/previewButton"
+            style="@style/ToolButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/tool_bg"
+            android:contentDescription="@string/preview_window"
+            android:src="@drawable/ic_movie" />
+
+        <ImageButton
             android:id="@+id/playButton"
             style="@style/ToolButton"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/play"
             android:src="@drawable/ic_play" />
 
         <ImageButton
+            android:id="@+id/hideUiButton"
+            style="@style/ToolButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:contentDescription="@string/hide_tools"
+            android:src="@drawable/ic_fullscreen" />
+
+        <ImageButton
             android:id="@+id/moreButton"
             style="@style/ToolButton"
-            android:layout_height="48dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
             android:contentDescription="@string/about"
             android:src="@drawable/ic_more" />
     </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal">
-
-        <FrameLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1">
-
-            <com.kjooy0305.stickfighter.ui.EditorView
-                android:id="@+id/editorView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-
-            <TextView
-                android:id="@+id/hintText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom"
-                android:background="#99000000"
-                android:padding="6dp"
-                android:textColor="#FFFFFF"
-                android:textSize="12sp" />
-        </FrameLayout>
+    <ScrollView
+        android:id="@+id/toolScroll"
+        android:layout_width="52dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|top"
+        android:layout_marginTop="44dp"
+        android:background="@drawable/panel_bg"
+        android:scrollbars="none">
 
         <LinearLayout
             android:id="@+id/toolColumn"
-            android:layout_width="56dp"
-            android:layout_height="match_parent"
-            android:background="@color/editorBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:orientation="vertical">
 
             <ImageButton
                 android:id="@+id/modePose"
                 style="@style/ToolButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="@drawable/tool_bg"
                 android:contentDescription="@string/mode_pose"
                 android:src="@drawable/ic_pose" />
@@ -97,6 +139,8 @@
             <ImageButton
                 android:id="@+id/modeStretch"
                 style="@style/ToolButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="@drawable/tool_bg"
                 android:contentDescription="@string/mode_stretch"
                 android:src="@drawable/ic_stretch" />
@@ -104,51 +148,110 @@
             <ImageButton
                 android:id="@+id/modeFlip"
                 style="@style/ToolButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="@drawable/tool_bg"
                 android:contentDescription="@string/mode_flip"
                 android:src="@drawable/ic_flip" />
 
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
             <ImageButton
                 android:id="@+id/sizeUp"
                 style="@style/ToolButton"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="40dp"
                 android:contentDescription="@string/size_up"
                 android:src="@drawable/ic_add" />
 
             <ImageButton
                 android:id="@+id/sizeDown"
                 style="@style/ToolButton"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="40dp"
                 android:contentDescription="@string/size_down"
                 android:src="@drawable/ic_minus" />
 
             <ImageButton
                 android:id="@+id/addItem"
                 style="@style/ToolButton"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="40dp"
                 android:contentDescription="@string/add_figure"
                 android:src="@drawable/ic_person_add" />
 
             <ImageButton
                 android:id="@+id/removeItem"
                 style="@style/ToolButton"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="40dp"
                 android:contentDescription="@string/remove_figure"
                 android:src="@drawable/ic_delete" />
         </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/zoomColumn"
+        android:layout_width="44dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|center_vertical"
+        android:background="@drawable/panel_bg"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <ImageButton
+            android:id="@+id/zoomIn"
+            style="@style/ToolButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:contentDescription="@string/zoom_in"
+            android:src="@drawable/ic_zoom_in" />
+
+        <ImageButton
+            android:id="@+id/zoomOut"
+            style="@style/ToolButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:contentDescription="@string/zoom_out"
+            android:src="@drawable/ic_zoom_out" />
+
+        <ImageButton
+            android:id="@+id/zoomFit"
+            style="@style/ToolButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:contentDescription="@string/zoom_fit"
+            android:src="@drawable/ic_fit" />
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/frameStrip"
         android:layout_width="match_parent"
         android:layout_height="80dp"
-        android:background="@color/editorBar"
+        android:layout_gravity="bottom"
+        android:layout_marginEnd="52dp"
+        android:background="@drawable/panel_bg"
         android:clipToPadding="false"
         android:paddingHorizontal="8dp"
         android:paddingVertical="6dp" />
-</LinearLayout>
+
+    <include
+        android:id="@+id/previewWindow"
+        layout="@layout/view_preview_window"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="64dp"
+        android:layout_marginTop="84dp"
+        android:visibility="gone" />
+
+    <ImageButton
+        android:id="@+id/showUiButton"
+        style="@style/ToolButton"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="8dp"
+        android:background="@drawable/round_bg"
+        android:contentDescription="@string/show_tools"
+        android:src="@drawable/ic_fullscreen_exit"
+        android:visibility="gone" />
+</FrameLayout>

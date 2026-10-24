@@ -93,4 +93,20 @@
     <string name="figure_disc">채운 원</string>
     <string name="figure_line">선</string>
     <string name="figure_sword">검</string>
+
+    <string name="guide_toggle">이전 장면 밑그림</string>
+    <string name="frames_window">장면 창</string>
+    <string name="preview_window">미리보기 창</string>
+    <string name="preview_resize">창 크기</string>
+    <string name="preview_transition">전환</string>
+    <string name="preview_all">전체</string>
+    <string name="preview_transition_label">%1$d → %2$d 장면 전환</string>
+    <string name="preview_all_label">전체 장면</string>
+    <string name="preview_single">장면이 1장입니다</string>
+    <string name="hide_tools">도구 숨기기</string>
+    <string name="show_tools">도구 보이기</string>
+    <string name="zoom_in">확대</string>
+    <string name="zoom_out">축소</string>
+    <string name="zoom_fit">화면에 맞추기</string>
+    <string name="hint_zoom">두 손가락으로 확대·축소, 빈 곳을 끌어 이동</string>
 </resources>

@@ -91,4 +91,20 @@
     <string name="figure_disc">Disc</string>
     <string name="figure_line">Line</string>
     <string name="figure_sword">Sword</string>
+
+    <string name="guide_toggle">Previous-frame guide</string>
+    <string name="frames_window">Frames window</string>
+    <string name="preview_window">Preview window</string>
+    <string name="preview_resize">Window size</string>
+    <string name="preview_transition">Transition</string>
+    <string name="preview_all">All</string>
+    <string name="preview_transition_label">Transition %1$d → %2$d</string>
+    <string name="preview_all_label">All frames</string>
+    <string name="preview_single">Only one frame</string>
+    <string name="hide_tools">Hide tools</string>
+    <string name="show_tools">Show tools</string>
+    <string name="zoom_in">Zoom in</string>
+    <string name="zoom_out">Zoom out</string>
+    <string name="zoom_fit">Fit to screen</string>
+    <string name="hint_zoom">Pinch to zoom, drag empty space to pan</string>
 </resources>
