@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <com.kjooy0305.stickfighter.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ImageButton
+        android:id="@+id/closeButton"
+        style="@style/ToolButton"
+        android:layout_gravity="top|start"
+        android:background="#66000000"
+        android:contentDescription="@string/close"
+        android:src="@drawable/ic_back" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#99000000"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp">
+
+        <ImageButton
+            android:id="@+id/playPause"
+            style="@style/ToolButton"
+            android:contentDescription="@string/pause"
+            android:src="@drawable/ic_pause" />
+
+        <SeekBar
+            android:id="@+id/progress"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:max="1000" />
+
+        <ImageButton
+            android:id="@+id/repeatButton"
+            style="@style/ToolButton"
+            android:background="@drawable/tool_bg"
+            android:contentDescription="@string/settings_repeat"
+            android:src="@drawable/ic_repeat" />
+
+        <ImageButton
+            android:id="@+id/slower"
+            style="@style/ToolButton"
+            android:src="@drawable/ic_minus" />
+
+        <TextView
+            android:id="@+id/speedText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="64dp"
+            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp" />
+
+        <ImageButton
+            android:id="@+id/faster"
+            style="@style/ToolButton"
+            android:src="@drawable/ic_add" />
+    </LinearLayout>
+</FrameLayout>

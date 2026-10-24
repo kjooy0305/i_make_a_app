@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/editorBack"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/editorBar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            style="@style/ToolButton"
+            android:layout_height="48dp"
+            android:contentDescription="@string/close"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/onPrimary"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/undoButton"
+            style="@style/ToolButton"
+            android:layout_height="48dp"
+            android:contentDescription="@string/undo"
+            android:src="@drawable/ic_undo" />
+
+        <ImageButton
+            android:id="@+id/playButton"
+            style="@style/ToolButton"
+            android:layout_height="48dp"
+            android:contentDescription="@string/play"
+            android:src="@drawable/ic_play" />
+
+        <ImageButton
+            android:id="@+id/moreButton"
+            style="@style/ToolButton"
+            android:layout_height="48dp"
+            android:contentDescription="@string/about"
+            android:src="@drawable/ic_more" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <com.kjooy0305.stickfighter.ui.EditorView
+                android:id="@+id/editorView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/hintText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#99000000"
+                android:padding="6dp"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/toolColumn"
+            android:layout_width="56dp"
+            android:layout_height="match_parent"
+            android:background="@color/editorBar"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <ImageButton
+                android:id="@+id/modePose"
+                style="@style/ToolButton"
+                android:background="@drawable/tool_bg"
+                android:contentDescription="@string/mode_pose"
+                android:src="@drawable/ic_pose" />
+
+            <ImageButton
+                android:id="@+id/modeStretch"
+                style="@style/ToolButton"
+                android:background="@drawable/tool_bg"
+                android:contentDescription="@string/mode_stretch"
+                android:src="@drawable/ic_stretch" />
+
+            <ImageButton
+                android:id="@+id/modeFlip"
+                style="@style/ToolButton"
+                android:background="@drawable/tool_bg"
+                android:contentDescription="@string/mode_flip"
+                android:src="@drawable/ic_flip" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <ImageButton
+                android:id="@+id/sizeUp"
+                style="@style/ToolButton"
+                android:layout_height="44dp"
+                android:contentDescription="@string/size_up"
+                android:src="@drawable/ic_add" />
+
+            <ImageButton
+                android:id="@+id/sizeDown"
+                style="@style/ToolButton"
+                android:layout_height="44dp"
+                android:contentDescription="@string/size_down"
+                android:src="@drawable/ic_minus" />
+
+            <ImageButton
+                android:id="@+id/addItem"
+                style="@style/ToolButton"
+                android:layout_height="44dp"
+                android:contentDescription="@string/add_figure"
+                android:src="@drawable/ic_person_add" />
+
+            <ImageButton
+                android:id="@+id/removeItem"
+                style="@style/ToolButton"
+                android:layout_height="44dp"
+                android:contentDescription="@string/remove_figure"
+                android:src="@drawable/ic_delete" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/frameStrip"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:background="@color/editorBar"
+        android:clipToPadding="false"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="6dp" />
+</LinearLayout>

@@ -61,10 +61,10 @@ jobs:
             3. APK 파일 실행 후 설치
 
             ### 주요 기능
-            - 스틱맨 프레임 편집과 애니메이션 재생
-            - 커스텀 피규어 만들기
-            - 애니메이션 가져오기(.sfa)·내보내기, MP4 영상으로 저장
-            - 최신 안드로이드(14) 대응, 광고 제거
+            - 키 프레임 사이를 자동으로 이어 주는 스틱맨 애니메이션
+            - 자세 잡기·늘이기·색 바꾸기·좌우 반전, 내 피규어 만들기
+            - 재생, MP4 영상 저장, 백업(.sfa) 저장과 가져오기
+            - 저장소·인터넷 권한 없음
           files: stickfighter/app/build/outputs/apk/release/StickFighter-*.apk
           draft: false
           prerelease: false

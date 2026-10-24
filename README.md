@@ -20,7 +20,7 @@ i_make_a_app/
 ├── epubmaker/      ← 네이티브 Android 앱
 ├── choicetheroute/ ← 네이티브 Android 앱 (분기점 기록기)
 ├── apkextractor/   ← 네이티브 Android 앱 (APK 추출기)
-├── stickfighter/   ← 네이티브 Android 앱 (스틱맨 애니메이션, 7.1.1 복원)
+├── stickfighter/   ← 네이티브 Android 앱 (스틱맨 애니메이션)
 ├── storyeditor/
 │   ├── web/        ← 분기형 이야기 에디터 (웹, 오프라인)
 │   └── test/       ← 엔진 단위 테스트 (node --test test/engine.test.js)
