@@ -160,12 +160,37 @@ figure { margin: 0; }
 .bottom { padding: 10px 16px; border-top: 2px solid var(--ink); flex: none; }
 
 /* 알림 */
-.shade { flex: 1; padding: 12px 12px; display: grid; gap: 8px; align-content: start; }
+.shade { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px; display: grid; gap: 8px; align-content: start; }
 .notif { border: 1.5px solid var(--ink); border-radius: 16px; padding: 10px 12px; }
 .notif .app { font-size: 11px; display: flex; justify-content: space-between; }
 .notif b { display: block; font-size: 15px; margin: 2px 0 6px; }
 .notif .btn { min-height: 36px; font-size: 13px; }
 .cap { text-align: center; font-size: 12px; padding: 6px 16px; }
+
+
+/* 스크롤: 폰처럼 얇은 막대로 보여 준다 */
+.scroll, .list { scrollbar-width: thin; scrollbar-color: var(--ink) var(--paper); }
+.scroll::-webkit-scrollbar, .list::-webkit-scrollbar { width: 6px; }
+.scroll::-webkit-scrollbar-thumb, .list::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 3px; }
+.scroll::-webkit-scrollbar-track, .list::-webkit-scrollbar-track { background: var(--paper); }
+
+/* 검색 */
+.searchbox { display: flex; gap: 8px; padding: 0 16px 10px; flex: none; }
+.searchbox input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); border-radius: 12px; padding: 0 12px; min-height: 46px; }
+.mcount { padding: 0 16px 6px; font-size: 12px; font-weight: 700; flex: none; display: flex; justify-content: space-between; }
+.empty { border: 1.5px dashed var(--ink); border-radius: 12px; padding: 18px 12px; text-align: center; margin-top: 12px; }
+mark { background: var(--paper); color: var(--ink); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 2px; font-weight: 900; }
+
+/* 요일 고르기 */
+.daypick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 6px 0; }
+.daypick button { aspect-ratio: 1; font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); border-radius: 50%; cursor: pointer; padding: 0; min-width: 40px; }
+.daypick button[aria-pressed="true"] { border-width: 3px; font-weight: 700; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.quick button { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); border-radius: 999px; min-height: 36px; padding: 0 12px; cursor: pointer; }
+.timebox { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.timebox .btn { flex-direction: column; min-height: 72px; gap: 0; }
+.timebox small { font-size: 12px; font-weight: 400; }
+.timebox .time { font-size: 26px; }
 
 @media (prefers-reduced-motion: no-preference) { .phone-scale { transition: none; } }
 </style>
@@ -190,6 +215,99 @@ figure { margin: 0; }
   var weekText = weekdays[today.getDay()] + '요일';
   var next1st = new Date(today.getFullYear(), today.getMonth() + 1, 1);
   var dLeft = Math.ceil((next1st - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
+
+
+  // ---- 메모리 예시 데이터와 검색 ----
+  var MEM = [
+    { d: '2026-10-24', w: '토',
+      late: [{ t: '21:40', x: '병원 예약 전화하기' }, { t: '21:40', x: '서랍 정리' }, { t: '21:41', x: '화분 물 주기' }],
+      memo: [{ t: '15:12', x: '새 아이디어: 주간 목표는 월요일 아침에 쓰기' }, { t: '11:03', x: '와이파이 비밀번호는 냉장고 옆 메모에 있음' }],
+      done: [{ w: '06:30', r: '08:05', p: '지금 우선', x: '보고서 초안 보내기' }, { w: '09:10', r: '18:44', p: '나중 일', x: '빨래 널기' }, { w: '07:00', r: '07:20', p: '지금 우선', x: '약 먹기' }] },
+    { d: '2026-10-23', w: '금',
+      late: [{ t: '21:35', x: '택배 상자 정리' }],
+      memo: [{ t: '13:20', x: '다음 달 모임 장소 후보: 성수, 합정, 연남' }],
+      done: [{ w: '07:05', r: '07:50', p: '지금 우선', x: '약 먹기' }, { w: '08:15', r: '10:02', p: '지금 우선', x: '세탁소에 전화하기' }, { w: '12:40', r: '19:30', p: '나중 일', x: '이번 주 장보기 목록 쓰기' }] },
+    { d: '2026-10-22', w: '목',
+      late: [{ t: '21:50', x: '회의 자료 프린트하기' }, { t: '21:50', x: '재활용 분리배출' }],
+      memo: [],
+      done: [{ w: '06:50', r: '09:30', p: '지금 우선', x: '엄마한테 전화 드리기' }, { w: '10:10', r: '20:15', p: '나중 일', x: '화분 물 주기' }] },
+    { d: '2026-10-21', w: '수',
+      late: [],
+      memo: [{ t: '09:45', x: '러닝화는 11월 세일 때 사기' }, { t: '18:02', x: '회의록은 공유 폴더 2026-10에 저장' }],
+      done: [{ w: '07:00', r: '07:12', p: '지금 우선', x: '물 마시기' }, { w: '07:30', r: '11:40', p: '지금 우선', x: '보고서 초안 보내기' }, { w: '14:20', r: '20:05', p: '나중 일', x: '빨래 널기' }, { w: '15:00', r: '20:10', p: '나중 일', x: '택배 상자 정리' }] },
+    { d: '2026-10-20', w: '화',
+      late: [{ t: '21:30', x: '여권 사진 찍기' }],
+      memo: [],
+      done: [{ w: '08:00', r: '09:15', p: '지금 우선', x: '병원 예약 전화하기' }, { w: '11:00', r: '19:50', p: '나중 일', x: '서랍 정리' }] },
+    { d: '2026-10-19', w: '월',
+      late: [],
+      memo: [{ t: '08:10', x: '이번 주 목표: 이력서 초안, 운동 3회' }],
+      done: [{ w: '07:10', r: '07:40', p: '지금 우선', x: '스트레칭 10분' }, { w: '09:00', r: '12:30', p: '지금 우선', x: '회의 자료 프린트하기' }, { w: '16:00', r: '21:00', p: '나중 일', x: '재활용 분리배출' }] },
+    { d: '2026-10-18', w: '일',
+      late: [{ t: '21:45', x: '이력서 초안 쓰기' }, { t: '21:45', x: '빨래 개기' }],
+      memo: [{ t: '10:30', x: '일요일 저녁에는 다음 주 일정만 보기' }],
+      done: [{ w: '09:30', r: '10:00', p: '지금 우선', x: '장보기' }] },
+    { d: '2026-10-17', w: '토',
+      late: [],
+      memo: [],
+      done: [{ w: '08:20', r: '08:50', p: '지금 우선', x: '약 먹기' }, { w: '10:00', r: '17:40', p: '나중 일', x: '화분 물 주기' }, { w: '11:00', r: '18:10', p: '나중 일', x: '빨래 널기' }] },
+    { d: '2026-10-16', w: '금',
+      late: [{ t: '21:55', x: '우편물 정리' }],
+      memo: [{ t: '12:05', x: '점심 점검 알림은 12:30이 좋음' }],
+      done: [{ w: '07:00', r: '08:00', p: '지금 우선', x: '물 마시기' }, { w: '13:00', r: '19:20', p: '나중 일', x: '이번 주 장보기 목록 쓰기' }] },
+    { d: '2026-10-15', w: '목',
+      late: [],
+      memo: [{ t: '17:25', x: '독서 모임 책: 다음 주까지 3장' }],
+      done: [{ w: '06:40', r: '07:10', p: '지금 우선', x: '보고서 초안 보내기' }, { w: '09:00', r: '09:20', p: '지금 우선', x: '세탁소에 전화하기' }] }
+  ];
+
+  function dateForms(d) {
+    var p = d.split('-');
+    return [d, p.join('.'), p[1] + '-' + p[2], p[1] + '.' + p[2], p[1] + p[2], p.join('')].join(' ');
+  }
+  function tokensOf(q) { return q.toLowerCase().split(/\s+/).filter(Boolean); }
+  function tokMatch(tok, hay) {
+    return [tok, tok.replace(/[.\/]/g, '-'), tok.replace(/[-\/]/g, '.')].some(function (a) { return hay.indexOf(a) >= 0; });
+  }
+  function esc(x) { return x.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function hl(text, toks) {
+    var out = esc(text);
+    toks.forEach(function (t) {
+      var e = esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      if (!e) return;
+      out = out.replace(new RegExp('(' + e + ')(?![^<]*>)', 'ig'), '<mark>$1</mark>');
+    });
+    return out;
+  }
+  function memFilter(q) {
+    var toks = tokensOf(q);
+    var days = [], count = 0;
+    MEM.forEach(function (day) {
+      var forms = dateForms(day.d) + ' ' + day.w + '요일';
+      function ok(section, x) { var hay = (forms + ' ' + section + ' ' + x).toLowerCase(); return toks.every(function (t) { return tokMatch(t, hay); }); }
+      var late = day.late.filter(function (i) { return ok('미룬 것', i.x); });
+      var memo = day.memo.filter(function (i) { return ok('메모', i.x); });
+      var done = day.done.filter(function (i) { return ok('해결한 내용 ' + i.p, i.x); }).sort(function (a, b) { return a.w < b.w ? -1 : 1; });
+      var n = late.length + memo.length + done.length;
+      if (n) { days.push({ day: day, late: late, memo: memo, done: done }); count += n; }
+    });
+    return { days: days, count: count, toks: toks };
+  }
+  function memCount(q) {
+    var r = memFilter(q);
+    return q.trim() ? '<span>검색 결과 ' + r.count + '건 · ' + r.days.length + '일</span><span>작성 시간 순</span>' : '<span>전체 ' + r.count + '건 · ' + r.days.length + '일</span><span>최근 날짜 먼저</span>';
+  }
+  function memTree(q) {
+    var r = memFilter(q);
+    if (!r.days.length) return '<div class="empty"><b>검색 결과가 없어요</b><br><span class="hint">날짜(10.24, 2026-10-24)나 내용의 일부를 입력해 보세요.</span></div>';
+    return r.days.map(function (g) {
+      var h = '<div class="d">' + hl(g.day.d, r.toks) + ' (' + g.day.w + ')</div>';
+      if (g.late.length) h += '<div class="l1"><b>미룬 것</b>' + g.late.map(function (i) { return '<div class="l2">ㄴ <span class="t">' + i.t + '</span><div class="l3">ㄴ ' + hl(i.x, r.toks) + '</div></div>'; }).join('') + '</div>';
+      if (g.memo.length) h += '<div class="l1"><b>메모</b>' + g.memo.map(function (i) { return '<div class="l2">ㄴ <span class="t">' + i.t + '</span><div class="l3">ㄴ ' + hl(i.x, r.toks) + '</div></div>'; }).join('') + '</div>';
+      if (g.done.length) h += '<div class="l1"><b>해결한 내용</b>' + g.done.map(function (i) { return '<div class="l2">ㄴ <span class="t">작성 ' + i.w + ' · 해결 ' + i.r + ' · ' + i.p + '</span><div class="l3">ㄴ ' + hl(i.x, r.toks) + '</div></div>'; }).join('') + '</div>';
+      return h;
+    }).join('');
+  }
 
   var status = '<div class="status"><span>07:02</span><span>▮▮▮ ◔</span></div>';
   var gesture = '<div class="gesture"><i></i></div>';
@@ -224,14 +342,26 @@ figure { margin: 0; }
         '<div class="list">' +
           '<div class="group"><span>어제 넘긴 기록</span></div>' +
           item('•', '병원 예약 전화하기', '', 'carry') +
+          item('-', '서랍 정리', '', 'carry') +
           '<div class="group"><span>지금 해야 할 것 •</span><span>10분마다 알림</span></div>' +
           item('•', '보고서 초안 보내기') +
+          item('•', '약 먹기') +
+          item('•', '세탁소에 전화하기') +
+          item('•', '회의 자료 프린트하기') +
+          item('•', '엄마한테 전화 드리기') +
           '<div class="group"><span>오늘 안에 - </span><span>19:00부터 알림</span></div>' +
           item('-', '빨래 널기') +
+          item('-', '택배 상자 정리') +
+          item('-', '화분 물 주기') +
+          item('-', '이번 주 장보기 목록 쓰기') +
           '<div class="group"><span>메모 =</span></div>' +
           plain('=', '새 아이디어: 주간 목표는 월요일 아침에 쓰기') +
+          plain('=', '와이파이 비밀번호는 냉장고 옆 메모에 있음') +
+          plain('=', '다음 달 모임 장소 후보: 성수, 합정, 연남') +
           '<div class="group"><span>해결한 것</span></div>' +
           '<div class="item done"><button class="chk" aria-pressed="true" aria-label="해결함"></button><span class="glyph">•</span><span class="txt">물 마시기</span><span class="meta">06:48</span></div>' +
+          '<div class="item done"><button class="chk" aria-pressed="true" aria-label="해결함"></button><span class="glyph">-</span><span class="txt">우편함 확인</span><span class="meta">06:31</span></div>' +
+          '<div class="item done"><button class="chk" aria-pressed="true" aria-label="해결함"></button><span class="glyph">•</span><span class="txt">스트레칭 10분</span><span class="meta">06:15</span></div>' +
         '</div>' +
       '</div></div>'; } },
 
@@ -246,9 +376,10 @@ figure { margin: 0; }
         '<div class="sec">‘-’ 알림</div>' +
         '<div class="row2"><div class="grow"><b>기본 알림 시작 시간</b><small>‘-’를 쓸 때 따로 안 고르면 이 정리 시간부터</small></div><button class="btn small">저녁 정리 ▾</button></div>' +
         '<div class="sec">알림 쉬는 시간</div>' +
-        '<div class="row2" style="display:block"><div style="display:flex;align-items:center;gap:8px"><span class="time">23:00 – 07:00</span><span style="flex:1"></span><button class="btn small">삭제</button></div>' + days(['월','화','수','목','금','토','일']) + '</div>' +
-        '<div class="row2" style="display:block"><div style="display:flex;align-items:center;gap:8px"><span class="time">13:00 – 14:00</span><span style="flex:1"></span><button class="btn small">삭제</button></div>' + days(['월','화','수','목','금']) + '</div>' +
-        '<div style="padding-top:8px"><button class="btn block">+ 쉬는 시간 구간 추가</button></div>' +
+        '<div class="row2" style="display:block"><div style="display:flex;align-items:center;gap:8px"><button class="btn small" data-go="addrest"><span class="time">23:00 – 07:00</span></button><span style="flex:1"></span><button class="btn small">삭제</button></div>' + days(['월','화','수','목','금','토','일']) + '</div>' +
+        '<div class="row2" style="display:block"><div style="display:flex;align-items:center;gap:8px"><button class="btn small" data-go="addrest"><span class="time">13:00 – 14:00</span></button><span style="flex:1"></span><button class="btn small">삭제</button></div>' + days(['월','화','수','목','금']) + '</div>' +
+        '<div class="row2" style="display:block"><div style="display:flex;align-items:center;gap:8px"><button class="btn small" data-go="addrest"><span class="time">09:00 – 12:00</span></button><span style="flex:1"></span><button class="btn small">삭제</button></div>' + days(['토','일']) + '</div>' +
+        '<div style="padding-top:8px"><button class="btn block" data-go="addrest">+ 쉬는 시간 구간 추가</button></div>' +
         '<div class="sec">알림이 꺼진 앱에서도 울리려면</div>' +
         '<div class="row2"><div class="grow"><b>정확한 알람 허용</b></div><button class="btn small">설정 열기</button></div>' +
         '<div class="row2"><div class="grow"><b>배터리 최적화 제외</b></div><button class="btn small">설정 열기</button></div>' +
@@ -264,22 +395,26 @@ figure { margin: 0; }
         '<p class="hint" style="margin:8px 0 0">아침형: 어제 넘긴 기록과 ‘-’ 항목을 확인하고 새로 추가해요.<br>저녁형: 남은 기록 체크만 가능해요.<br>알림만: 알림만 울려요.</p>' +
       '</div><div class="bottom" style="display:flex;gap:8px"><button class="btn block" data-go="settings">취소</button><button class="btn block primary" data-go="settings">저장</button></div></div>'; } },
 
+    { id: 'addrest', label: '쉬는 시간 추가', html: function () { return '<div class="screen">' + topbar('settings', '쉬는 시간 구간 추가') +
+      '<div class="scroll">' +
+        '<div class="sec">시간</div>' +
+        '<div class="timebox"><button class="btn"><small>시작</small><span class="time">23:00</span></button><button class="btn"><small>끝</small><span class="time">07:00</span></button></div>' +
+        '<p class="hint" style="margin:6px 0 0">끝 시간이 시작보다 이르면 다음 날 아침까지 이어져요.</p>' +
+        '<div class="sec">요일</div>' +
+        '<div class="quick"><button data-days="월화수목금토일">매일</button><button data-days="월화수목금">평일</button><button data-days="토일">주말</button></div>' +
+        '<div class="daypick" role="group" aria-label="요일">' + ['월','화','수','목','금','토','일'].map(function (d) { return '<button class="dayt" aria-pressed="' + ('월화수목금토일'.indexOf(d) >= 0) + '">' + d + '</button>'; }).join('') + '</div>' +
+        '<p class="hint" style="margin:6px 0 0">같은 구간을 요일만 바꿔 여러 개 만들 수 있어요.</p>' +
+        '<div class="sec">이 구간에서는</div>' +
+        '<div class="card"><b>10분마다 반복 알림이 쉬어요</b><p class="hint" style="margin:4px 0 0">구간이 끝나면 남은 항목을 한 번 알려요.<br>아침 · 저녁 정리와 회고 알림은 그대로 울려요.</p></div>' +
+        '<div class="sec">겹치는 구간</div>' +
+        '<div class="card"><p class="hint" style="margin:0">23:00 – 07:00 (월~일)과 겹치면 두 구간을 합쳐서 보여 줘요.</p></div>' +
+      '</div><div class="bottom" style="display:flex;gap:8px"><button class="btn block" data-go="settings">취소</button><button class="btn block primary" data-go="settings">저장</button></div></div>'; } },
+
     { id: 'memory', label: '메모리', html: function () { return '<div class="screen">' + topbar('home', '메모리') +
+      '<div class="searchbox"><input class="msearch" type="search" placeholder="날짜나 내용으로 검색 (예: 10.24, 빨래)" aria-label="기록 검색" autocomplete="off"><button class="btn" data-clear="1" aria-label="검색 지우기">✕</button></div>' +
       '<div class="grid4"><button class="btn">오늘 기록<br>불러오기</button><button class="btn">전체 기록<br>불러오기</button><button class="btn">오늘 기록<br>내보내기</button><button class="btn">전체 기록<br>내보내기</button></div>' +
-      '<div class="scroll tree">' +
-        '<div class="d">2026-10-24 (토)</div>' +
-        '<div class="l1"><b>미룬 것</b>' +
-          '<div class="l2">ㄴ <span class="t">21:40</span><div class="l3">ㄴ 병원 예약 전화하기</div></div>' +
-          '<div class="l2">ㄴ <span class="t">21:40</span><div class="l3">ㄴ 서랍 정리</div></div></div>' +
-        '<div class="l1"><b>메모</b>' +
-          '<div class="l2">ㄴ <span class="t">15:12</span><div class="l3">ㄴ 새 아이디어: 주간 목표는 월요일 아침에 쓰기</div></div></div>' +
-        '<div class="l1"><b>해결한 내용</b>' +
-          '<div class="l2">ㄴ <span class="t">작성 06:30 · 해결 08:05 · 지금 우선</span><div class="l3">ㄴ 보고서 초안 보내기</div></div>' +
-          '<div class="l2">ㄴ <span class="t">작성 09:10 · 해결 18:44 · 나중 일</span><div class="l3">ㄴ 빨래 널기</div></div></div>' +
-        '<div class="d">2026-10-23 (금)</div>' +
-        '<div class="l1"><b>해결한 내용</b>' +
-          '<div class="l2">ㄴ <span class="t">작성 07:05 · 해결 07:50 · 지금 우선</span><div class="l3">ㄴ 약 먹기</div></div></div>' +
-      '</div></div>'; } },
+      '<div class="mcount">' + memCount('') + '</div>' +
+      '<div class="scroll tree">' + memTree('') + '</div></div>'; } },
 
     { id: 'goals', label: '장기 목표', html: function () { return '<div class="screen">' + topbar('home', '장기 목표', '<span class="sub">다음 달 1일까지 <b class="dday">D-' + dLeft + '</b></span>') +
       '<div class="scroll">' +
@@ -291,7 +426,7 @@ figure { margin: 0; }
           '<div class="tabs" role="group" aria-label="기간"><button aria-pressed="true">전체</button><button aria-pressed="false">1주</button><button aria-pressed="false">1달</button><button aria-pressed="false">1년</button><button aria-pressed="false" data-go="goalnew">작성</button></div>' +
           '<div class="sorts" role="group" aria-label="정렬"><button aria-pressed="true">빠른 목표순</button><button aria-pressed="false">빠른 추가순</button><button aria-pressed="false">느린 목표순</button><button aria-pressed="false">느린 추가순</button></div>' +
         '</div>' +
-        ['10.28|이력서 초안 끝내기','11.01|운동 12회 채우기','11.15|자격증 접수','11.30|독서 4권','12.31|이사 준비 시작','2027.03.01|영어 점수 올리기','2027.06.30|저축 목표 달성','2027.10.25|1년 회고 쓰기','2027.12.31|새 프로젝트 시작'].map(function (r) {
+        ['10.28|이력서 초안 끝내기','10.31|운동 12회 채우기','11.01|월간 지출 정리하기','11.08|자격증 접수','11.15|독서 모임 발표 준비','11.22|책상 서랍 전부 비우기','11.30|독서 4권','12.10|연말 모임 장소 예약','12.31|이사 준비 시작','2027.01.31|건강검진 받기','2027.03.01|영어 점수 올리기','2027.04.15|여행 계획 확정','2027.06.30|저축 목표 달성','2027.08.31|포트폴리오 완성','2027.10.25|1년 회고 쓰기','2027.12.31|새 프로젝트 시작'].map(function (r) {
           var p = r.split('|'); return '<div class="goal"><span class="gd">' + p[0] + '</span><span>' + p[1] + '</span></div>'; }).join('') +
       '</div></div>'; } },
 
@@ -308,9 +443,13 @@ figure { margin: 0; }
         '<div class="group"><span>어제 넘긴 기록</span><span>눌러서 수정</span></div>' +
         '<div class="item carry"><span class="glyph">•</span><span class="txt">병원 예약 전화하기</span><button class="btn small">유형 ▾</button></div>' +
         '<div class="item carry"><span class="glyph">-</span><span class="txt">서랍 정리</span><button class="btn small">유형 ▾</button></div>' +
+        '<div class="item carry"><span class="glyph">•</span><span class="txt">세탁소에 전화하기</span><button class="btn small">유형 ▾</button></div>' +
+        '<div class="item carry"><span class="glyph">-</span><span class="txt">이번 주 장보기 목록 쓰기</span><button class="btn small">유형 ▾</button></div>' +
         '<div class="group"><span>오늘 ‘-’ 기록</span><span>알림 시작 정리 시간</span></div>' +
         '<div class="item"><span class="glyph">-</span><span class="txt">빨래 널기</span><button class="btn small">저녁 정리 ▾</button></div>' +
         '<div class="item"><span class="glyph">-</span><span class="txt">택배 상자 정리</span><button class="btn small">점심 점검 ▾</button></div>' +
+        '<div class="item"><span class="glyph">-</span><span class="txt">화분 물 주기</span><button class="btn small">저녁 정리 ▾</button></div>' +
+        '<div class="item"><span class="glyph">-</span><span class="txt">재활용 분리배출</span><button class="btn small">저녁 정리 ▾</button></div>' +
         '<div class="group"><span>오늘 할 일 추가</span></div>' +
         '<div class="seg" role="group" aria-label="기록 유형" style="margin:8px 0"><button aria-pressed="true">• 지금</button><button aria-pressed="false">- 나중에</button><button aria-pressed="false">= 메모</button></div>' +
         '<div class="field"><input placeholder="오늘 해야 할 것" aria-label="기록 내용"><button class="btn primary">추가</button></div>' +
@@ -331,9 +470,9 @@ figure { margin: 0; }
       '<div class="pad" style="padding-bottom:8px"><div class="lockline">지금은 체크만 할 수 있어요. 메모와 새 기록은 잠겨 있어요.</div></div>' +
       '<div class="scroll">' +
         '<div class="group"><span>• 지금</span></div>' +
-        item('•', '보고서 초안 보내기') + item('•', '약 먹기') +
+        item('•', '보고서 초안 보내기') + item('•', '약 먹기') + item('•', '세탁소에 전화하기') + item('•', '회의 자료 프린트하기') + item('•', '엄마한테 전화 드리기') +
         '<div class="group"><span>- 나중에</span></div>' +
-        item('-', '빨래 널기') + item('-', '택배 상자 정리') + item('-', '서랍 정리') +
+        item('-', '빨래 널기') + item('-', '택배 상자 정리') + item('-', '서랍 정리') + item('-', '화분 물 주기') + item('-', '이번 주 장보기 목록 쓰기') + item('-', '재활용 분리배출') +
         '<p class="hint" style="margin-top:12px">= 메모는 저녁 정리에 나오지 않아요.</p>' +
       '</div><div class="bottom"><button class="btn block primary" data-go="review">확인 · 저녁 정리 끝내기</button><p class="hint" style="margin:6px 0 0;text-align:center">끝내기 전에는 뒤로 갈 수 없어요.</p></div></div>'; } },
 
@@ -343,6 +482,8 @@ figure { margin: 0; }
         '<div class="group"><span>못한 일</span></div>' +
         '<div class="card"><div>• 택배 상자 정리</div><div class="acts"><button class="btn">내일로 넘기기</button><button class="btn">끝내기</button></div></div>' +
         '<div class="card"><div>- 서랍 정리</div><div class="acts"><button class="btn">내일로 넘기기</button><button class="btn">끝내기</button></div></div>' +
+        '<div class="card"><div>- 화분 물 주기</div><div class="acts"><button class="btn">내일로 넘기기</button><button class="btn">끝내기</button></div></div>' +
+        '<div class="card"><div>- 이번 주 장보기 목록 쓰기</div><div class="acts"><button class="btn">내일로 넘기기</button><button class="btn">끝내기</button></div></div>' +
         '<div class="group"><span>내일 할 일 미리 적기</span></div>' +
         '<div class="seg" role="group" aria-label="기록 유형" style="margin:8px 0"><button aria-pressed="true">• 지금</button><button aria-pressed="false">- 나중에</button><button aria-pressed="false">= 메모</button></div>' +
         '<div class="field"><input placeholder="내일 해야 할 것" aria-label="기록 내용"><button class="btn primary">추가</button></div>' +
@@ -351,10 +492,14 @@ figure { margin: 0; }
 
     { id: 'notif', label: '알림', html: function () { return '<div class="screen">' +
       '<div class="date"><b>07:10</b><span>' + dateText + ' ' + weekText + '</span></div>' +
-      '<div class="shade">' +
+      '<div class="shade scroll">' +
         '<div class="notif"><div class="app"><span>하루 정리 · 지금 해야 할 것</span><span>07:10</span></div><b>• 보고서 초안 보내기</b><button class="btn">완료</button></div>' +
         '<div class="notif"><div class="app"><span>하루 정리 · 지금 해야 할 것</span><span>07:10</span></div><b>• 약 먹기</b><button class="btn">완료</button></div>' +
         '<div class="notif"><div class="app"><span>하루 정리 · 오늘 안에</span><span>19:10</span></div><b>- 빨래 널기</b><button class="btn">완료</button></div>' +
+        '<div class="notif"><div class="app"><span>하루 정리 · 지금 해야 할 것</span><span>07:10</span></div><b>• 세탁소에 전화하기</b><button class="btn">완료</button></div>' +
+        '<div class="notif"><div class="app"><span>하루 정리 · 지금 해야 할 것</span><span>07:10</span></div><b>• 회의 자료 프린트하기</b><button class="btn">완료</button></div>' +
+        '<div class="notif"><div class="app"><span>하루 정리 · 오늘 안에</span><span>19:10</span></div><b>- 택배 상자 정리</b><button class="btn">완료</button></div>' +
+        '<div class="notif"><div class="app"><span>하루 정리 · 오늘 안에</span><span>19:10</span></div><b>- 화분 물 주기</b><button class="btn">완료</button></div>' +
         '<div class="notif"><div class="app"><span>하루 정리 · 정리 시간</span><span>19:00</span></div><b>저녁 정리 시간이에요</b><button class="btn">열기</button></div>' +
         '<p class="hint" style="text-align:center;margin:8px 0 0">항목마다 알림이 따로 울리고, 완료는 그 항목만 처리해요.<br>알림 쉬는 시간에는 울리지 않아요.</p>' +
       '</div></div>'; } }
@@ -413,6 +558,22 @@ figure { margin: 0; }
   document.addEventListener('click', function (e) {
     var t = e.target.closest ? e.target.closest('button') : null;
     if (!t || !stage.contains(t)) return;
+    if (t.hasAttribute('data-clear')) {
+      var box = t.parentElement.querySelector('input');
+      box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true })); box.focus();
+      return;
+    }
+    if (t.classList.contains('dayt')) {
+      t.setAttribute('aria-pressed', String(t.getAttribute('aria-pressed') !== 'true'));
+      return;
+    }
+    if (t.hasAttribute('data-days')) {
+      var want = t.getAttribute('data-days');
+      Array.prototype.forEach.call(t.closest('.screen').querySelectorAll('.dayt'), function (b) {
+        b.setAttribute('aria-pressed', String(want.indexOf(b.textContent) >= 0));
+      });
+      return;
+    }
     var go = t.getAttribute('data-go');
     if (go && find(go)) {
       current = go; mode = 'one'; render(); window.scrollTo({ top: 0 });
@@ -431,8 +592,24 @@ figure { margin: 0; }
     }
   });
 
+
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (!t.classList || !t.classList.contains('msearch')) return;
+    var scr = t.closest('.screen');
+    scr.querySelector('.tree').innerHTML = memTree(t.value);
+    scr.querySelector('.mcount').innerHTML = memCount(t.value);
+    scr.querySelector('.tree').scrollTop = 0;
+  });
+
   var timer;
-  window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(render, 120); });
+  // 폭이 바뀔 때만 다시 그린다. 폰에서 키보드가 올라와 높이만 바뀌어도 검색 중인 글자가 지워지지 않게 한다.
+  var lastWidth = window.innerWidth;
+  window.addEventListener('resize', function () {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    clearTimeout(timer); timer = setTimeout(render, 120);
+  });
   render();
 })();
 </script>
