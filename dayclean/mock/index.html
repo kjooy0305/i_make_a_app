@@ -202,6 +202,8 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
 .switch:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 .fssample { border: 1.5px dashed var(--ink); border-radius: 10px; padding: 8px 12px; margin-top: 8px; }
 
+.switch:disabled { border-style: dashed; cursor: default; }
+.switch:disabled::after { border-style: dashed; }
 /* 아래에서 올라오는 시트 */
 .scrim { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.86); z-index: 5; }
 .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--paper); border-top: 3px solid var(--ink); border-radius: 22px 22px 0 0; padding: 14px 16px 22px; display: grid; gap: 10px; }
@@ -254,7 +256,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
 
   // ---------- 상태 ----------
   var S = {
-    fs: 1, goalsOn: true,
+    fs: 1, goalsOn: true, g1w: true, g1m: true, g1y: true, autoAdd: true, calReturn: 'goalnew',
     baseISO: '',                // 시안 확인용: 작성하는 날을 바꿔 계산해 보기
     period: '1m', dY: 0, dM: 0, dD: 0,
     calY: 0, calM: 0,
@@ -281,10 +283,14 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
     var ny = m === 11 ? y + 1 : y, nm = (m + 1) % 12, nl = lastDayOf(ny, nm);
     return new Date(ny, nm, isLast ? nl : Math.min(d, nl));
   }
+  function addYearRule(t) {
+    var y = t.getFullYear() + 1, m = t.getMonth(), d = t.getDate();
+    return new Date(y, m, Math.min(d, lastDayOf(y, m)));
+  }
   function calcDate(period, t) {
     if (period === '1w') return addDays(t, 7);       // 내일부터 7일 = 오늘 + 7일
     if (period === '1m') return addMonthRule(t);
-    return addDays(t, 365);                          // 1년 = 365일
+    return addYearRule(t);                           // 1년 = 같은 날짜 1년 뒤
   }
   function setDateFields(d) { S.dY = d.getFullYear(); S.dM = d.getMonth() + 1; S.dD = d.getDate(); S.calY = S.dY; S.calM = S.dM - 1; }
   function fieldsDate() {
@@ -313,8 +319,12 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
     { id: 15, g: '=', x: '다음 달 모임 장소 후보: 성수, 합정, 연남', grp: 'memo' },
     { id: 16, g: '•', x: '물 마시기', grp: 'now', done: true, t: '06:48' },
     { id: 17, g: '-', x: '우편함 확인', grp: 'later', done: true, t: '06:31' },
-    { id: 18, g: '•', x: '스트레칭 10분', grp: 'now', done: true, t: '06:15' }
+    { id: 18, g: '•', x: '스트레칭 10분', grp: 'now', done: true, t: '06:15' },
+    { id: 19, g: '-', x: '이력서 초안 끝내기', grp: 'later', auto: true, off: 9 }
   ];
+  function typeOn(p) { return S.goalsOn && S['g' + p]; }
+  function activeTypes() { return ['1w', '1m', '1y'].filter(typeOn); }
+  function visible(i) { return !i.auto || S.autoAdd; }
   function byId(id) { return HOME.filter(function (i) { return i.id === id; })[0]; }
   function nowTime() { var t = new Date(); return z(t.getHours()) + ':' + z(t.getMinutes()); }
 
@@ -450,7 +460,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
   }
   function item(i, extra) {
     return '<div class="item ' + (extra || '') + (i.done ? ' done' : '') + '"><button class="chk" data-id="' + i.id + '" aria-pressed="' + (!!i.done) + '" aria-label="' + (i.done ? '해결 취소' : '완료') + '"></button>' +
-      '<span class="glyph">' + i.g + '</span><span class="txt">' + i.x + '</span><span class="meta">' + (i.done && i.t ? i.t : '') + '</span></div>';
+      '<span class="glyph">' + i.g + '</span><span class="txt">' + i.x + (i.auto ? ' <span class="tag">장기 목표 D-' + i.off + '</span>' : '') + '</span><span class="meta">' + (i.done && i.t ? i.t : '') + '</span></div>';
   }
   function plain(glyph, text, meta, extra) {
     return '<div class="item ' + (extra || '') + '"><span class="glyph">' + glyph + '</span><span class="txt">' + text + '</span>' + (meta ? '<span class="meta">' + meta + '</span>' : '') + '</div>';
@@ -458,8 +468,8 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
   function seg(labels, on, attrs) {
     return '<div class="seg" role="group">' + labels.map(function (l, i) { return '<button aria-pressed="' + (i === on) + '" ' + (attrs ? attrs(i) : '') + '>' + l + '</button>'; }).join('') + '</div>';
   }
-  function undone(grp) { return HOME.filter(function (i) { return i.grp === grp && !i.done; }); }
-  function doneList() { return HOME.filter(function (i) { return i.done; }).sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; }); }
+  function undone(grp) { return HOME.filter(function (i) { return visible(i) && i.grp === grp && !i.done; }); }
+  function doneList() { return HOME.filter(function (i) { return visible(i) && i.done; }).sort(function (a, b) { return (a.t || '') < (b.t || '') ? -1 : 1; }); }
 
   var screens = [
     { id: 'home', label: '홈', html: function () {
@@ -467,9 +477,8 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       return '<div class="screen">' +
         '<div class="date"><b>' + dateText + '</b><span>' + weekText + '</span></div>' +
         '<div class="navrow"><button class="btn" data-go="settings" aria-label="설정">설정</button><span class="spacer"></span>' +
-          (S.goalsOn ? '<button class="btn" data-go="goals">장기 목표 <span class="dday">D-' + dLeft() + '</span></button>' : '') +
+          '<button class="btn" data-go="goals">장기 목표 <span class="dday">D-' + dLeft() + '</span></button>' +
           '<button class="btn" data-go="memory">메모리</button></div>' +
-        '<button class="banner" data-go="morning"><span>아침 정리 · 07:00</span><span>시작하기 ▸</span></button>' +
         '<div class="journal">' +
           '<div class="composer">' +
             seg(['• 지금', '- 나중에', '= 메모'], 0) +
@@ -493,7 +502,11 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
         '<div class="row2" style="display:block"><b>글씨 크기</b>' + seg(['작게', '보통', '크게', '아주 크게'], fsOn, function (i) { return 'data-set="fs" data-v="' + [0.9, 1, 1.15, 1.3][i] + '"'; }) +
           '<div class="fssample">가나다라마바사 · 보고서 초안 보내기 · 07:00</div></div>' +
         '<div class="sec">장기 목표</div>' +
-        '<div class="row2"><div class="grow"><b>장기 목표 사용</b><small>끄면 홈 버튼과 점검 창이 사라져요. 목표는 지워지지 않아요.</small></div><button class="switch" data-set="goalsOn" aria-pressed="' + S.goalsOn + '" aria-label="장기 목표 사용"></button></div>' +
+        '<div class="row2"><div class="grow"><b>장기 목표 정리 사용</b><small>끄면 목표는 계속 쓸 수 있지만 점검 창과 점검 알림이 멈춰요</small></div><button class="switch" data-set="goalsOn" aria-pressed="' + S.goalsOn + '" aria-label="장기 목표 정리 사용"></button></div>' +
+        [['g1w', '1주 정리', '아침 정리 때마다'], ['g1m', '1달 정리', '7일마다 · 점검 알림 함께 켜고 꺼요'], ['g1y', '1년 정리', '매달 1일 · 점검 알림 함께 켜고 꺼요']].map(function (r) {
+          return '<div class="row2"><div class="grow"><b>' + r[1] + '</b><small>' + (S.goalsOn ? r[2] : '전체가 꺼져 있어요') + '</small></div><button class="switch" data-set="' + r[0] + '" aria-pressed="' + (S.goalsOn && S[r[0]]) + '"' + (S.goalsOn ? '' : ' disabled') + ' aria-label="' + r[1] + '"></button></div>';
+        }).join('') +
+        '<div class="row2"><div class="grow"><b>10일 남은 목표를 기록장에 자동 추가</b><small>정리 설정과 따로 켜고 꺼요</small></div><button class="switch" data-set="autoAdd" aria-pressed="' + S.autoAdd + '" aria-label="자동 추가"></button></div>' +
         '<div class="sec">정리 시간</div>' +
         '<div class="row2"><div class="grow"><b>아침 정리 <span class="tag">기본</span></b><small>알림과 기능이 함께 시작돼요</small></div><button class="btn small"><span class="time">07:00</span></button></div>' +
         '<div class="row2"><div class="grow"><b>저녁 정리 <span class="tag">기본</span></b><small>이 시간부터 체크만 가능</small></div><button class="btn small"><span class="time">19:00</span></button></div>' +
@@ -544,6 +557,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
         '<button aria-pressed="' + (S.mdone === 'written') + '" data-set="mdone" data-v="written">해결 목록: 작성 시간순</button>' +
         '<button aria-pressed="' + (S.mdone === 'resolved') + '" data-set="mdone" data-v="resolved">해결 목록: 해결 시간순</button></div>' +
       '<div class="grid4"><button class="btn">오늘 기록<br>불러오기</button><button class="btn">전체 기록<br>불러오기</button><button class="btn">오늘 기록<br>내보내기</button><button class="btn">전체 기록<br>내보내기</button></div>' +
+      '<div class="pad" style="padding-bottom:6px;flex:none"><div class="lockline" style="text-align:left;font-size:12px">오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.</div></div>' +
       '<div class="mcount">' + memCount('') + '</div>' +
       '<div class="scroll tree">' + memTree('') + '</div></div>'; } },
 
@@ -554,17 +568,17 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       var sorters = { soon: function (a, b) { return a.off - b.off; }, late: function (a, b) { return b.off - a.off; }, newadd: function (a, b) { return b.added - a.added; }, oldadd: function (a, b) { return a.added - b.added; } };
       list.sort(sorters[S.gsort]);
       var top3 = all.slice().sort(sorters.soon).slice(0, 3);
-      if (!S.goalsOn) return '<div class="screen">' + topbar('home', '장기 목표') + '<div class="scroll"><div class="empty"><b>장기 목표가 꺼져 있어요</b><br><span class="hint">설정에서 켜면 목표가 그대로 다시 보여요.</span></div><div style="padding-top:10px"><button class="btn block" data-go="settings">설정으로</button></div></div></div>';
       function tabBtn(id, label) { return '<button aria-pressed="' + (S.gtab === id) + '" data-gtab="' + id + '">' + label + '</button>'; }
       function sortBtn(id, label) { return '<button aria-pressed="' + (S.gsort === id) + '" data-gsort="' + id + '">' + label + '</button>'; }
       return '<div class="screen">' + topbar('home', '장기 목표', '<span class="sub">다음 달 1일까지 <b class="dday">D-' + dLeft() + '</b></span>') +
       '<div class="scroll">' +
+        (S.goalsOn ? '' : '<div class="lockline" style="margin-bottom:10px">장기 목표 정리가 꺼져 있어요. 목표는 쓸 수 있고, 점검만 쉬어요.</div>') +
         '<div class="top3"><h3>가장 빠른 목표 3개</h3>' + top3.map(function (g) { return '<div class="goal"><span class="dd">D-' + g.off + '</span><span>' + g.x + '</span></div>'; }).join('') + '</div>' +
         '<div class="stick">' +
           '<div class="tabs" role="group" aria-label="기간">' + tabBtn('all', '전체') + tabBtn('1w', '1주') + tabBtn('1m', '1달') + tabBtn('1y', '1년') + '<button aria-pressed="false" data-go="goalnew">작성</button></div>' +
           '<div class="sorts" role="group" aria-label="정렬">' + sortBtn('soon', '빠른 목표순') + sortBtn('newadd', '빠른 추가순') + sortBtn('late', '느린 목표순') + sortBtn('oldadd', '느린 추가순') + '</div>' +
         '</div>' +
-        list.map(function (g) { return '<div class="goal"><span class="gd">' + ymd(g.date).slice(2) + '</span><span style="flex:1">' + g.x + '</span><span class="dday">D-' + g.off + '</span></div>'; }).join('') +
+        list.map(function (g) { return '<div class="goal"><span class="gd">' + ymd(g.date).slice(2) + '</span><span style="flex:1">' + g.x + (typeOn(g.p) ? '' : ' <span class="tag">정리 꺼짐</span>') + '</span><span class="dday">D-' + g.off + '</span></div>'; }).join('') +
         '<div class="morerow">' + list.length + '개</div>' +
       '</div></div>'; } },
 
@@ -575,11 +589,11 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       return '<div class="screen">' + topbar('goals', '장기 목표 작성') +
       '<div class="scroll">' +
         '<div class="sec">주기</div>' + seg(['1주', '1달', '1년'], pidx, function (i) { return 'data-period="' + ['1w', '1m', '1y'][i] + '"'; }) +
-        '<p class="hint" style="margin:6px 0 0">1주 = 내일부터 7일 · 1달 = 같은 날짜(말일이면 다음 달 말일) · 1년 = 365일 뒤</p>' +
+        '<p class="hint" style="margin:6px 0 0">1주 = 내일부터 7일 · 1달 = 같은 날짜(말일이면 다음 달 말일) · 1년 = 같은 날짜 1년 뒤(2월 29일은 2월 28일)</p>' +
         '<div class="sec">목표 날짜</div>' +
         '<div class="dfields"><label>년<input class="dfield" data-f="dY" inputmode="numeric" maxlength="4" value="' + S.dY + '" aria-label="년"></label><label>월<input class="dfield" data-f="dM" inputmode="numeric" maxlength="2" value="' + S.dM + '" aria-label="월"></label><label>일<input class="dfield" data-f="dD" inputmode="numeric" maxlength="2" value="' + S.dD + '" aria-label="일"></label></div>' +
         '<div class="dinfo">' + info + '</div>' +
-        '<div style="padding-top:8px"><button class="btn block" data-go="calendar">달력에서 고르기</button></div>' +
+        '<div style="padding-top:8px"><button class="btn block" data-cal-open="goalnew">달력에서 고르기</button></div>' +
         '<div class="sec">내용</div><div class="field"><textarea rows="3" placeholder="이루고 싶은 것을 적어요" aria-label="내용"></textarea></div>' +
         '<div class="mockbox"><b style="font-size:13px">시안 확인용</b><span class="hint">작성하는 날을 바꿔서 위 규칙이 어떻게 계산되는지 볼 수 있어요. (앱에는 없는 칸)</span><input type="date" id="baseDate" value="' + iso(today()) + '" aria-label="작성하는 날 가정"></div>' +
       '</div><div class="bottom" style="display:flex;gap:8px"><button class="btn block" data-go="goals">취소</button><button class="btn block primary" data-go="goals">저장</button></div></div>'; } },
@@ -594,18 +608,18 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
         var cls = (cur.getTime() === t.getTime() ? 'today ' : '') + (sel && cur.getTime() === sel.getTime() ? 'sel' : '');
         cells += '<button class="' + cls + '" data-cal-day="' + d + '"' + (past ? ' disabled' : '') + '>' + d + '</button>';
       }
-      return '<div class="screen">' + topbar('goalnew', '날짜 고르기') +
+      return '<div class="screen">' + topbar(S.calReturn, '날짜 고르기') +
       '<div class="scroll">' +
         '<div class="calhead"><button class="btn" data-cal-nav="-1" aria-label="이전 달">◀</button><b>' + y + '년 ' + (m + 1) + '월</b><button class="btn" data-cal-nav="1" aria-label="다음 달">▶</button></div>' +
         '<div class="cal">' + cells + '</div>' +
         '<p class="hint" style="margin:10px 0 0">점선 칸은 오늘이에요. 지난 날짜는 고를 수 없어요.</p>' +
         (sel ? '<p class="dtext">' + ymd(sel) + ' · ' + dText(dayDiff(t, sel)) + '</p>' : '') +
-      '</div><div class="bottom" style="display:flex;gap:8px"><button class="btn block" data-go="goalnew">취소</button><button class="btn block primary" data-go="goalnew">이 날짜로 정하기</button></div></div>'; } },
+      '</div><div class="bottom" style="display:flex;gap:8px"><button class="btn block" data-go="' + S.calReturn + '">취소</button><button class="btn block primary" data-go="' + S.calReturn + '">이 날짜로 정하기</button></div></div>'; } },
 
-    { id: 'morning', label: '아침 정리', html: function () {
-      var carry = undone('carry'), later = undone('later');
+    { id: 'morning', label: '아침 정리 (앱 열면 바로)', cap: '아침 정리 알림이 울린 뒤에는 홈이 아니라 이 화면이 바로 열려요. 정리를 마치면 홈으로 가요.', html: function () {
+      var carry = undone('carry'), later = undone('later'), nTypes = activeTypes().length;
       return '<div class="screen">' +
-      '<div class="topbar"><h2>아침 정리 · 07:00</h2><span class="sub">1 / ' + (S.goalsOn ? 2 : 1) + '</span></div>' +
+      '<div class="topbar"><h2>아침 정리 · 07:00</h2><span class="sub">1 / ' + (nTypes ? 2 : 1) + '</span></div>' +
       '<div class="scroll">' +
         '<div class="group"><span>어제 넘긴 기록</span><span>유형을 눌러 수정</span></div>' +
         carry.map(function (i) { return '<div class="item carry"><span class="glyph">' + i.g + '</span><span class="txt">' + i.x + '</span><button class="btn small" data-edit="' + i.id + '">유형 ▾</button></div>'; }).join('') +
@@ -616,7 +630,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
         '<div class="field"><input placeholder="오늘 해야 할 것" aria-label="기록 내용"><button class="btn primary">추가</button></div>' +
         '<div class="group"><span>방금 추가한 것</span><span>' + ADDED.length + '개</span></div>' +
         ADDED.map(function (a) { return '<div class="item"><span class="glyph">' + a[0] + '</span><span class="txt">' + a[1] + '</span><button class="btn small" aria-label="삭제">삭제</button></div>'; }).join('') +
-      '</div><div class="bottom"><button class="btn block primary" ' + (S.goalsOn ? 'data-gc="start"' : 'data-go="home"') + '>' + (S.goalsOn ? '아침 정리 완료 ▸' : '아침 정리 끝내기') + '</button></div></div>'; } },
+      '</div><div class="bottom"><button class="btn block primary" ' + (nTypes ? 'data-gc="start"' : 'data-go="home"') + '>' + (nTypes ? '아침 정리 완료 ▸' : '아침 정리 끝내기') + '</button></div></div>'; } },
 
     { id: 'typeedit', label: '아침 정리 · 유형 수정', html: function () {
       var it = byId(S.editId) || HOME[0];
@@ -632,23 +646,40 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       '</div>'; } },
 
     { id: 'goalcheck', label: '장기 목표 점검', html: function () {
-      var steps = ['1주', '1달', '1년'], st = S.gcStep;
-      var sets = [
-        [['D-3', '이력서 초안 끝내기'], ['D-5', '운동 12회 채우기'], ['D-6', '월간 지출 정리하기'], ['D-7', '자격증 접수'], ['D-7', '독서 모임 발표 준비'], ['D-2', '책상 서랍 비우기'], ['D+1', '냉장고 대청소'], ['D-4', '사진 앨범 정리'], ['D-6', '부모님께 전화'], ['D-7', '러닝 5km 완주']],
-        [['D-12', '독서 4권'], ['D-19', '연말 모임 장소 예약'], ['D-24', '치과 정기검진'], ['D-30', '블로그 글 10편 쓰기'], ['D-28', '옷장 정리'], ['D-15', '명함 정리'], ['D-21', '가계부 점검'], ['D-9', '악기 연습 20시간']],
-        [['D-140', '영어 점수 올리기'], ['D-200', '포트폴리오 완성'], ['D-250', '저축 목표 달성'], ['D-300', '여행 계획 확정'], ['D-365', '1년 회고 쓰기'], ['D-180', '건강검진 받기'], ['D-90', '운전면허 갱신'], ['D-330', '새 프로젝트 시작']]
-      ];
-      var nextLabel = st < 2 ? steps[st + 1] + ' 점검으로 ▸' : '정리 끝내기';
+      var labels = { '1w': '1주', '1m': '1달', '1y': '1년' };
+      var types = activeTypes();
+      if (!types.length) types = ['1w'];
+      var st = Math.min(S.gcStep, types.length - 1), cur = types[st];
+      var sets = {
+        '1w': [['D-3', '이력서 초안 끝내기'], ['D-5', '운동 12회 채우기'], ['D-6', '월간 지출 정리하기'], ['D-7', '자격증 접수'], ['D-7', '독서 모임 발표 준비'], ['D-2', '책상 서랍 비우기'], ['D+2', '냉장고 대청소'], ['D-4', '사진 앨범 정리'], ['D-6', '부모님께 전화'], ['D-7', '러닝 5km 완주']],
+        '1m': [['D-12', '독서 4권'], ['D-19', '연말 모임 장소 예약'], ['D-24', '치과 정기검진'], ['D-30', '블로그 글 10편 쓰기'], ['D-28', '옷장 정리'], ['D-15', '명함 정리'], ['D-21', '가계부 점검'], ['D-9', '악기 연습 20시간']],
+        '1y': [['D-140', '영어 점수 올리기'], ['D-200', '포트폴리오 완성'], ['D-250', '저축 목표 달성'], ['D-300', '여행 계획 확정'], ['D-365', '1년 회고 쓰기'], ['D-180', '건강검진 받기'], ['D-90', '운전면허 갱신'], ['D-330', '새 프로젝트 시작']]
+      };
+      var nextLabel = st < types.length - 1 ? labels[types[st + 1]] + ' 점검으로 ▸' : '정리 끝내기';
       return '<div class="screen">' +
-      '<div class="topbar"><h2>장기 목표 점검</h2><span class="sub">' + steps[st] + ' · ' + sets[st].length + '개</span></div>' +
-      '<div class="steps">' + steps.map(function (s, i) { return '<span class="' + (i === st ? 'on' : '') + '">' + s + '</span>'; }).join('') + '</div>' +
+      '<div class="topbar"><h2>장기 목표 점검</h2><span class="sub">' + labels[cur] + ' · ' + sets[cur].length + '개</span></div>' +
+      '<div class="steps">' + types.map(function (t, i) { return '<span class="' + (i === st ? 'on' : '') + '">' + labels[t] + '</span>'; }).join('') + '</div>' +
       '<div class="scroll">' +
-        sets[st].map(function (g) { var late = g[0].charAt(1) === '+'; return '<div class="card"><div class="goal" style="border:0;padding:0"><span class="dd">' + g[0] + '</span><b>' + g[1] + '</b></div><div class="acts"><button class="btn">달성</button><button class="btn">' + (late ? '연장' : '계속') + '</button><button class="btn">삭제</button></div></div>'; }).join('') +
-        '<p class="hint">같은 날 여러 점검이 있으면 1주, 1달, 1년 순으로 나와요.</p>' +
+        sets[cur].map(function (g) { var late = g[0].charAt(1) === '+'; return '<div class="card"><div class="goal" style="border:0;padding:0"><span class="dd">' + g[0] + '</span><b>' + g[1] + '</b></div><div class="acts"><button class="btn">달성</button>' + (late ? '<button class="btn" data-extend="1">연장</button>' : '<button class="btn">계속</button>') + '<button class="btn">삭제</button></div></div>'; }).join('') +
+        '<p class="hint">같은 날 여러 점검이 있으면 1주, 1달, 1년 순으로 나와요. 꺼 둔 정리는 나오지 않아요.</p>' +
       '</div><div class="bottom"><button class="btn block primary" data-gc="next">' + nextLabel + '</button></div></div>'; } },
 
+    { id: 'goalextend', label: '목표 연장', html: function () {
+      var d = fieldsDate(), t = today();
+      var info = d ? '<p class="dtext">' + ymd(d) + ' · ' + dText(dayDiff(t, d)) + '</p>' : '<p class="dbad">없는 날짜예요. 년 · 월 · 일을 확인해 주세요.</p>';
+      return '<div class="screen">' + topbar('goalcheck', '목표 연장') +
+      '<div class="scroll">' +
+        '<div class="card"><div class="goal" style="border:0;padding:0"><span class="dd">D+2</span><b>냉장고 대청소</b></div><p class="hint" style="margin:4px 0 0">목표 날짜(' + ymd(addDays(t, -2)) + ')가 지났어요. 새 날짜를 정하면 이어서 점검해요.</p></div>' +
+        '<div class="sec">새 목표 날짜</div>' +
+        '<div class="quick"><button data-ext="1w">+1주</button><button data-ext="1m">+1달</button><button data-ext="1y">+1년</button></div>' +
+        '<div class="dfields"><label>년<input class="dfield" data-f="dY" inputmode="numeric" maxlength="4" value="' + S.dY + '" aria-label="년"></label><label>월<input class="dfield" data-f="dM" inputmode="numeric" maxlength="2" value="' + S.dM + '" aria-label="월"></label><label>일<input class="dfield" data-f="dD" inputmode="numeric" maxlength="2" value="' + S.dD + '" aria-label="일"></label></div>' +
+        '<div class="dinfo">' + info + '</div>' +
+        '<div style="padding-top:8px"><button class="btn block" data-cal-open="goalextend">달력에서 고르기</button></div>' +
+        '<p class="hint" style="margin:10px 0 0">연장하지 않고 달성하거나 삭제하려면 취소하고 점검 화면에서 눌러요.</p>' +
+      '</div><div class="bottom" style="display:flex;gap:8px"><button class="btn block" data-go="goalcheck">취소</button><button class="btn block primary" data-go="goalcheck">연장하기</button></div></div>'; } },
+
     { id: 'evening', label: '저녁 정리', html: function () {
-      var act = HOME.filter(function (i) { return i.grp !== 'memo'; });
+      var act = HOME.filter(function (i) { return visible(i) && i.grp !== 'memo'; });
       function part(g) { return act.filter(function (i) { return i.g === g && !i.done; }).concat(act.filter(function (i) { return i.g === g && i.done; })); }
       return '<div class="screen">' +
       '<div class="topbar"><h2>저녁 정리 · 19:00</h2></div>' +
@@ -729,6 +760,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       fig.appendChild(slot);
       var cap = document.createElement('figcaption'); cap.textContent = s.label;
       fig.appendChild(cap);
+      if (s.cap) { var note = document.createElement('p'); note.className = 'note'; note.style.maxWidth = Math.round(W * scale) + 'px'; note.textContent = s.cap; fig.appendChild(note); }
       stage.appendChild(fig);
     });
     if (keepScroll) Array.prototype.forEach.call(stage.querySelectorAll('.scroll,.list,.shade'), function (e, i) { if (saved[i] != null) e.scrollTop = saved[i]; });
@@ -768,6 +800,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       var v = t.getAttribute('data-v');
       if (a === 'fs') S.fs = parseFloat(v);
       else if (a === 'goalsOn') S.goalsOn = !S.goalsOn;
+      else if (a === 'g1w' || a === 'g1m' || a === 'g1y' || a === 'autoAdd') S[a] = !S[a];
       else if (a === 'mdesc') S.mdesc = v === '1';
       else if (a === 'mdone') S.mdone = v;
       render(true);
@@ -781,10 +814,13 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       S.calY = d.getFullYear(); S.calM = d.getMonth(); render(true); return;
     }
     if (t.hasAttribute('data-cal-day')) { S.dY = S.calY; S.dM = S.calM + 1; S.dD = parseInt(t.getAttribute('data-cal-day'), 10); render(true); return; }
+    if (t.hasAttribute('data-cal-open')) { S.calReturn = t.getAttribute('data-cal-open'); go('calendar'); return; }
+    if (t.hasAttribute('data-extend')) { setDateFields(calcDate('1w', today())); go('goalextend'); return; }
+    if (t.hasAttribute('data-ext')) { setDateFields(calcDate(t.getAttribute('data-ext'), today())); render(true); return; }
     if (t.hasAttribute('data-edit')) { S.editId = parseInt(t.getAttribute('data-edit'), 10); go('typeedit'); return; }
     if ((a = t.getAttribute('data-gc'))) {
       if (a === 'start') { S.gcStep = 0; go('goalcheck'); }
-      else if (S.gcStep < 2) { S.gcStep += 1; render(); window.scrollTo({ top: 0 }); }
+      else if (S.gcStep < Math.max(activeTypes().length, 1) - 1) { S.gcStep += 1; render(); window.scrollTo({ top: 0 }); }
       else { S.gcStep = 0; go('home'); }
       return;
     }
