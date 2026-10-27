@@ -144,7 +144,7 @@ figure { margin: 0; }
 .goal:last-child { border-bottom: 0; }
 .goal .dd { font-family: var(--font-num); font-weight: 800; width: 52px; flex: none; }
 .goal .gd { font-family: var(--font-num); font-size: calc(12px * var(--fs, 1)); width: 84px; flex: none; }
-.stick { position: sticky; top: 0; background: var(--paper); z-index: 2; border-bottom: 2px solid var(--ink); padding: 8px 0; display: grid; gap: 6px; }
+.stick { position: sticky; top: 0; background: var(--paper); z-index: 2; border-bottom: 2px solid var(--ink); padding: 8px 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .tabs button { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); border-radius: 10px; min-height: 42px; cursor: pointer; }
 .tabs button[aria-pressed="true"] { border-width: 3px; font-weight: 700; }
@@ -194,6 +194,8 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
 
 @media (prefers-reduced-motion: no-preference) { .phone-scale { transition: none; } }
 
+.grid4.one { grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 0 0 10px; }
+.grid4.one .btn { min-height: 52px; font-size: 12px; padding: 0 2px; line-height: 1.25; text-align: center; }
 /* 스위치 */
 .switch { width: 58px; height: 34px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); position: relative; cursor: pointer; flex: none; padding: 0; }
 .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; border: 2px solid var(--ink); border-radius: 50%; background: var(--paper); }
@@ -550,16 +552,19 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       '</div><div class="bottom" style="display:flex;gap:8px"><button class="btn block" data-go="settings">취소</button><button class="btn block primary" data-go="settings">저장</button></div></div>'; } },
 
     { id: 'memory', label: '메모리', html: function () { return '<div class="screen">' + topbar('home', '메모리') +
-      '<div class="searchbox"><input class="msearch" type="search" placeholder="날짜나 내용으로 검색 (예: 10.24, 빨래)" aria-label="기록 검색" autocomplete="off"><button class="btn" data-clear="1" aria-label="검색 지우기">✕</button></div>' +
-      '<div class="sorts" style="padding:0 16px 8px;flex:none;flex-wrap:wrap" role="group" aria-label="순서">' +
-        '<button aria-pressed="' + S.mdesc + '" data-set="mdesc" data-v="1">최근 날짜 먼저</button>' +
-        '<button aria-pressed="' + (!S.mdesc) + '" data-set="mdesc" data-v="0">오래된 날짜 먼저</button>' +
-        '<button aria-pressed="' + (S.mdone === 'written') + '" data-set="mdone" data-v="written">해결 목록: 작성 시간순</button>' +
-        '<button aria-pressed="' + (S.mdone === 'resolved') + '" data-set="mdone" data-v="resolved">해결 목록: 해결 시간순</button></div>' +
-      '<div class="grid4"><button class="btn">오늘 기록<br>불러오기</button><button class="btn">전체 기록<br>불러오기</button><button class="btn">오늘 기록<br>내보내기</button><button class="btn">전체 기록<br>내보내기</button></div>' +
-      '<div class="pad" style="padding-bottom:6px;flex:none"><div class="lockline" style="text-align:left;font-size:12px">오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.</div></div>' +
-      '<div class="mcount">' + memCount('') + '</div>' +
-      '<div class="scroll tree">' + memTree('') + '</div></div>'; } },
+      '<div class="scroll">' +
+        '<div class="grid4 one"><button class="btn">오늘<br>불러오기</button><button class="btn">전체<br>불러오기</button><button class="btn">오늘<br>내보내기</button><button class="btn">전체<br>내보내기</button></div>' +
+        '<div class="lockline" style="text-align:left;font-size:12px;margin-bottom:8px">오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.</div>' +
+        '<div class="stick">' +
+          '<div class="field"><input class="msearch" type="search" placeholder="날짜나 내용으로 검색 (예: 10.24, 빨래)" aria-label="기록 검색" autocomplete="off"><button class="btn" data-clear="1" aria-label="검색 지우기">✕</button></div>' +
+          '<div class="sorts" style="flex-wrap:wrap" role="group" aria-label="순서">' +
+            '<button aria-pressed="' + S.mdesc + '" data-set="mdesc" data-v="1">최근 날짜 먼저</button>' +
+            '<button aria-pressed="' + (!S.mdesc) + '" data-set="mdesc" data-v="0">오래된 날짜 먼저</button>' +
+            '<button aria-pressed="' + (S.mdone === 'written') + '" data-set="mdone" data-v="written">해결 목록: 작성 시간순</button>' +
+            '<button aria-pressed="' + (S.mdone === 'resolved') + '" data-set="mdone" data-v="resolved">해결 목록: 해결 시간순</button></div>' +
+          '<div class="mcount" style="padding:0">' + memCount('') + '</div>' +
+        '</div>' +
+        '<div class="tree">' + memTree('') + '</div></div></div>'; } },
 
     { id: 'goals', label: '장기 목표', html: function () {
       var t = realToday();
@@ -840,7 +845,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       var scr = t.closest('.screen');
       scr.querySelector('.tree').innerHTML = memTree(t.value);
       scr.querySelector('.mcount').innerHTML = memCount(t.value);
-      scr.querySelector('.tree').scrollTop = 0;
+      scr.querySelector('.scroll').scrollTop = 0;
     } else if (t.classList.contains('dfield')) {
       S[t.getAttribute('data-f')] = t.value.replace(/\D/g, '');
       var d = fieldsDate(), box = t.closest('.screen').querySelector('.dinfo');
