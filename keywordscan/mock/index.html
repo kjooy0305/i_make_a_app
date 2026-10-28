@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>소설 키워드 분석기 시안</title>
+<style>
+/* Layout: 시안 모음. 위에 화면을 고르는 칩, 가운데에 폰 비율(390×844) 한 대, 전체 보기에서는 격자.
+   색과 부품 모양은 실제 앱(keywordscan/web)의 것을 그대로 쓴다. */
+:root {
+  --page: #101020;
+  --bg: #1a1a2e; --bg2: #16213e; --card: #1f2a4a; --line: #2f3d66; --txt: #e8ebf7; --sub: #9aa5c8;
+  --pri: #7c3aed; --pri2: #a78bfa; --like: #34d399; --norm: #94a3b8; --hate: #f87171; --warn: #fbbf24;
+  --font: -apple-system, "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { background: var(--page); }
+body {
+  margin: 0; background: var(--page); color: var(--txt); font: 15px/1.5 var(--font);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.page { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; }
+.head h1 { margin: 0; font-size: 24px; font-weight: 800; text-wrap: balance; }
+.head p { margin: 4px 0 0; max-width: 64ch; color: var(--sub); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill, .mode button {
+  font: inherit; font-size: 13px; color: var(--txt); background: var(--bg2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer;
+}
+.pill[aria-pressed="true"], .mode button[aria-pressed="true"] { background: var(--pri); border-color: var(--pri); color: #fff; font-weight: 700; }
+.pill:focus-visible, .mode button:focus-visible, .phone button:focus-visible, .phone input:focus-visible, .phone select:focus-visible, .phone textarea:focus-visible { outline: 2px solid var(--pri2); outline-offset: 2px; }
+.mode { display: flex; gap: 8px; margin-left: auto; }
+.stage { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: flex-start; }
+.cell { display: grid; gap: 8px; justify-items: center; margin: 0; }
+.cell figcaption { font-weight: 700; }
+.slot { position: relative; }
+.scaler { transform-origin: top left; }
+.note { max-width: 64ch; margin: 0 auto; text-align: center; color: var(--sub); font-size: 13px; }
+
+/* ===== 폰 ===== */
+.phone { width: 390px; height: 844px; background: var(--bg); border: 2px solid var(--line); border-radius: 38px; display: flex; flex-direction: column; overflow: hidden; position: relative; color: var(--txt); font: 15px/1.5 var(--font); }
+.status { height: 30px; display: flex; justify-content: space-between; align-items: center; padding: 8px 24px 0; font-size: 12px; font-weight: 700; background: var(--bg2); flex: none; }
+.app-head { background: var(--bg2); padding: 12px 16px; font-weight: 700; font-size: 17px; border-bottom: 1px solid var(--line); flex: none; }
+.app-head small { color: var(--sub); font-weight: 400; margin-left: 8px; font-size: 12px; }
+.main { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 20px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.nav { display: flex; background: var(--bg2); border-top: 1px solid var(--line); flex: none; }
+.nav button { flex: 1; background: none; border: 0; color: var(--sub); padding: 11px 4px; font-size: 13px; position: relative; cursor: pointer; min-height: 48px; }
+.nav button.on { color: var(--pri2); font-weight: 700; }
+.nav .badge { position: absolute; top: 5px; margin-left: 2px; background: var(--pri); color: #fff; border-radius: 9px; font-size: 10px; padding: 0 6px; }
+.gesture { height: 18px; display: flex; justify-content: center; align-items: center; background: var(--bg2); flex: none; }
+.gesture i { width: 110px; border-top: 3px solid var(--line); border-radius: 3px; }
+
+.phone input, .phone select, .phone textarea, .phone button { font: inherit; color: inherit; }
+.phone input[type=text], .phone input[type=number], .phone select, .phone textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; color: var(--txt); min-height: 40px; }
+.phone textarea { min-height: 150px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+button.btn { background: var(--pri); border: 0; color: #fff; border-radius: 8px; padding: 9px 14px; font-weight: 600; cursor: pointer; min-height: 40px; }
+button.btn.sec { background: var(--line); }
+button.btn.dng { background: #b91c1c; }
+button.btn.sm { padding: 5px 10px; font-size: 12px; min-height: 32px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > .grow { flex: 1; min-width: 110px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 10px 0; }
+.muted { color: var(--sub); font-size: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 3px 10px; margin: 3px 4px 3px 0; font-size: 13px; }
+.chip.sel { background: var(--pri); border-color: var(--pri); }
+.chip.up { border-color: var(--pri2); color: var(--pri2); }
+.chip.up.bang { background: rgba(124, 58, 237, .25); }
+.chip.like { border-color: var(--like); color: var(--like); }
+.chip.normal { border-color: var(--norm); color: #cbd5e1; }
+.chip.dislike { border-color: var(--hate); color: var(--hate); }
+.chip b { font-weight: 700; }
+button.chip { font: inherit; font-size: 13px; cursor: pointer; }
+.tn { font-size: 12px; color: var(--sub); margin-top: 8px; }
+.tn.like { color: var(--like); } .tn.dislike { color: var(--hate); }
+.title { font-weight: 700; word-break: break-all; cursor: pointer; }
+.tagname { font-size: 12px; color: var(--pri2); word-break: break-all; margin: 2px 0 4px; }
+.drop { border: 2px dashed var(--line); border-radius: 14px; padding: 26px 12px; text-align: center; color: var(--sub); margin: 6px 0; }
+.bar-p { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.bar-p i { display: block; height: 100%; background: var(--pri2); }
+.dist { display: inline-flex; align-items: flex-end; gap: 2px; height: 22px; vertical-align: middle; margin-left: 6px; }
+.dist i { display: block; width: 5px; background: var(--pri2); border-radius: 1px; min-height: 1px; }
+.dist i.z { background: var(--line); }
+.banner { background: rgba(251, 191, 36, .12); border: 1px solid var(--warn); color: var(--warn); border-radius: 10px; padding: 10px; margin: 8px 0; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 6px 0; }
+.seg button { flex: 1; background: none; border: 0; padding: 9px 8px; color: var(--sub); cursor: pointer; min-height: 40px; }
+.seg button.on { background: var(--pri); color: #fff; }
+label.ck { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--sub); min-height: 32px; }
+.kwrow { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); padding: 8px 0; }
+.kwrow:last-child { border-bottom: 0; }
+h4 { margin: 14px 0 4px; }
+.err { color: var(--hate); } .ok { color: var(--like); }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; font-size: 13px; }
+.cmp > div { background: var(--bg); border-radius: 8px; padding: 8px; word-break: break-all; }
+.modal { position: absolute; inset: 0; background: rgba(0, 0, 0, .65); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+.modal > div { background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 16px; width: 100%; max-height: 88%; overflow-y: auto; }
+.modal h3 { margin: 0 0 8px; font-size: 17px; }
+.loading .box { background: var(--bg2); border: 1px solid var(--line); border-radius: 14px; padding: 22px 26px; min-width: 220px; text-align: center; }
+.spin { width: 38px; height: 38px; margin: 0 auto; border: 4px solid var(--line); border-top-color: var(--pri2); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.toast { position: absolute; left: 50%; bottom: 68px; transform: translateX(-50%); background: #0f172a; border: 1px solid var(--line); padding: 8px 16px; border-radius: 20px; z-index: 30; font-size: 13px; max-width: 90%; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="head">
+    <h1>소설 키워드 분석기 시안</h1>
+    <p>실제 앱(keywordscan)의 화면과 색을 폰 비율(390×844)로 옮긴 임시 화면입니다. 예시 소설 18편으로 검색·필터·펼치기·키워드 수정·업로드 대기열·중복 경고를 눌러 볼 수 있습니다. 파일은 읽지 않고 저장도 하지 않습니다.</p>
+  </header>
+  <div class="bar" id="bar" role="group" aria-label="화면 고르기"></div>
+  <div class="stage" id="stage"></div>
+  <p class="note">‘파일 선택’은 예시 파일 4개를 고른 것처럼 동작합니다. 그중 하나는 기존 소설과 이름이 비슷해서 중복 경고가 뜹니다.</p>
+</div>
+
+<script>
+(function () {
+  var W = 390, H = 844, SEGMENTS = 10;
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var TONES = { like: '호감', normal: '일반', dislike: '불호' };
+
+  // ---------- 예시 데이터 ----------
+  var keywords = [
+    { id: 'k1', level: 'upper', name: '로맨스판타지', synonyms: ['로판'], threshold: 5, tone: 'normal' },
+    { id: 'k2', level: 'upper', name: '무협', synonyms: ['무림', '강호'], threshold: 5, tone: 'normal' },
+    { id: 'k3', level: 'upper', name: '현대판타지', synonyms: ['헌터', '게이트'], threshold: 5, tone: 'normal' },
+    { id: 'k4', level: 'lower', name: '회귀', synonyms: ['회귀했', '회귀자'], threshold: 10, tone: 'like' },
+    { id: 'k5', level: 'lower', name: '빙의', synonyms: ['빙의했', '빙의자'], threshold: 10, tone: 'normal' },
+    { id: 'k6', level: 'lower', name: '집착남', synonyms: ['남주가 집착함', '집착하는 남자주인공'], threshold: 5, tone: 'like' },
+    { id: 'k7', level: 'lower', name: '네토라레', synonyms: ['NTR'], threshold: 1, tone: 'dislike' }
+  ];
+  function sigOf(k) { return [k.name].concat(k.synonyms).map(function (t) { return t.toLowerCase().replace(/\s+/g, ''); }).filter(Boolean).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort().join('|'); }
+  var RAW = [
+    ['달빛 아래 회귀한 공작부인', 'txt', 1420000, [42, 0, 0, 38, 6, 17, 0]], ['강호제일검 환생기', 'epub', 2210000, [0, 57, 0, 22, 0, 0, 0]],
+    ['헌터 아카데미의 천재 신입', 'txt', 1180000, [0, 0, 63, 9, 0, 0, 0]], ['악역 영애는 집착남에게 빙의했다', 'epub', 930000, [31, 0, 0, 4, 27, 21, 0]],
+    ['무림맹주의 두 번째 인생', 'txt', 1760000, [0, 48, 0, 31, 0, 0, 0]], ['게이트가 열린 날, 나는 회귀했다', 'txt', 1340000, [0, 0, 52, 44, 0, 0, 0]],
+    ['북해의 검, 남궁세가의 막내', 'epub', 1510000, [0, 36, 0, 0, 0, 0, 0]], ['황후가 된 건 우연이었다', 'txt', 860000, [24, 0, 0, 12, 0, 9, 0]],
+    ['S급 헌터는 퇴근하고 싶다', 'txt', 1980000, [0, 0, 41, 0, 0, 0, 0]], ['독점욕 강한 남주와 계약결혼', 'epub', 720000, [19, 0, 0, 0, 0, 26, 0]],
+    ['혈교의 후계자가 되어버렸다', 'txt', 1290000, [0, 29, 0, 6, 0, 0, 0]], ['이세계 약초꾼의 하루', 'txt', 410000, [0, 0, 3, 0, 0, 0, 0]],
+    ['빙의했더니 악당의 조카', 'txt', 640000, [4, 0, 0, 0, 18, 3, 0]], ['마교 교주는 은퇴하고 싶다', 'epub', 1450000, [0, 33, 0, 0, 0, 0, 0]],
+    ['NTR 당한 용사의 복수', 'txt', 580000, [0, 0, 17, 0, 0, 0, 5]], ['도시 던전 관리인', 'txt', 1010000, [0, 0, 22, 0, 0, 0, 0]],
+    ['공작가의 막내딸은 회귀자', 'epub', 1120000, [27, 0, 0, 35, 0, 0, 1]], ['강호에 핀 한 송이 꽃', 'txt', 520000, [0, 12, 0, 0, 0, 0, 0]]
+  ];
+  function segsFor(count, i, j) {
+    var a = []; for (var s = 0; s < SEGMENTS; s++) a.push(0);
+    if (!count) return a;
+    if (count <= 3) { a[(i * 3 + j) % 10] += count - 1 > 0 ? 1 : 0; a[(i + j * 2 + 3) % 10] += count > 1 ? count - 1 : 1; return a; }
+    if ((i + j) % 4 === 0) { var peak = (i * 3 + j) % 10; var rest = Math.round(count * 0.25); a[peak] = count - rest; a[(peak + 1) % 10] = Math.ceil(rest / 2); a[(peak + 5) % 10] = Math.floor(rest / 2); return a; }
+    var left = count; for (var s2 = 0; s2 < SEGMENTS; s2++) { var v = Math.max(0, Math.round(count / SEGMENTS + (((i * 7 + j * 5 + s2 * 3) % 5) - 2))); v = Math.min(v, left); a[s2] = v; left -= v; }
+    a[(i + j) % 10] += left; return a;
+  }
+  var novels = RAW.map(function (r, i) {
+    var results = {};
+    keywords.forEach(function (k, j) { results[k.id] = { count: r[3][j], segs: segsFor(r[3][j], i, j), sig: sigOf(k) }; });
+    return { id: 'n' + i, title: r[0], ext: r[1], totalChars: r[2], addedAt: 100 - i, results: results };
+  });
+  var uidN = 100;
+  function statusOf(count, th) { return !count ? '' : (count >= Math.max(1, th || 1) ? '!' : '?'); }
+  function density(count, total) { return total ? count / total * 10000 : 0; }
+  function distOf(segs) {
+    var total = segs.reduce(function (a, b) { return a + b; }, 0);
+    if (!total) return { kind: '', peak: -1 };
+    var spread = segs.filter(function (v) { return v > 0; }).length, peak = 0;
+    segs.forEach(function (v, i) { if (v > segs[peak]) peak = i; });
+    var share = segs[peak] / total, kind = '분산';
+    if (total >= 3 && (share >= 0.5 || spread <= 2)) kind = '집중'; else if (total < 3) kind = '드문드문';
+    return { kind: kind, peak: peak };
+  }
+  function fmtChars(n) { return n >= 10000 ? (n / 10000).toFixed(1) + '만자' : n + '자'; }
+  function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB'; }
+  function ups() { return keywords.filter(function (k) { return k.level === 'upper'; }); }
+  function lows() { return keywords.filter(function (k) { return k.level === 'lower'; }); }
+  function kwById(id) { return keywords.filter(function (k) { return k.id === id; })[0]; }
+  function isStale(n) { return keywords.some(function (k) { var r = n.results[k.id]; return !r || r.sig !== sigOf(k); }); }
+  function staleCount() { return novels.filter(isStale).length; }
+  function hitsOf(n, list) {
+    return list.map(function (k) { var r = n.results[k.id]; var c = r ? r.count : 0; return { kw: k, name: k.name, count: c, status: statusOf(c, k.threshold), segs: r ? r.segs : [], density: density(c, n.totalChars) }; });
+  }
+  function tagName(n) {
+    var parts = hitsOf(n, ups()).filter(function (h) { return h.status; }).map(function (h) { return h.name + '(' + h.status + ')'; });
+    return parts.length ? n.title + '_' + parts.join('_') : n.title;
+  }
+
+  // ---------- 상태 ----------
+  var S = { tab: 'lib', kwTab: 'upper', editing: null, open: {}, q: '', sort: 'new', upper: {}, mode: 'or', noDislike: false, queue: [], overlay: null, toast: '', sel: null };
+  var timer = null, toastTimer = null;
+
+  function toast(msg) { S.toast = msg; clearTimeout(toastTimer); toastTimer = setTimeout(function () { S.toast = ''; render(true); }, 2200); }
+
+  function filtered() {
+    var list = novels.filter(function (n) {
+      if (S.q && n.title.toLowerCase().indexOf(S.q.toLowerCase()) < 0) return false;
+      var ids = Object.keys(S.upper).filter(function (k) { return S.upper[k]; });
+      if (ids.length) {
+        var hit = function (id) { return n.results[id] && n.results[id].count > 0; };
+        if (!(S.mode === 'and' ? ids.every(hit) : ids.some(hit))) return false;
+      }
+      if (S.noDislike) {
+        var bad = lows().some(function (k) { return k.tone === 'dislike' && statusOf(n.results[k.id] ? n.results[k.id].count : 0, k.threshold) === '!'; });
+        if (bad) return false;
+      }
+      return true;
+    });
+    if (S.sort === 'title') list.sort(function (a, b) { return a.title.localeCompare(b.title, 'ko'); });
+    else list.sort(function (a, b) { return b.addedAt - a.addedAt; });
+    return list;
+  }
+  function distHtml(segs) {
+    var mx = Math.max.apply(null, segs.concat([1]));
+    return '<span class="dist">' + segs.map(function (v) { return '<i class="' + (v ? '' : 'z') + '" style="height:' + Math.max(8, Math.round(v / mx * 100)) + '%"></i>'; }).join('') + '</span>';
+  }
+  function chip(h, cls) { return '<span class="chip ' + cls + (h.status === '!' ? ' bang' : '') + '"><b>' + esc(h.name) + '</b>' + (h.status ? '(' + h.status + ')' : '') + ' <span class="muted">' + h.count + '회</span></span>'; }
+
+  function novelCard(n) {
+    var up = hitsOf(n, ups()).filter(function (h) { return h.count > 0; });
+    var lo = hitsOf(n, lows()).filter(function (h) { return h.count > 0; });
+    var open = !!S.open[n.id];
+    var h = '<div class="card">';
+    h += '<div class="row"><div class="grow title" role="button" tabindex="0" data-act="toggle" data-id="' + n.id + '">' + esc(n.title) + '</div><span class="muted">' + n.ext.toUpperCase() + ' · ' + fmtChars(n.totalChars) + '</span></div>';
+    h += '<div class="tagname">' + esc(tagName(n)) + '</div>';
+    h += up.length ? up.map(function (x) { return chip(x, 'up'); }).join('') : '<span class="muted">상위 키워드 없음</span>';
+    ['like', 'normal', 'dislike'].forEach(function (tone) {
+      var g = lo.filter(function (x) { return x.kw.tone === tone; });
+      if (!g.length) return;
+      h += '<div class="tn ' + tone + '">' + (tone === 'like' ? '💚' : tone === 'dislike' ? '🚫' : '▫️') + ' ' + TONES[tone] + ' 키워드</div>' + g.map(function (x) { return chip(x, tone); }).join('');
+    });
+    if (isStale(n)) h += '<div class="muted" style="margin-top:6px">⚠️ 키워드가 바뀌어 재분석이 필요해요</div>';
+    if (open) {
+      h += '<h4>상세 (만자당 빈도 · 구간 분포)</h4>';
+      var rows = up.concat(lo);
+      h += rows.length ? rows.map(function (x) {
+        var d = distOf(x.segs);
+        return '<div class="kwrow"><div class="grow"><b>' + esc(x.name) + '</b> <span class="muted">' + x.count + '회 · 1만자당 ' + x.density.toFixed(2) + '회 · 임계 ' + x.kw.threshold + '</span></div><div class="muted">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div>' + distHtml(x.segs) + '</div>';
+      }).join('') : '<div class="muted">발견된 키워드가 없어요</div>';
+      h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-act="copytag" data-id="' + n.id + '">태그 파일명 복사</button><button class="btn sm sec" data-act="rescan" data-id="' + n.id + '">재분석</button><button class="btn sm dng" data-act="del" data-id="' + n.id + '">삭제</button></div>';
+    }
+    return h + '</div>';
+  }
+
+  function libList() {
+    var list = filtered();
+    var h = '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + novels.length + '개</span>' +
+      (list.length ? '<button class="btn sm sec" data-act="copyall">태그 파일명 복사</button><button class="btn sm sec" data-act="exporttxt">목록 txt 추출</button>' : '') + '</div>';
+    h += list.length ? list.map(novelCard).join('') : '<div class="card muted" style="text-align:center">' + (novels.length ? '조건에 맞는 소설이 없어요' : '업로드 탭에서 TXT·ePub 파일을 추가하세요') + '</div>';
+    return h;
+  }
+  function libHtml() {
+    var u = ups();
+    var h = '<div class="row"><input type="text" class="grow q" placeholder="제목 검색" value="' + esc(S.q) + '" aria-label="제목 검색"><select class="sort" style="width:auto" aria-label="정렬"><option value="new"' + (S.sort === 'new' ? ' selected' : '') + '>최근 추가순</option><option value="title"' + (S.sort === 'title' ? ' selected' : '') + '>제목순</option></select></div>';
+    h += '<div style="margin-top:8px">' + (u.length ? u.map(function (k) { return '<button class="chip' + (S.upper[k.id] ? ' sel' : '') + '" data-act="fup" data-id="' + k.id + '">' + esc(k.name) + '</button>'; }).join('') : '<span class="muted">키워드 탭에서 상위 키워드를 추가하세요</span>') + '</div>';
+    h += '<div class="row" style="margin-top:4px"><label class="ck"><input type="radio" name="mode" value="or"' + (S.mode === 'or' ? ' checked' : '') + '> 하나라도</label><label class="ck"><input type="radio" name="mode" value="and"' + (S.mode === 'and' ? ' checked' : '') + '> 모두</label><label class="ck"><input type="checkbox" class="nod"' + (S.noDislike ? ' checked' : '') + '> 불호 키워드(!) 포함 소설 제외</label></div>';
+    return h + '<div class="liblist">' + libList() + '</div>';
+  }
+
+  function queueHtml() {
+    if (!S.queue.length) return '<div class="muted" style="text-align:center;margin-top:14px">대기열이 비어 있어요</div>';
+    return S.queue.slice().reverse().map(function (q) {
+      var cls = q.status === '오류' ? 'err' : q.status === '완료' ? 'ok' : 'muted';
+      return '<div class="card" style="padding:9px"><div class="row"><div class="grow" style="word-break:break-all">' + (q.kind === 'new' ? '📥 ' : '🔄 ') + esc(q.label) + '</div><span class="' + cls + '">' + q.status + '</span></div>' +
+        (q.status === '진행' ? '<div class="bar-p"><i style="width:' + Math.round(q.progress * 100) + '%"></i></div>' : '') + (q.error ? '<div class="err muted">' + esc(q.error) + '</div>' : '') + '</div>';
+    }).join('');
+  }
+  function upHtml() {
+    var stale = staleCount();
+    var h = '<div class="drop">📂 여기에 TXT·ePub 파일을 끌어다 놓거나<br>아래 버튼으로 여러 개를 한 번에 선택하세요<br><br><button class="btn" data-act="pick">파일 선택</button></div>';
+    h += '<div class="muted">100개 이상도 한 번에 올릴 수 있어요. 한 파일씩 차례로 처리해서 메모리를 아껴요.</div>';
+    if (stale) h += '<div class="banner">키워드가 바뀌어 재분석이 필요한 소설이 ' + stale + '개 있어요.<div style="margin-top:8px"><button class="btn sm" data-act="rescanstale">필요한 것만 재분석</button></div></div>';
+    h += '<div class="row" style="margin-top:10px"><h4 class="grow" style="margin:0">대기열</h4>' + (novels.length ? '<button class="btn sm sec" data-act="rescanall">전체 재분석</button>' : '') + '<button class="btn sm sec" data-act="clearq">완료 항목 지우기</button></div>';
+    return h + '<div class="queueBox">' + queueHtml() + '</div>';
+  }
+
+  function kwHtml() {
+    var lvl = S.kwTab, ed = S.editing;
+    var list = keywords.filter(function (k) { return k.level === lvl; });
+    var h = '<div class="seg"><button data-act="kwtab" data-v="upper" class="' + (lvl === 'upper' ? 'on' : '') + '">상위 키워드</button><button data-act="kwtab" data-v="lower" class="' + (lvl === 'lower' ? 'on' : '') + '">하위 키워드</button></div>';
+    h += '<div class="muted">' + (lvl === 'upper' ? '검색·목록에 대표로 보여줄 단어 (예: 로맨스판타지, 무협)' : '소설 본문에서 실제로 찾아낼 세부 요소 (예: 회귀, 빙의, 집착남)') + '</div>';
+    var sn = staleCount();
+    if (sn) h += '<div class="banner">키워드 변경으로 재분석이 필요한 소설: ' + sn + '개 <button class="btn sm" data-act="rescanstale" style="margin-left:6px">재분석</button></div>';
+    h += '<div class="card"><b>' + (ed ? '키워드 수정' : '키워드 추가') + '</b>';
+    h += '<div style="margin-top:8px"><input type="text" class="kn" placeholder="키워드 이름" value="' + esc(ed ? ed.name : '') + '" aria-label="키워드 이름"></div>';
+    h += '<div style="margin-top:8px"><input type="text" class="ks" placeholder="유의어 (쉼표로 구분) 예: 남주가 집착함, 집착하는 남자주인공" value="' + esc(ed ? ed.synonyms.join(', ') : '') + '" aria-label="유의어"></div>';
+    h += '<div class="row" style="margin-top:8px"><div class="grow"><div class="muted">(!) 임계 횟수</div><input type="number" class="kt" min="1" value="' + (ed ? ed.threshold : 5) + '" aria-label="임계 횟수"></div>';
+    if (lvl === 'lower') h += '<div class="grow"><div class="muted">성향</div><select class="ktone" aria-label="성향">' + Object.keys(TONES).map(function (t) { return '<option value="' + t + '"' + ((ed ? ed.tone : 'normal') === t ? ' selected' : '') + '>' + TONES[t] + '</option>'; }).join('') + '</select></div>';
+    h += '</div><div class="row" style="margin-top:10px">' + (ed ? '<button class="btn sec" data-act="kwcancel">취소</button>' : '') + '<button class="btn" data-act="kwsave">' + (ed ? '저장' : '추가') + '</button></div></div>';
+    h += list.map(function (k) {
+      return '<div class="card" style="padding:9px"><div class="row"><div class="grow"><b>' + esc(k.name) + '</b> ' + (k.level === 'lower' ? '<span class="chip ' + k.tone + '">' + TONES[k.tone] + '</span>' : '') + '<span class="muted">임계 ' + k.threshold + '회</span><div class="muted">' + (k.synonyms.length ? '유의어: ' + esc(k.synonyms.join(', ')) : '유의어 없음') + '</div></div><button class="btn sm sec" data-act="kwedit" data-id="' + k.id + '">수정</button><button class="btn sm dng" data-act="kwdel" data-id="' + k.id + '">삭제</button></div></div>';
+    }).join('');
+    h += '<div class="row" style="margin-top:12px"><button class="btn sm sec" data-act="kwexport">키워드 내보내기</button><button class="btn sm sec" data-act="kwimport">키워드 가져오기</button></div>';
+    return h;
+  }
+
+  // ---------- 겹쳐 뜨는 창 ----------
+  function overlayHtml() {
+    var o = S.overlay; if (!o) return '';
+    if (o.type === 'loading') return '<div class="modal loading"><div class="box"><div class="spin"></div><div style="margin-top:12px;font-size:14px">' + esc(o.msg) + '</div><div class="bar-p"><i style="width:' + Math.round(o.ratio * 100) + '%"></i></div></div></div>';
+    if (o.type === 'dup') return '<div class="modal"><div><h3>⚠️ 중복 의심 파일</h3><div class="muted">이미 비슷한 이름의 소설이 있어요.</div>' +
+      '<div class="cmp"><div><b>새 파일</b><br>' + esc(o.file) + '<br><span class="muted">2.4MB</span></div><div><b>기존 파일</b><br>' + esc(o.existing) + '<br><span class="muted">2.1MB · 221.0만자 · 2026. 10. 22.</span></div></div>' +
+      (o.remaining > 0 ? '<label class="ck" style="margin:8px 0"><input type="checkbox" class="dupAll"> 남은 ' + o.remaining + '개 중복 의심 파일에도 같은 선택 적용</label>' : '') +
+      '<div class="row" style="margin-top:10px"><button class="btn" data-act="dup" data-v="replace">덮어쓰기</button><button class="btn sec" data-act="dup" data-v="rename">이름 변경 후 추가</button><button class="btn sec" data-act="dup" data-v="cancel">업로드 취소</button></div></div></div>';
+    if (o.type === 'rename') return '<div class="modal"><div><h3>새 이름</h3><input type="text" class="rn" value="' + esc(o.proposed) + '" aria-label="새 이름"><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" data-act="rename" data-v="0">취소</button><button class="btn" data-act="rename" data-v="1">추가</button></div></div></div>';
+    if (o.type === 'confirm') return '<div class="modal"><div><p style="margin:0 0 12px">' + esc(o.msg) + '</p><div class="row" style="justify-content:flex-end"><button class="btn sec" data-act="confirm" data-v="0">취소</button><button class="btn" data-act="confirm" data-v="1">삭제</button></div></div></div>';
+    if (o.type === 'kexport') return '<div class="modal"><div><h3>키워드 내보내기</h3><textarea readonly aria-label="키워드 JSON">' + esc(JSON.stringify(keywords, null, 1)) + '</textarea><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" data-act="mclose">닫기</button><button class="btn" data-act="mcopy">복사</button></div></div></div>';
+    if (o.type === 'kimport') return '<div class="modal"><div><h3>키워드 가져오기</h3><div class="muted">내보내기로 복사한 JSON을 붙여넣으세요. 현재 키워드가 모두 교체됩니다.</div><textarea placeholder="[{&quot;level&quot;:&quot;upper&quot;,&quot;name&quot;:&quot;무협&quot;, ...}]" aria-label="붙여넣기"></textarea><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" data-act="mclose">닫기</button><button class="btn" data-act="mimport">가져오기</button></div></div></div>';
+    return '';
+  }
+
+  var TABS = [['lib', '📚 라이브러리'], ['up', '📥 업로드'], ['kw', '🏷 키워드']];
+  function navHtml() {
+    var pending = S.queue.filter(function (q) { return q.status === '대기' || q.status === '진행'; }).length;
+    return TABS.map(function (t) { return '<button data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + t[1] + (t[0] === 'up' && pending ? '<span class="badge">' + pending + '</span>' : '') + '</button>'; }).join('');
+  }
+  function screenHtml(tab) {
+    var body = tab === 'lib' ? libHtml() : tab === 'up' ? upHtml() : kwHtml();
+    return '<div class="app-head">🔎 소설 키워드 분석기<small>' + novels.length + '개 소설 · 키워드 ' + keywords.length + '개</small></div>' +
+      '<div class="main" data-tab="' + tab + '">' + body + '</div><div class="nav">' + navHtml() + '</div>';
+  }
+
+  // ---------- 화면 목록(시안 보기용) ----------
+  var screens = [
+    { id: 'lib', label: '라이브러리', set: function () { S.tab = 'lib'; S.overlay = null; } },
+    { id: 'libopen', label: '라이브러리 · 상세 펼침', set: function () { S.tab = 'lib'; S.overlay = null; S.open = { n0: true }; } },
+    { id: 'up', label: '업로드', set: function () { S.tab = 'up'; S.overlay = null; } },
+    { id: 'kw', label: '키워드', set: function () { S.tab = 'kw'; S.kwTab = 'upper'; S.editing = null; S.overlay = null; } },
+    { id: 'kwedit', label: '키워드 수정', set: function () { S.tab = 'kw'; S.kwTab = 'lower'; S.editing = keywords[5]; S.overlay = null; } },
+    { id: 'dup', label: '중복 경고', set: function () { S.tab = 'up'; S.overlay = { type: 'dup', file: '강호제일검 환생기(!).epub', existing: '강호제일검 환생기.epub', remaining: 2 }; } },
+    { id: 'rename', label: '새 이름', set: function () { S.tab = 'up'; S.overlay = { type: 'rename', proposed: '강호제일검 환생기 (2)' }; } },
+    { id: 'loading', label: '파일 확인 중', set: function () { S.tab = 'up'; S.overlay = { type: 'loading', msg: '파일 확인 중... (37/120)', ratio: 0.31 }; } },
+    { id: 'confirm', label: '삭제 확인', set: function () { S.tab = 'lib'; S.open = { n1: true }; S.overlay = { type: 'confirm', msg: '이 소설과 분석 결과를 삭제할까요?', action: 'novel', id: 'n1' }; } },
+    { id: 'kexport', label: '키워드 내보내기', set: function () { S.tab = 'kw'; S.overlay = { type: 'kexport' }; } },
+    { id: 'kimport', label: '키워드 가져오기', set: function () { S.tab = 'kw'; S.overlay = { type: 'kimport' }; } }
+  ];
+  var current = 'lib', mode = 'one';
+
+  var bar = document.getElementById('bar'), stage = document.getElementById('stage');
+  function phoneHtml(s) {
+    return '<div class="phone" data-screen="' + s.id + '"><div class="status"><span>9:41</span><span>▮▮▮ ◔</span></div>' + screenHtml(S.tab) + overlayHtml() +
+      (S.toast ? '<div class="toast" role="status">' + esc(S.toast) + '</div>' : '') + '<div class="gesture"><i></i></div></div>';
+  }
+  function render(keep) {
+    var saved = [];
+    if (keep) Array.prototype.forEach.call(stage.querySelectorAll('.main'), function (m) { saved.push(m.scrollTop); });
+    var active = document.activeElement, activeInfo = null;
+    if (keep && active && stage.contains(active) && active.className && /\b(q|kn|ks|kt|rn)\b/.test(active.className)) {
+      activeInfo = { cls: (active.className.match(/\b(q|kn|ks|kt|rn)\b/) || [])[1], pos: active.selectionStart };
+    }
+    bar.innerHTML = '';
+    screens.forEach(function (s) {
+      var b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.label;
+      b.setAttribute('aria-pressed', String(mode === 'one' && s.id === current));
+      b.addEventListener('click', function () { current = s.id; mode = 'one'; applyScreen(); render(); });
+      bar.appendChild(b);
+    });
+    var m = document.createElement('div'); m.className = 'mode';
+    [['one', '하나씩'], ['all', '전체 보기']].forEach(function (p) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = p[1]; b.setAttribute('aria-pressed', String(mode === p[0]));
+      b.addEventListener('click', function () { mode = p[0]; render(); }); m.appendChild(b);
+    });
+    bar.appendChild(m);
+    stage.innerHTML = '';
+    var avail = Math.min(window.innerWidth - 32, 1180);
+    if (mode === 'all') {
+      // 전체 보기: 화면마다 상태를 맞춰 한 번씩 그린다
+      var list = screens, saveState = JSON.stringify([S.tab, S.kwTab, S.overlay, S.open]), editBak = S.editing;
+      var scale = avail < 520 ? Math.min(1, avail / W) * 0.9 : 0.5;
+      list.forEach(function (s) { s.set(); addCell(s, scale); });
+      var bak = JSON.parse(saveState); S.tab = bak[0]; S.kwTab = bak[1]; S.overlay = bak[2]; S.open = bak[3]; S.editing = editBak;
+    } else {
+      addCell(find(current), Math.min(1, avail / W));
+    }
+    if (keep) {
+      Array.prototype.forEach.call(stage.querySelectorAll('.main'), function (el, i) { if (saved[i] != null) el.scrollTop = saved[i]; });
+      if (activeInfo) { var el2 = stage.querySelector('.' + activeInfo.cls); if (el2) { el2.focus(); try { el2.setSelectionRange(activeInfo.pos, activeInfo.pos); } catch (e) { /* 숫자칸 */ } } }
+    }
+  }
+  function find(id) { return screens.filter(function (s) { return s.id === id; })[0]; }
+  function addCell(s, scale) {
+    var fig = document.createElement('figure'); fig.className = 'cell';
+    var slot = document.createElement('div'); slot.className = 'slot';
+    slot.style.width = Math.round(W * scale) + 'px'; slot.style.height = Math.round(H * scale) + 'px';
+    var sc = document.createElement('div'); sc.className = 'scaler'; sc.style.transform = 'scale(' + scale + ')'; sc.style.width = W + 'px'; sc.style.height = H + 'px';
+    sc.innerHTML = phoneHtml(s); slot.appendChild(sc); fig.appendChild(slot);
+    var cap = document.createElement('figcaption'); cap.textContent = s.label; fig.appendChild(cap);
+    stage.appendChild(fig);
+  }
+  function applyScreen() { var s = find(current); S.open = {}; S.editing = null; s.set(); }
+
+  // ---------- 대기열 ----------
+  function enqueue(item) { item.status = '대기'; item.progress = 0; S.queue.push(item); startTimer(); }
+  function startTimer() { if (timer) return; timer = setInterval(tick, 220); }
+  function tick() {
+    var cur = S.queue.filter(function (q) { return q.status === '진행'; })[0];
+    if (!cur) {
+      cur = S.queue.filter(function (q) { return q.status === '대기'; })[0];
+      if (!cur) { clearInterval(timer); timer = null; render(true); return; }
+      cur.status = '진행';
+    }
+    cur.progress = Math.min(1, cur.progress + 0.25 + Math.random() * 0.15);
+    if (cur.progress >= 1) {
+      cur.status = '완료';
+      if (cur.kind === 'new') {
+        var counts = [0, 0, 0, 0, 0, 0, 0]; counts[cur.seed % 3] = 20 + cur.seed * 3; counts[3 + cur.seed % 4] = 8 + cur.seed;
+        var results = {}; keywords.forEach(function (k, j) { var c = counts[j] || 0; results[k.id] = { count: c, segs: segsFor(c, 50 + cur.seed, j), sig: sigOf(k) }; });
+        if (cur.replaceId) novels = novels.filter(function (n) { return n.id !== cur.replaceId; });
+        novels.push({ id: 'n' + (uidN++), title: cur.label.replace(/\.(txt|epub)$/i, ''), ext: /epub/i.test(cur.label) ? 'epub' : 'txt', totalChars: 900000 + cur.seed * 130000, addedAt: 200 + uidN, results: results });
+      } else if (cur.novelId) {
+        var n = novels.filter(function (x) { return x.id === cur.novelId; })[0];
+        if (n) keywords.forEach(function (k) { var r = n.results[k.id] || { count: 0, segs: segsFor(0, 0, 0) }; r.sig = sigOf(k); n.results[k.id] = r; });
+      }
+    }
+    var stillRunning = S.queue.some(function (q) { return q.status === '대기' || q.status === '진행'; });
+    // 진행 막대와 배지만 바꾼다
+    Array.prototype.forEach.call(stage.querySelectorAll('.queueBox'), function (b) { b.innerHTML = queueHtml(); });
+    Array.prototype.forEach.call(stage.querySelectorAll('.nav'), function (b) { b.innerHTML = navHtml(); });
+    if (!stillRunning) { clearInterval(timer); timer = null; render(true); }
+  }
+
+  // ---------- 업로드 시나리오 ----------
+  var PICKED = ['달빛 정원의 비밀 연회.txt', '강호제일검 환생기(!).epub', '재벌가 막내는 회귀 중.txt', '도서관의 마법사 견습생.epub'];
+  function pickFiles() {
+    S.overlay = { type: 'loading', msg: '파일 확인 중... (0/' + PICKED.length + ')', ratio: 0 }; render(true);
+    var i = 0, iv = setInterval(function () {
+      i++; if (S.overlay) { S.overlay.msg = '파일 확인 중... (' + i + '/' + PICKED.length + ')'; S.overlay.ratio = i / PICKED.length; }
+      render(true);
+      if (i >= PICKED.length) { clearInterval(iv); S.overlay = { type: 'dup', file: PICKED[1], existing: '강호제일검 환생기.epub', remaining: 0, flow: 'pick' }; render(true); }
+    }, 350);
+  }
+  function addPicked(opts) {
+    PICKED.forEach(function (name, idx) {
+      if (idx === 1) { if (opts.action === 'cancel') return; if (opts.action === 'replace') { enqueue({ kind: 'new', label: name, seed: idx + 2, replaceId: 'n1' }); return; }
+        name = (opts.rename || '강호제일검 환생기 (2)') + '.epub'; }
+      enqueue({ kind: 'new', label: name, seed: idx + 2 });
+    });
+    S.overlay = null; S.tab = 'up'; toast((opts.action === 'cancel' ? 3 : 4) + '개를 대기열에 추가했어요');
+  }
+
+  // ---------- 이벤트 ----------
+  stage.addEventListener('click', function (e) {
+    var tb = e.target.closest('[data-tab]');
+    if (tb && tb.tagName === 'BUTTON') { S.tab = tb.getAttribute('data-tab'); S.overlay = null; render(); var mm = stage.querySelector('.main'); if (mm) mm.scrollTop = 0; return; }
+    var a = e.target.closest('[data-act]'); if (!a) return;
+    var id = a.getAttribute('data-id'), v = a.getAttribute('data-v');
+    switch (a.getAttribute('data-act')) {
+      case 'toggle': S.open[id] = !S.open[id]; render(true); break;
+      case 'fup': S.upper[id] = !S.upper[id]; render(true); break;
+      case 'copytag': toast('복사했어요'); render(true); break;
+      case 'copyall': toast('복사했어요'); render(true); break;
+      case 'exporttxt': toast('소설목록_20261028.txt 저장했어요'); render(true); break;
+      case 'rescan': enqueue({ kind: 'rescan', label: (novels.filter(function (n) { return n.id === id; })[0] || {}).title, novelId: id }); S.tab = 'up'; render(); break;
+      case 'del': S.overlay = { type: 'confirm', msg: '이 소설과 분석 결과를 삭제할까요?', action: 'novel', id: id }; render(true); break;
+      case 'confirm':
+        if (v === '1') { var o = S.overlay; if (o.action === 'novel') { novels = novels.filter(function (n) { return n.id !== o.id; }); delete S.open[o.id]; } else { keywords = keywords.filter(function (k) { return k.id !== o.id; }); delete S.upper[o.id]; } }
+        S.overlay = null; render(true); break;
+      case 'pick': pickFiles(); break;
+      case 'dup': {
+        var all = !!(stage.querySelector('.dupAll') || {}).checked;
+        if (S.overlay && S.overlay.flow === 'pick') {
+          if (v === 'rename' && !all) { S.overlay = { type: 'rename', proposed: '강호제일검 환생기 (2)', flow: 'pick' }; render(true); }
+          else addPicked({ action: v }), render(true);
+        } else { S.overlay = null; toast(v === 'cancel' ? '업로드를 취소했어요' : '대기열에 추가했어요'); render(true); }
+        break;
+      }
+      case 'rename': {
+        var name = (stage.querySelector('.rn') || {}).value || '';
+        if (S.overlay && S.overlay.flow === 'pick') { if (v === '1' && name.trim()) addPicked({ action: 'rename', rename: name.trim() }); else { S.overlay = null; } } else S.overlay = null;
+        render(true); break;
+      }
+      case 'rescanstale': { var targets = novels.filter(isStale); targets.forEach(function (n) { enqueue({ kind: 'rescan', label: n.title, novelId: n.id }); }); if (targets.length) { toast(targets.length + '개 재분석을 시작해요'); S.tab = 'up'; } render(); break; }
+      case 'rescanall': novels.forEach(function (n) { enqueue({ kind: 'rescan', label: n.title, novelId: n.id }); }); toast(novels.length + '개 재분석을 시작해요'); render(true); break;
+      case 'clearq': S.queue = S.queue.filter(function (q) { return q.status === '대기' || q.status === '진행'; }); render(true); break;
+      case 'kwtab': S.kwTab = v; S.editing = null; render(); break;
+      case 'kwsave': saveKw(); break;
+      case 'kwcancel': S.editing = null; render(); break;
+      case 'kwedit': S.editing = kwById(id); render(); var m2 = stage.querySelector('.main'); if (m2) m2.scrollTop = 0; break;
+      case 'kwdel': S.overlay = { type: 'confirm', msg: '"' + kwById(id).name + '" 키워드를 삭제할까요?', action: 'kw', id: id }; render(true); break;
+      case 'kwexport': S.overlay = { type: 'kexport' }; render(true); break;
+      case 'kwimport': S.overlay = { type: 'kimport' }; render(true); break;
+      case 'mcopy': toast('복사했어요'); render(true); break;
+      case 'mimport': S.overlay = null; toast('JSON 형식이 올바르지 않아요'); render(true); break;
+      case 'mclose': S.overlay = null; render(true); break;
+    }
+  });
+  function saveKw() {
+    var scope = stage.querySelector('.phone');
+    var name = scope.querySelector('.kn').value.trim();
+    if (!name) { toast('이름을 입력하세요'); render(true); return; }
+    var syn = scope.querySelector('.ks').value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    var th = Math.max(1, parseInt(scope.querySelector('.kt').value, 10) || 1);
+    var tone = S.kwTab === 'lower' ? scope.querySelector('.ktone').value : 'normal';
+    if (keywords.some(function (k) { return k.level === S.kwTab && k.name === name && (!S.editing || k.id !== S.editing.id); })) { toast('이미 있는 이름이에요'); render(true); return; }
+    if (S.editing) { S.editing.name = name; S.editing.synonyms = syn; S.editing.threshold = th; S.editing.tone = tone; }
+    else keywords.push({ id: 'k' + (uidN++), level: S.kwTab, name: name, synonyms: syn, threshold: th, tone: tone });
+    S.editing = null; toast('저장했어요'); render(true);
+  }
+  stage.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.classList.contains('q')) { S.q = t.value; var box = t.closest('.main').querySelector('.liblist'); if (box) box.innerHTML = libList(); }
+  });
+  stage.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.classList.contains('sort')) { S.sort = t.value; render(true); }
+    else if (t.name === 'mode') { S.mode = t.value; render(true); }
+    else if (t.classList.contains('nod')) { S.noDislike = t.checked; render(true); }
+  });
+  stage.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('data-act') === 'toggle') { e.preventDefault(); e.target.click(); } });
+
+  var lastWidth = window.innerWidth, rt;
+  window.addEventListener('resize', function () { if (window.innerWidth === lastWidth) return; lastWidth = window.innerWidth; clearTimeout(rt); rt = setTimeout(function () { render(true); }, 120); });
+  window.__S = S; window.__novels = function () { return novels; }; window.__kw = function () { return keywords; };
+  applyScreen(); render();
+})();
+</script>
+</body>
+</html>

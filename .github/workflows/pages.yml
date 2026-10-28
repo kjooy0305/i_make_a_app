@@ -7,6 +7,7 @@ on:
     paths:
       - 'storyeditor/**'
       - 'dayclean/**'
+      - 'keywordscan/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
