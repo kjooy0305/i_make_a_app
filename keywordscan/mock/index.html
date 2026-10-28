@@ -65,13 +65,13 @@ button.btn.sm { padding: 5px 10px; font-size: 12px; min-height: 32px; }
 .muted { color: var(--sub); font-size: 12px; }
 .chip { display: inline-flex; align-items: center; gap: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 3px 10px; margin: 3px 4px 3px 0; font-size: 13px; }
 .chip.sel { background: var(--pri); border-color: var(--pri); }
-.chip.up { border-color: var(--pri2); color: var(--pri2); }
-.chip.up.bang { background: rgba(124, 58, 237, .25); }
+.chip.bang { background: rgba(124, 58, 237, .25); }
 .chip.like { border-color: var(--like); color: var(--like); }
 .chip.normal { border-color: var(--norm); color: #cbd5e1; }
 .chip.dislike { border-color: var(--hate); color: var(--hate); }
 .chip b { font-weight: 700; }
 button.chip { font: inherit; font-size: 13px; cursor: pointer; }
+.chip.sel.like, .chip.sel.normal, .chip.sel.dislike { border-color: var(--pri); color: #fff; }
 .tn { font-size: 12px; color: var(--sub); margin-top: 8px; }
 .tn.like { color: var(--like); } .tn.dislike { color: var(--hate); }
 .title { font-weight: 700; word-break: break-all; cursor: pointer; }
@@ -86,6 +86,7 @@ button.chip { font: inherit; font-size: 13px; cursor: pointer; }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 6px 0; }
 .seg button { flex: 1; background: none; border: 0; padding: 9px 8px; color: var(--sub); cursor: pointer; min-height: 40px; }
 .seg button.on { background: var(--pri); color: #fff; }
+.seg.tone button { font-size: 13px; }
 label.ck { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--sub); min-height: 32px; }
 .kwrow { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); padding: 8px 0; }
 .kwrow:last-child { border-bottom: 0; }
@@ -107,7 +108,7 @@ h4 { margin: 14px 0 4px; }
 <div class="page">
   <header class="head">
     <h1>소설 키워드 분석기 시안</h1>
-    <p>실제 앱(keywordscan)의 화면과 색을 폰 비율(390×844)로 옮긴 임시 화면입니다. 예시 소설 18편으로 검색·필터·펼치기·키워드 수정·업로드 대기열·중복 경고를 눌러 볼 수 있습니다. 파일은 읽지 않고 저장도 하지 않습니다.</p>
+    <p>실제 앱(keywordscan)의 화면과 색을 폰 비율(390×844)로 옮긴 임시 화면입니다. 예시 소설 18편으로 검색·필터·펼치기·키워드 추가와 수정(호불호 선택)·업로드 대기열·중복 경고를 눌러 볼 수 있습니다. 상위·하위 구분 없이 키워드 하나로 합쳤습니다. 파일은 읽지 않고 저장도 하지 않습니다.</p>
   </header>
   <div class="bar" id="bar" role="group" aria-label="화면 고르기"></div>
   <div class="stage" id="stage"></div>
@@ -122,13 +123,13 @@ h4 { margin: 14px 0 4px; }
 
   // ---------- 예시 데이터 ----------
   var keywords = [
-    { id: 'k1', level: 'upper', name: '로맨스판타지', synonyms: ['로판'], threshold: 5, tone: 'normal' },
-    { id: 'k2', level: 'upper', name: '무협', synonyms: ['무림', '강호'], threshold: 5, tone: 'normal' },
-    { id: 'k3', level: 'upper', name: '현대판타지', synonyms: ['헌터', '게이트'], threshold: 5, tone: 'normal' },
-    { id: 'k4', level: 'lower', name: '회귀', synonyms: ['회귀했', '회귀자'], threshold: 10, tone: 'like' },
-    { id: 'k5', level: 'lower', name: '빙의', synonyms: ['빙의했', '빙의자'], threshold: 10, tone: 'normal' },
-    { id: 'k6', level: 'lower', name: '집착남', synonyms: ['남주가 집착함', '집착하는 남자주인공'], threshold: 5, tone: 'like' },
-    { id: 'k7', level: 'lower', name: '네토라레', synonyms: ['NTR'], threshold: 1, tone: 'dislike' }
+    { id: 'k1', name: '로맨스판타지', synonyms: ['로판'], threshold: 5, tone: 'normal' },
+    { id: 'k2', name: '무협', synonyms: ['무림', '강호'], threshold: 5, tone: 'normal' },
+    { id: 'k3', name: '현대판타지', synonyms: ['헌터', '게이트'], threshold: 5, tone: 'normal' },
+    { id: 'k4', name: '회귀', synonyms: ['회귀했', '회귀자'], threshold: 10, tone: 'like' },
+    { id: 'k5', name: '빙의', synonyms: ['빙의했', '빙의자'], threshold: 10, tone: 'normal' },
+    { id: 'k6', name: '집착남', synonyms: ['남주가 집착함', '집착하는 남자주인공'], threshold: 5, tone: 'like' },
+    { id: 'k7', name: '네토라레', synonyms: ['NTR'], threshold: 1, tone: 'dislike' }
   ];
   function sigOf(k) { return [k.name].concat(k.synonyms).map(function (t) { return t.toLowerCase().replace(/\s+/g, ''); }).filter(Boolean).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort().join('|'); }
   var RAW = [
@@ -169,8 +170,6 @@ h4 { margin: 14px 0 4px; }
   }
   function fmtChars(n) { return n >= 10000 ? (n / 10000).toFixed(1) + '만자' : n + '자'; }
   function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB'; }
-  function ups() { return keywords.filter(function (k) { return k.level === 'upper'; }); }
-  function lows() { return keywords.filter(function (k) { return k.level === 'lower'; }); }
   function kwById(id) { return keywords.filter(function (k) { return k.id === id; })[0]; }
   function isStale(n) { return keywords.some(function (k) { var r = n.results[k.id]; return !r || r.sig !== sigOf(k); }); }
   function staleCount() { return novels.filter(isStale).length; }
@@ -178,12 +177,12 @@ h4 { margin: 14px 0 4px; }
     return list.map(function (k) { var r = n.results[k.id]; var c = r ? r.count : 0; return { kw: k, name: k.name, count: c, status: statusOf(c, k.threshold), segs: r ? r.segs : [], density: density(c, n.totalChars) }; });
   }
   function tagName(n) {
-    var parts = hitsOf(n, ups()).filter(function (h) { return h.status; }).map(function (h) { return h.name + '(' + h.status + ')'; });
+    var parts = hitsOf(n, keywords).filter(function (h) { return h.status; }).map(function (h) { return h.name + '(' + h.status + ')'; });
     return parts.length ? n.title + '_' + parts.join('_') : n.title;
   }
 
   // ---------- 상태 ----------
-  var S = { tab: 'lib', kwTab: 'upper', editing: null, open: {}, q: '', sort: 'new', upper: {}, mode: 'or', noDislike: false, queue: [], overlay: null, toast: '', sel: null };
+  var S = { tab: 'lib', tone: 'normal', form: null, editing: null, open: {}, q: '', sort: 'new', upper: {}, mode: 'or', noDislike: false, queue: [], overlay: null, toast: '', sel: null };
   var timer = null, toastTimer = null;
 
   function toast(msg) { S.toast = msg; clearTimeout(toastTimer); toastTimer = setTimeout(function () { S.toast = ''; render(true); }, 2200); }
@@ -197,7 +196,7 @@ h4 { margin: 14px 0 4px; }
         if (!(S.mode === 'and' ? ids.every(hit) : ids.some(hit))) return false;
       }
       if (S.noDislike) {
-        var bad = lows().some(function (k) { return k.tone === 'dislike' && statusOf(n.results[k.id] ? n.results[k.id].count : 0, k.threshold) === '!'; });
+        var bad = keywords.some(function (k) { return k.tone === 'dislike' && statusOf(n.results[k.id] ? n.results[k.id].count : 0, k.threshold) === '!'; });
         if (bad) return false;
       }
       return true;
@@ -213,22 +212,21 @@ h4 { margin: 14px 0 4px; }
   function chip(h, cls) { return '<span class="chip ' + cls + (h.status === '!' ? ' bang' : '') + '"><b>' + esc(h.name) + '</b>' + (h.status ? '(' + h.status + ')' : '') + ' <span class="muted">' + h.count + '회</span></span>'; }
 
   function novelCard(n) {
-    var up = hitsOf(n, ups()).filter(function (h) { return h.count > 0; });
-    var lo = hitsOf(n, lows()).filter(function (h) { return h.count > 0; });
+    var hits = hitsOf(n, keywords).filter(function (h) { return h.count > 0; });
     var open = !!S.open[n.id];
     var h = '<div class="card">';
     h += '<div class="row"><div class="grow title" role="button" tabindex="0" data-act="toggle" data-id="' + n.id + '">' + esc(n.title) + '</div><span class="muted">' + n.ext.toUpperCase() + ' · ' + fmtChars(n.totalChars) + '</span></div>';
     h += '<div class="tagname">' + esc(tagName(n)) + '</div>';
-    h += up.length ? up.map(function (x) { return chip(x, 'up'); }).join('') : '<span class="muted">상위 키워드 없음</span>';
+    if (!hits.length) h += '<span class="muted">발견된 키워드 없음</span>';
     ['like', 'normal', 'dislike'].forEach(function (tone) {
-      var g = lo.filter(function (x) { return x.kw.tone === tone; });
+      var g = hits.filter(function (x) { return x.kw.tone === tone; });
       if (!g.length) return;
       h += '<div class="tn ' + tone + '">' + (tone === 'like' ? '💚' : tone === 'dislike' ? '🚫' : '▫️') + ' ' + TONES[tone] + ' 키워드</div>' + g.map(function (x) { return chip(x, tone); }).join('');
     });
     if (isStale(n)) h += '<div class="muted" style="margin-top:6px">⚠️ 키워드가 바뀌어 재분석이 필요해요</div>';
     if (open) {
       h += '<h4>상세 (만자당 빈도 · 구간 분포)</h4>';
-      var rows = up.concat(lo);
+      var rows = hits;
       h += rows.length ? rows.map(function (x) {
         var d = distOf(x.segs);
         return '<div class="kwrow"><div class="grow"><b>' + esc(x.name) + '</b> <span class="muted">' + x.count + '회 · 1만자당 ' + x.density.toFixed(2) + '회 · 임계 ' + x.kw.threshold + '</span></div><div class="muted">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div>' + distHtml(x.segs) + '</div>';
@@ -246,9 +244,9 @@ h4 { margin: 14px 0 4px; }
     return h;
   }
   function libHtml() {
-    var u = ups();
+    var u = keywords;
     var h = '<div class="row"><input type="text" class="grow q" placeholder="제목 검색" value="' + esc(S.q) + '" aria-label="제목 검색"><select class="sort" style="width:auto" aria-label="정렬"><option value="new"' + (S.sort === 'new' ? ' selected' : '') + '>최근 추가순</option><option value="title"' + (S.sort === 'title' ? ' selected' : '') + '>제목순</option></select></div>';
-    h += '<div style="margin-top:8px">' + (u.length ? u.map(function (k) { return '<button class="chip' + (S.upper[k.id] ? ' sel' : '') + '" data-act="fup" data-id="' + k.id + '">' + esc(k.name) + '</button>'; }).join('') : '<span class="muted">키워드 탭에서 상위 키워드를 추가하세요</span>') + '</div>';
+    h += '<div style="margin-top:8px">' + (u.length ? u.map(function (k) { return '<button class="chip ' + k.tone + (S.upper[k.id] ? ' sel' : '') + '" data-act="fup" data-id="' + k.id + '" aria-pressed="' + (!!S.upper[k.id]) + '">' + esc(k.name) + '</button>'; }).join('') : '<span class="muted">키워드 탭에서 키워드를 추가하세요</span>') + '</div>';
     h += '<div class="row" style="margin-top:4px"><label class="ck"><input type="radio" name="mode" value="or"' + (S.mode === 'or' ? ' checked' : '') + '> 하나라도</label><label class="ck"><input type="radio" name="mode" value="and"' + (S.mode === 'and' ? ' checked' : '') + '> 모두</label><label class="ck"><input type="checkbox" class="nod"' + (S.noDislike ? ' checked' : '') + '> 불호 키워드(!) 포함 소설 제외</label></div>';
     return h + '<div class="liblist">' + libList() + '</div>';
   }
@@ -271,20 +269,22 @@ h4 { margin: 14px 0 4px; }
   }
 
   function kwHtml() {
-    var lvl = S.kwTab, ed = S.editing;
-    var list = keywords.filter(function (k) { return k.level === lvl; });
-    var h = '<div class="seg"><button data-act="kwtab" data-v="upper" class="' + (lvl === 'upper' ? 'on' : '') + '">상위 키워드</button><button data-act="kwtab" data-v="lower" class="' + (lvl === 'lower' ? 'on' : '') + '">하위 키워드</button></div>';
-    h += '<div class="muted">' + (lvl === 'upper' ? '검색·목록에 대표로 보여줄 단어 (예: 로맨스판타지, 무협)' : '소설 본문에서 실제로 찾아낼 세부 요소 (예: 회귀, 빙의, 집착남)') + '</div>';
+    var ed = S.editing;
+    // 입력 중인 글자는 다시 그려도 남도록 상태에 둔다
+    var f = S.form || (ed ? { name: ed.name, syn: ed.synonyms.join(', '), th: ed.threshold } : { name: '', syn: '', th: 5 });
+    var h = '<div class="muted">소설 본문에서 찾아서 검색·태그·목록에 보여줄 단어예요. 유의어는 한 키워드로 합산하고, 호감·일반·불호는 추가할 때 정해요.</div>';
     var sn = staleCount();
     if (sn) h += '<div class="banner">키워드 변경으로 재분석이 필요한 소설: ' + sn + '개 <button class="btn sm" data-act="rescanstale" style="margin-left:6px">재분석</button></div>';
     h += '<div class="card"><b>' + (ed ? '키워드 수정' : '키워드 추가') + '</b>';
-    h += '<div style="margin-top:8px"><input type="text" class="kn" placeholder="키워드 이름" value="' + esc(ed ? ed.name : '') + '" aria-label="키워드 이름"></div>';
-    h += '<div style="margin-top:8px"><input type="text" class="ks" placeholder="유의어 (쉼표로 구분) 예: 남주가 집착함, 집착하는 남자주인공" value="' + esc(ed ? ed.synonyms.join(', ') : '') + '" aria-label="유의어"></div>';
-    h += '<div class="row" style="margin-top:8px"><div class="grow"><div class="muted">(!) 임계 횟수</div><input type="number" class="kt" min="1" value="' + (ed ? ed.threshold : 5) + '" aria-label="임계 횟수"></div>';
-    if (lvl === 'lower') h += '<div class="grow"><div class="muted">성향</div><select class="ktone" aria-label="성향">' + Object.keys(TONES).map(function (t) { return '<option value="' + t + '"' + ((ed ? ed.tone : 'normal') === t ? ' selected' : '') + '>' + TONES[t] + '</option>'; }).join('') + '</select></div>';
-    h += '</div><div class="row" style="margin-top:10px">' + (ed ? '<button class="btn sec" data-act="kwcancel">취소</button>' : '') + '<button class="btn" data-act="kwsave">' + (ed ? '저장' : '추가') + '</button></div></div>';
-    h += list.map(function (k) {
-      return '<div class="card" style="padding:9px"><div class="row"><div class="grow"><b>' + esc(k.name) + '</b> ' + (k.level === 'lower' ? '<span class="chip ' + k.tone + '">' + TONES[k.tone] + '</span>' : '') + '<span class="muted">임계 ' + k.threshold + '회</span><div class="muted">' + (k.synonyms.length ? '유의어: ' + esc(k.synonyms.join(', ')) : '유의어 없음') + '</div></div><button class="btn sm sec" data-act="kwedit" data-id="' + k.id + '">수정</button><button class="btn sm dng" data-act="kwdel" data-id="' + k.id + '">삭제</button></div></div>';
+    h += '<div style="margin-top:8px"><input type="text" class="kn" placeholder="키워드 이름" value="' + esc(f.name) + '" aria-label="키워드 이름"></div>';
+    h += '<div style="margin-top:8px"><input type="text" class="ks" placeholder="유의어 (쉼표로 구분) 예: 남주가 집착함, 집착하는 남자주인공" value="' + esc(f.syn) + '" aria-label="유의어"></div>';
+    h += '<div class="muted" style="margin-top:8px">호불호</div><div class="seg tone" role="group" aria-label="호불호">' + Object.keys(TONES).map(function (t) {
+      return '<button type="button" data-act="tone" data-v="' + t + '" class="' + (S.tone === t ? 'on' : '') + '" aria-pressed="' + (S.tone === t) + '">' + (t === 'like' ? '💚 ' : t === 'dislike' ? '🚫 ' : '▫️ ') + TONES[t] + '</button>'; }).join('') + '</div>';
+    h += '<div class="row" style="margin-top:8px"><div class="grow"><div class="muted">(!) 임계 횟수</div><input type="number" class="kt" min="1" value="' + esc(f.th) + '" aria-label="임계 횟수"></div></div>';
+    h += '<div class="row" style="margin-top:10px">' + (ed ? '<button class="btn sec" data-act="kwcancel">취소</button>' : '') + '<button class="btn" data-act="kwsave">' + (ed ? '저장' : '추가') + '</button></div></div>';
+    h += '<div class="row" style="margin-top:4px"><h4 class="grow" style="margin:0">키워드 ' + keywords.length + '개</h4></div>';
+    h += keywords.map(function (k) {
+      return '<div class="card" style="padding:9px"><div class="row"><div class="grow"><b>' + esc(k.name) + '</b> <span class="chip ' + k.tone + '">' + TONES[k.tone] + '</span><span class="muted">임계 ' + k.threshold + '회</span><div class="muted">' + (k.synonyms.length ? '유의어: ' + esc(k.synonyms.join(', ')) : '유의어 없음') + '</div></div><button class="btn sm sec" data-act="kwedit" data-id="' + k.id + '">수정</button><button class="btn sm dng" data-act="kwdel" data-id="' + k.id + '">삭제</button></div></div>';
     }).join('');
     h += '<div class="row" style="margin-top:12px"><button class="btn sm sec" data-act="kwexport">키워드 내보내기</button><button class="btn sm sec" data-act="kwimport">키워드 가져오기</button></div>';
     return h;
@@ -301,7 +301,7 @@ h4 { margin: 14px 0 4px; }
     if (o.type === 'rename') return '<div class="modal"><div><h3>새 이름</h3><input type="text" class="rn" value="' + esc(o.proposed) + '" aria-label="새 이름"><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" data-act="rename" data-v="0">취소</button><button class="btn" data-act="rename" data-v="1">추가</button></div></div></div>';
     if (o.type === 'confirm') return '<div class="modal"><div><p style="margin:0 0 12px">' + esc(o.msg) + '</p><div class="row" style="justify-content:flex-end"><button class="btn sec" data-act="confirm" data-v="0">취소</button><button class="btn" data-act="confirm" data-v="1">삭제</button></div></div></div>';
     if (o.type === 'kexport') return '<div class="modal"><div><h3>키워드 내보내기</h3><textarea readonly aria-label="키워드 JSON">' + esc(JSON.stringify(keywords, null, 1)) + '</textarea><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" data-act="mclose">닫기</button><button class="btn" data-act="mcopy">복사</button></div></div></div>';
-    if (o.type === 'kimport') return '<div class="modal"><div><h3>키워드 가져오기</h3><div class="muted">내보내기로 복사한 JSON을 붙여넣으세요. 현재 키워드가 모두 교체됩니다.</div><textarea placeholder="[{&quot;level&quot;:&quot;upper&quot;,&quot;name&quot;:&quot;무협&quot;, ...}]" aria-label="붙여넣기"></textarea><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" data-act="mclose">닫기</button><button class="btn" data-act="mimport">가져오기</button></div></div></div>';
+    if (o.type === 'kimport') return '<div class="modal"><div><h3>키워드 가져오기</h3><div class="muted">내보내기로 복사한 JSON을 붙여넣으세요. 현재 키워드가 모두 교체됩니다.</div><textarea placeholder="[{&quot;name&quot;:&quot;무협&quot;,&quot;synonyms&quot;:[&quot;무림&quot;],&quot;threshold&quot;:5,&quot;tone&quot;:&quot;normal&quot;}]" aria-label="붙여넣기"></textarea><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn sec" data-act="mclose">닫기</button><button class="btn" data-act="mimport">가져오기</button></div></div></div>';
     return '';
   }
 
@@ -321,8 +321,8 @@ h4 { margin: 14px 0 4px; }
     { id: 'lib', label: '라이브러리', set: function () { S.tab = 'lib'; S.overlay = null; } },
     { id: 'libopen', label: '라이브러리 · 상세 펼침', set: function () { S.tab = 'lib'; S.overlay = null; S.open = { n0: true }; } },
     { id: 'up', label: '업로드', set: function () { S.tab = 'up'; S.overlay = null; } },
-    { id: 'kw', label: '키워드', set: function () { S.tab = 'kw'; S.kwTab = 'upper'; S.editing = null; S.overlay = null; } },
-    { id: 'kwedit', label: '키워드 수정', set: function () { S.tab = 'kw'; S.kwTab = 'lower'; S.editing = keywords[5]; S.overlay = null; } },
+    { id: 'kw', label: '키워드', set: function () { S.tab = 'kw'; S.tone = 'normal'; S.editing = null; S.form = null; S.overlay = null; } },
+    { id: 'kwedit', label: '키워드 수정', set: function () { S.tab = 'kw'; S.editing = keywords[5]; S.tone = keywords[5].tone; S.form = null; S.overlay = null; } },
     { id: 'dup', label: '중복 경고', set: function () { S.tab = 'up'; S.overlay = { type: 'dup', file: '강호제일검 환생기(!).epub', existing: '강호제일검 환생기.epub', remaining: 2 }; } },
     { id: 'rename', label: '새 이름', set: function () { S.tab = 'up'; S.overlay = { type: 'rename', proposed: '강호제일검 환생기 (2)' }; } },
     { id: 'loading', label: '파일 확인 중', set: function () { S.tab = 'up'; S.overlay = { type: 'loading', msg: '파일 확인 중... (37/120)', ratio: 0.31 }; } },
@@ -361,10 +361,10 @@ h4 { margin: 14px 0 4px; }
     var avail = Math.min(window.innerWidth - 32, 1180);
     if (mode === 'all') {
       // 전체 보기: 화면마다 상태를 맞춰 한 번씩 그린다
-      var list = screens, saveState = JSON.stringify([S.tab, S.kwTab, S.overlay, S.open]), editBak = S.editing;
+      var list = screens, saveState = JSON.stringify([S.tab, S.tone, S.overlay, S.open]), editBak = S.editing;
       var scale = avail < 520 ? Math.min(1, avail / W) * 0.9 : 0.5;
       list.forEach(function (s) { s.set(); addCell(s, scale); });
-      var bak = JSON.parse(saveState); S.tab = bak[0]; S.kwTab = bak[1]; S.overlay = bak[2]; S.open = bak[3]; S.editing = editBak;
+      var bak = JSON.parse(saveState); S.tab = bak[0]; S.tone = bak[1]; S.overlay = bak[2]; S.open = bak[3]; S.editing = editBak;
     } else {
       addCell(find(current), Math.min(1, avail / W));
     }
@@ -468,10 +468,10 @@ h4 { margin: 14px 0 4px; }
       case 'rescanstale': { var targets = novels.filter(isStale); targets.forEach(function (n) { enqueue({ kind: 'rescan', label: n.title, novelId: n.id }); }); if (targets.length) { toast(targets.length + '개 재분석을 시작해요'); S.tab = 'up'; } render(); break; }
       case 'rescanall': novels.forEach(function (n) { enqueue({ kind: 'rescan', label: n.title, novelId: n.id }); }); toast(novels.length + '개 재분석을 시작해요'); render(true); break;
       case 'clearq': S.queue = S.queue.filter(function (q) { return q.status === '대기' || q.status === '진행'; }); render(true); break;
-      case 'kwtab': S.kwTab = v; S.editing = null; render(); break;
+      case 'tone': S.tone = v; render(true); break;
       case 'kwsave': saveKw(); break;
-      case 'kwcancel': S.editing = null; render(); break;
-      case 'kwedit': S.editing = kwById(id); render(); var m2 = stage.querySelector('.main'); if (m2) m2.scrollTop = 0; break;
+      case 'kwcancel': S.editing = null; S.tone = 'normal'; S.form = null; render(); break;
+      case 'kwedit': S.editing = kwById(id); S.tone = S.editing.tone; S.form = null; render(); var m2 = stage.querySelector('.main'); if (m2) m2.scrollTop = 0; break;
       case 'kwdel': S.overlay = { type: 'confirm', msg: '"' + kwById(id).name + '" 키워드를 삭제할까요?', action: 'kw', id: id }; render(true); break;
       case 'kwexport': S.overlay = { type: 'kexport' }; render(true); break;
       case 'kwimport': S.overlay = { type: 'kimport' }; render(true); break;
@@ -486,14 +486,18 @@ h4 { margin: 14px 0 4px; }
     if (!name) { toast('이름을 입력하세요'); render(true); return; }
     var syn = scope.querySelector('.ks').value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
     var th = Math.max(1, parseInt(scope.querySelector('.kt').value, 10) || 1);
-    var tone = S.kwTab === 'lower' ? scope.querySelector('.ktone').value : 'normal';
-    if (keywords.some(function (k) { return k.level === S.kwTab && k.name === name && (!S.editing || k.id !== S.editing.id); })) { toast('이미 있는 이름이에요'); render(true); return; }
+    var tone = S.tone;
+    if (keywords.some(function (k) { return k.name === name && (!S.editing || k.id !== S.editing.id); })) { toast('이미 있는 이름이에요'); render(true); return; }
     if (S.editing) { S.editing.name = name; S.editing.synonyms = syn; S.editing.threshold = th; S.editing.tone = tone; }
-    else keywords.push({ id: 'k' + (uidN++), level: S.kwTab, name: name, synonyms: syn, threshold: th, tone: tone });
-    S.editing = null; toast('저장했어요'); render(true);
+    else keywords.push({ id: 'k' + (uidN++), name: name, synonyms: syn, threshold: th, tone: tone });
+    S.editing = null; S.tone = 'normal'; S.form = null; toast('저장했어요'); render(true);
   }
   stage.addEventListener('input', function (e) {
     var t = e.target;
+    if (t.classList.contains('kn') || t.classList.contains('ks') || t.classList.contains('kt')) {
+      var ph = t.closest('.phone');
+      S.form = { name: ph.querySelector('.kn').value, syn: ph.querySelector('.ks').value, th: ph.querySelector('.kt').value };
+    }
     if (t.classList.contains('q')) { S.q = t.value; var box = t.closest('.main').querySelector('.liblist'); if (box) box.innerHTML = libList(); }
   });
   stage.addEventListener('change', function (e) {
