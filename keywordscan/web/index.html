@@ -31,9 +31,7 @@ button.btn.sm{padding:5px 10px;font-size:12px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
 .muted{color:var(--sub);font-size:12px}
 .chip{display:inline-flex;align-items:center;gap:3px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:3px 10px;margin:3px 4px 3px 0;font-size:13px}
-.chip.sel{background:var(--pri);border-color:var(--pri)}
-.chip.up{border-color:var(--pri2);color:var(--pri2)}
-.chip.up.bang{background:rgba(124,58,237,.25)}
+.chip.sel,.chip.sel.like,.chip.sel.normal,.chip.sel.dislike{background:var(--pri);border-color:var(--pri2);color:#fff}
 .chip.like{border-color:var(--like);color:var(--like)}
 .chip.normal{border-color:var(--norm);color:#cbd5e1}
 .chip.dislike{border-color:var(--hate);color:var(--hate)}
@@ -41,7 +39,6 @@ button.btn.sm{padding:5px 10px;font-size:12px}
 .tn{font-size:12px;color:var(--sub);margin-top:8px}
 .tn.like{color:var(--like)}.tn.dislike{color:var(--hate)}
 .title{font-weight:700;word-break:break-all}
-.tagname{font-size:12px;color:var(--pri2);word-break:break-all;margin:2px 0 4px}
 .drop{border:2px dashed var(--line);border-radius:14px;padding:26px 12px;text-align:center;color:var(--sub);margin:6px 0}
 .drop.over{border-color:var(--pri2);background:rgba(124,58,237,.12);color:var(--txt)}
 .bar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:6px}
@@ -62,6 +59,16 @@ label.ck{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var
 .ok{color:var(--like)}
 .cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;font-size:13px}
 .cmp>div{background:var(--bg);border-radius:8px;padding:8px;word-break:break-all}
+.dtw{overflow-x:auto}
+.dt{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.dt thead th{color:var(--sub);font-weight:600;text-align:left;padding:5px 4px;border-bottom:1px solid var(--pri2)}
+.dt td,.dt tbody th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-weight:400}
+.dt tbody th{font-weight:700;word-break:break-all}
+.dt .num{text-align:right}
+.dt .dist{margin-left:0}
+.dk{font-size:11px;color:var(--sub);margin-top:2px}
+.st{font-size:11px;border-radius:8px;padding:0 5px;border:1px solid var(--line)}
+.st.like{color:var(--like);border-color:var(--like)}.st.dislike{color:var(--hate);border-color:var(--hate)}
 .kwrow{display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0}
 .kwrow:last-child{border-bottom:0}
 h4{margin:14px 0 4px}

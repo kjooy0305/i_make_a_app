@@ -51,7 +51,6 @@
     tab: 'lib',
     keywords: [],
     novels: [],
-    kwTab: 'upper',
     editing: null,
     filter: { q: '', upper: new Set(), mode: 'or', noDislike: false, sort: 'new' },
     open: new Set(),
@@ -117,15 +116,13 @@
 
   /* ================= 키워드 도우미 ================= */
   const kwById = (id) => S.keywords.find((k) => k.id === id);
-  const upperKws = () => S.keywords.filter((k) => k.level === 'upper');
-  const lowerKws = () => S.keywords.filter((k) => k.level === 'lower');
 
   function defaultKeywords() {
-    const mk = (level, name, synonyms, threshold, tone) => ({ id: uid('k'), level, name, synonyms, threshold, tone: tone || 'normal' });
+    const mk = (name, synonyms, threshold, tone) => ({ id: uid('k'), name, synonyms, threshold, tone: tone || 'normal' });
     return [
-      mk('upper', '로맨스판타지', ['로판'], 5), mk('upper', '무협', ['무림', '강호'], 5), mk('upper', '현대판타지', ['헌터', '게이트'], 5),
-      mk('lower', '회귀', ['회귀했', '회귀자'], 10, 'like'), mk('lower', '빙의', ['빙의했', '빙의자'], 10, 'normal'),
-      mk('lower', '집착남', ['남주가 집착함', '집착하는 남자주인공'], 5, 'like'), mk('lower', '네토라레', ['NTR'], 1, 'dislike'),
+      mk('로맨스판타지', ['로판'], 5), mk('무협', ['무림', '강호'], 5), mk('현대판타지', ['헌터', '게이트'], 5),
+      mk('회귀', ['회귀했', '회귀자'], 10, 'like'), mk('빙의', ['빙의했', '빙의자'], 10, 'normal'),
+      mk('집착남', ['남주가 집착함', '집착하는 남자주인공'], 5, 'like'), mk('네토라레', ['NTR'], 1, 'dislike'),
     ];
   }
   async function saveKeywords() { await DB.put('meta', { key: 'keywords', value: S.keywords }); }
@@ -146,7 +143,6 @@
       return { kw: k, name: k.name, count, status: E.statusOf(count, k.threshold), segs: r ? r.segs : [], density: E.densityPer10k(count, novel.totalChars) };
     });
   }
-  const tagName = (novel) => E.tagFileName(novel.title, hitsOf(novel, upperKws()).map((h) => ({ name: h.name, status: h.status })));
 
   /* ================= 큐 (순차 처리) ================= */
   function enqueue(item) {
@@ -317,14 +313,9 @@
     if (targets.length) { toast(targets.length + '개 재분석을 시작해요'); S.tab = 'up'; render(); } else toast('재분석할 파일이 없어요');
   }
 
-  /* ================= 목록 텍스트 추출 (제목 + 상위 태그만) ================= */
+  /* ================= 목록 텍스트 추출 (제목만) ================= */
   function buildListText(list) {
-    const ups = upperKws();
-    const lines = list.map((n) => {
-      const tags = hitsOf(n, ups).filter((h) => h.status).map((h) => h.name + '(' + h.status + ')');
-      return n.title + (tags.length ? ' | ' + tags.join(', ') : '');
-    });
-    return '소설 목록 (' + list.length + '개)\n' + lines.join('\n') + '\n';
+    return '소설 목록 (' + list.length + '개)\n' + list.map((n) => n.title).join('\n') + '\n';
   }
   function exportListTxt() {
     const list = filteredNovels();
@@ -345,19 +336,18 @@
   /* ================= 화면: 라이브러리 ================= */
   function filteredNovels() {
     const f = S.filter;
-    const uppers = upperKws();
     let list = S.novels.filter((n) => {
       if (f.q && !n.fileName.toLowerCase().includes(f.q.toLowerCase())) return false;
       if (f.upper.size) {
         const hit = (id) => ((n.results || {})[id] || { count: 0 }).count > 0;
-        const ids = Array.from(f.upper).filter((id) => uppers.some((u) => u.id === id));
+        const ids = Array.from(f.upper).filter((id) => kwById(id));
         if (ids.length) {
           const ok = f.mode === 'and' ? ids.every(hit) : ids.some(hit);
           if (!ok) return false;
         }
       }
       if (f.noDislike) {
-        const bad = lowerKws().some((k) => k.tone === 'dislike' && E.statusOf(((n.results || {})[k.id] || {}).count || 0, k.threshold) === '!');
+        const bad = S.keywords.some((k) => k.tone === 'dislike' && E.statusOf(((n.results || {})[k.id] || {}).count || 0, k.threshold) === '!');
         if (bad) return false;
       }
       return true;
@@ -371,40 +361,41 @@
     return '<span class="dist">' + segs.map((v) => '<i class="' + (v ? '' : 'z') + '" style="height:' + Math.max(8, Math.round((v / mx) * 100)) + '%"></i>').join('') + '</span>';
   };
   function novelCard(n) {
-    const upHits = hitsOf(n, upperKws()).filter((h) => h.count > 0);
-    const loHits = hitsOf(n, lowerKws()).filter((h) => h.count > 0);
+    const hits = hitsOf(n, S.keywords).filter((h) => h.count > 0);
     const open = S.open.has(n.id);
-    const chip = (h, cls) => '<span class="chip ' + cls + (h.status === '!' ? ' bang' : '') + '"><b>' + esc(h.name) + '</b>' + (h.status ? '(' + h.status + ')' : '') + ' <span class="muted">' + h.count + '회</span></span>';
+    const chip = (h) => '<span class="chip ' + h.kw.tone + (h.status === '!' ? ' bang' : '') + '"><b>' + esc(h.name) + '</b>' + (h.status ? '(' + h.status + ')' : '') + ' <span class="muted">' + h.count + '회</span></span>';
     let h = '<div class="card" data-id="' + n.id + '">';
     h += '<div class="row"><div class="grow title" data-act="toggle" data-id="' + n.id + '">' + esc(n.title) + '</div><span class="muted">' + n.ext.slice(1).toUpperCase() + ' · ' + fmtChars(n.totalChars) + '</span></div>';
-    h += '<div class="tagname">' + esc(tagName(n)) + '</div>';
-    h += upHits.length ? upHits.map((x) => chip(x, 'up')).join('') : '<span class="muted">상위 키워드 없음</span>';
     ['like', 'normal', 'dislike'].forEach((tone) => {
-      const g = loHits.filter((x) => x.kw.tone === tone);
+      const g = hits.filter((x) => x.kw.tone === tone);
       if (!g.length) return;
       h += '<div class="tn ' + tone + '">' + (tone === 'like' ? '💚' : tone === 'dislike' ? '🚫' : '▫️') + ' ' + TONES[tone] + ' 키워드</div>';
-      h += g.map((x) => chip(x, tone)).join('');
+      h += g.map(chip).join('');
     });
+    if (!hits.length) h += '<span class="muted">발견된 키워드 없음</span>';
     if (isStale(n)) h += '<div class="muted" style="margin-top:6px">⚠️ 키워드가 바뀌어 재분석이 필요해요</div>';
     if (open) {
-      h += '<h4>상세 (만자당 빈도 · 구간 분포)</h4>';
-      const rows = upHits.concat(loHits);
-      h += rows.length ? rows.map((x) => {
-        const d = E.distributionOf(x.segs);
-        return '<div class="kwrow"><div class="grow"><b>' + esc(x.name) + '</b> <span class="muted">' + x.count + '회 · 1만자당 ' + x.density.toFixed(2) + '회 · 임계 ' + x.kw.threshold + '</span></div><div class="muted">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div>' + distHtml(x.segs) + '</div>';
-      }).join('') : '<div class="muted">발견된 키워드가 없어요</div>';
-      h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-act="copytag" data-id="' + n.id + '">태그 파일명 복사</button><button class="btn sm sec" data-act="rescan" data-id="' + n.id + '">재분석</button><button class="btn sm dng" data-act="del" data-id="' + n.id + '">삭제</button></div>';
+      h += '<h4>상세</h4>';
+      if (hits.length) {
+        h += '<div class="dtw"><table class="dt"><colgroup><col style="width:33%"><col style="width:13%"><col style="width:16%"><col style="width:11%"><col style="width:27%"></colgroup><thead><tr><th>키워드</th><th class="num">횟수</th><th class="num">1만자당</th><th class="num">임계</th><th>분포</th></tr></thead><tbody>';
+        h += hits.map((x) => {
+          const d = E.distributionOf(x.segs);
+          return '<tr><th scope="row">' + esc(x.name) + (x.status ? ' <span class="st ' + x.kw.tone + '">' + x.status + '</span>' : '') + '</th><td class="num">' + x.count + '회</td><td class="num">' + x.density.toFixed(2) + '</td><td class="num">' + x.kw.threshold + '</td><td>' + distHtml(x.segs) + '<div class="dk">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div></td></tr>';
+        }).join('');
+        h += '</tbody></table></div><div class="muted" style="font-size:11px;margin-top:6px">분포는 소설을 앞에서부터 10칸으로 나눈 구간별 등장 횟수예요. 1만자당은 글자 1만 개당 평균 횟수예요.</div>';
+      } else h += '<div class="muted">발견된 키워드가 없어요</div>';
+      h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-act="copyname" data-id="' + n.id + '">이름 복사</button><button class="btn sm sec" data-act="rescan" data-id="' + n.id + '">재분석</button><button class="btn sm dng" data-act="del" data-id="' + n.id + '">삭제</button></div>';
     }
     return h + '</div>';
   }
   function renderLib() {
     const f = S.filter;
     const list = filteredNovels();
-    const ups = upperKws();
+    const ups = S.keywords;
     let h = '<div class="row"><input type="text" class="grow" id="q" placeholder="제목 검색" value="' + esc(f.q) + '"><select id="sort" style="width:auto"><option value="new"' + (f.sort === 'new' ? ' selected' : '') + '>최근순</option><option value="title"' + (f.sort === 'title' ? ' selected' : '') + '>제목순</option></select></div>';
-    h += '<div style="margin-top:8px">' + (ups.length ? ups.map((u) => '<span class="chip' + (f.upper.has(u.id) ? ' sel' : '') + '" data-act="fup" data-id="' + u.id + '">' + esc(u.name) + '</span>').join('') : '<span class="muted">키워드 탭에서 상위 키워드를 추가하세요</span>') + '</div>';
+    h += '<div style="margin-top:8px">' + (ups.length ? ups.map((u) => '<span class="chip ' + u.tone + (f.upper.has(u.id) ? ' sel' : '') + '" data-act="fup" data-id="' + u.id + '">' + esc(u.name) + '</span>').join('') : '<span class="muted">키워드 탭에서 키워드를 추가하세요</span>') + '</div>';
     h += '<div class="row" style="margin-top:4px"><label class="ck"><input type="radio" name="mode" value="or"' + (f.mode === 'or' ? ' checked' : '') + '> 하나라도</label><label class="ck"><input type="radio" name="mode" value="and"' + (f.mode === 'and' ? ' checked' : '') + '> 모두 포함</label><label class="ck"><input type="checkbox" id="nod"' + (f.noDislike ? ' checked' : '') + '> 불호 키워드(!) 제외</label></div>';
-    h += '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">태그 파일명 복사</button><button class="btn sm" data-act="exporttxt">📄 목록 txt 추출</button>' : '') + '</div>';
+    h += '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">이름 복사</button><button class="btn sm" data-act="exporttxt">📄 목록 txt 추출</button>' : '') + '</div>';
     h += list.length ? list.map(novelCard).join('') : '<div class="card muted" style="text-align:center">' + (S.novels.length ? '조건에 맞는 소설이 없어요' : '업로드 탭에서 TXT·ePub 파일을 추가하세요') + '</div>';
     $('#main').innerHTML = h;
   }
@@ -433,20 +424,18 @@
 
   /* ================= 화면: 키워드 관리 ================= */
   function renderKw() {
-    const lvl = S.kwTab;
-    const list = S.keywords.filter((k) => k.level === lvl);
+    const list = S.keywords;
     const ed = S.editing;
-    let h = '<div class="seg"><button data-act="kwtab" data-v="upper" class="' + (lvl === 'upper' ? 'on' : '') + '">상위 키워드</button><button data-act="kwtab" data-v="lower" class="' + (lvl === 'lower' ? 'on' : '') + '">하위 키워드</button></div>';
-    h += '<div class="muted">' + (lvl === 'upper' ? '검색·목록에 대표로 보여줄 단어 (예: 로맨스판타지, 무협)' : '소설 본문에서 실제로 찾아낼 세부 요소 (예: 회귀, 빙의, 집착남)') + '</div>';
+    let h = '<div class="muted">소설 본문에서 찾아낼 키워드예요. 추가할 때 호감·일반·불호를 정할 수 있어요.</div>';
     const staleN = staleCount();
     if (staleN) h += '<div class="banner">키워드 변경으로 재분석이 필요한 소설: ' + staleN + '개 <button class="btn sm" data-act="rescanstale" style="margin-left:6px">재분석</button></div>';
     h += '<div class="card"><b>' + (ed ? '키워드 수정' : '키워드 추가') + '</b>';
     h += '<div style="margin-top:8px"><input type="text" id="kn" placeholder="키워드 이름" value="' + esc(ed ? ed.name : '') + '"></div>';
     h += '<div style="margin-top:8px"><input type="text" id="ks" placeholder="유의어 (쉼표로 구분) 예: 남주가 집착함, 집착하는 남자주인공" value="' + esc(ed ? ed.synonyms.join(', ') : '') + '"></div>';
     h += '<div class="row" style="margin-top:8px"><div class="grow"><div class="muted">(!) 임계 횟수</div><input type="number" id="kt" min="1" value="' + (ed ? ed.threshold : 5) + '"></div>';
-    if (lvl === 'lower') h += '<div class="grow"><div class="muted">성향</div><select id="ktone">' + Object.keys(TONES).map((t) => '<option value="' + t + '"' + ((ed ? ed.tone : 'normal') === t ? ' selected' : '') + '>' + TONES[t] + '</option>').join('') + '</select></div>';
+    h += '<div class="grow"><div class="muted">성향</div><select id="ktone">' + Object.keys(TONES).map((t) => '<option value="' + t + '"' + ((ed ? ed.tone : 'normal') === t ? ' selected' : '') + '>' + TONES[t] + '</option>').join('') + '</select></div>';
     h += '</div><div class="row" style="margin-top:10px">' + (ed ? '<button class="btn sec" data-act="kwcancel">취소</button>' : '') + '<button class="btn" data-act="kwsave">' + (ed ? '저장' : '추가') + '</button></div></div>';
-    h += list.length ? list.map((k) => '<div class="card" style="padding:9px"><div class="row"><div class="grow"><b>' + esc(k.name) + '</b> ' + (k.level === 'lower' ? '<span class="chip ' + k.tone + '">' + TONES[k.tone] + '</span>' : '') + '<div class="muted">' + (k.synonyms.length ? '유의어: ' + esc(k.synonyms.join(', ')) + ' · ' : '') + '임계 ' + k.threshold + '회</div></div><button class="btn sm sec" data-act="kwedit" data-id="' + k.id + '">수정</button><button class="btn sm dng" data-act="kwdel" data-id="' + k.id + '">삭제</button></div></div>').join('') : '<div class="muted" style="text-align:center;margin:12px">등록된 키워드가 없어요</div>';
+    h += list.length ? list.map((k) => '<div class="card" style="padding:9px"><div class="row"><div class="grow"><b>' + esc(k.name) + '</b> ' + '<span class="chip ' + k.tone + '">' + TONES[k.tone] + '</span>' + '<div class="muted">' + (k.synonyms.length ? '유의어: ' + esc(k.synonyms.join(', ')) + ' · ' : '') + '임계 ' + k.threshold + '회</div></div><button class="btn sm sec" data-act="kwedit" data-id="' + k.id + '">수정</button><button class="btn sm dng" data-act="kwdel" data-id="' + k.id + '">삭제</button></div></div>').join('') : '<div class="muted" style="text-align:center;margin:12px">등록된 키워드가 없어요</div>';
     h += '<div class="row" style="margin-top:12px"><button class="btn sm sec" data-act="kwexport">키워드 내보내기</button><button class="btn sm sec" data-act="kwimport">키워드 가져오기</button></div>';
     $('#main').innerHTML = h;
   }
@@ -455,10 +444,10 @@
     if (!name) { toast('이름을 입력하세요'); return; }
     const syn = $('#ks').value.split(',').map((s) => s.trim()).filter(Boolean);
     const th = Math.max(1, parseInt($('#kt').value, 10) || 1);
-    const tone = S.kwTab === 'lower' ? $('#ktone').value : 'normal';
-    if (S.keywords.some((k) => k.level === S.kwTab && k.name === name && (!S.editing || k.id !== S.editing.id))) { toast('이미 있는 이름이에요'); return; }
+    const tone = $('#ktone').value;
+    if (S.keywords.some((k) => k.name === name && (!S.editing || k.id !== S.editing.id))) { toast('이미 있는 이름이에요'); return; }
     if (S.editing) Object.assign(S.editing, { name, synonyms: syn, threshold: th, tone });
-    else S.keywords.push({ id: uid('k'), level: S.kwTab, name, synonyms: syn, threshold: th, tone });
+    else S.keywords.push({ id: uid('k'), name, synonyms: syn, threshold: th, tone });
     S.editing = null;
     await saveKeywords();
     toast('저장했어요');
@@ -487,9 +476,9 @@
     switch (a.dataset.act) {
       case 'toggle': S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderLib(); break;
       case 'fup': S.filter.upper.has(id) ? S.filter.upper.delete(id) : S.filter.upper.add(id); renderLib(); break;
-      case 'copytag': { const n = S.novels.find((x) => x.id === id); if (n) copyText(tagName(n) + n.ext); break; }
+      case 'copyname': { const n = S.novels.find((x) => x.id === id); if (n) copyText(n.title); break; }
       case 'exporttxt': exportListTxt(); break;
-      case 'copyall': copyText(filteredNovels().map((n) => tagName(n) + n.ext).join('\n')); break;
+      case 'copyall': copyText(filteredNovels().map((n) => n.title).join('\n')); break;
       case 'rescan': { const n = S.novels.find((x) => x.id === id); if (n) enqueue({ kind: 'rescan', novelId: id, label: n.fileName }); S.tab = 'up'; render(); break; }
       case 'del': {
         if (await ask('이 소설과 분석 결과를 삭제할까요?', '삭제')) {
@@ -502,7 +491,6 @@
       case 'rescanstale': enqueueRescan(true); break;
       case 'rescanall': enqueueRescan(false); break;
       case 'clearq': S.queue = S.queue.filter((q) => q.status === '대기' || q.status === '진행'); renderUp(); updateNav(); break;
-      case 'kwtab': S.kwTab = a.dataset.v; S.editing = null; renderKw(); break;
       case 'kwsave': saveKwForm(); break;
       case 'kwcancel': S.editing = null; renderKw(); break;
       case 'kwedit': S.editing = kwById(id); renderKw(); window.scrollTo(0, 0); $('#main').scrollTop = 0; break;
@@ -526,8 +514,8 @@
           try {
             const arr = JSON.parse(m.el.querySelector('#ji').value);
             if (!Array.isArray(arr)) throw new Error('배열이 아닙니다');
-            S.keywords = arr.filter((k) => k && k.name && (k.level === 'upper' || k.level === 'lower')).map((k) => ({
-              id: k.id || uid('k'), level: k.level, name: String(k.name), synonyms: Array.isArray(k.synonyms) ? k.synonyms.map(String) : [],
+            S.keywords = arr.filter((k) => k && k.name).map((k) => ({
+              id: k.id || uid('k'), name: String(k.name), synonyms: Array.isArray(k.synonyms) ? k.synonyms.map(String) : [],
               threshold: Math.max(1, parseInt(k.threshold, 10) || 1), tone: TONES[k.tone] ? k.tone : 'normal',
             }));
             await saveKeywords(); m.close(); toast('키워드 ' + S.keywords.length + '개를 가져왔어요'); renderKw(); updateStat();
@@ -569,7 +557,13 @@
     const ok = await DB.open();
     if (!ok) toast('저장소를 쓸 수 없어 이번 실행 동안만 보관돼요');
     const rec = await DB.get('meta', 'keywords');
-    if (rec && Array.isArray(rec.value)) S.keywords = rec.value;
+    if (rec && Array.isArray(rec.value)) {
+      const seen = new Set();
+      S.keywords = rec.value.filter((k) => k && k.name && !seen.has(k.name) && seen.add(k.name)).map((k) => ({
+        id: k.id, name: k.name, synonyms: k.synonyms || [], threshold: k.threshold || 1, tone: TONES[k.tone] ? k.tone : 'normal',
+      }));
+      if (rec.value.some((k) => k && 'level' in k)) await saveKeywords();
+    }
     else { S.keywords = defaultKeywords(); await saveKeywords(); }
     S.novels = await DB.all('novels');
     render();
