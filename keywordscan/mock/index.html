@@ -75,7 +75,6 @@ button.chip { font: inherit; font-size: 13px; cursor: pointer; }
 .tn { font-size: 12px; color: var(--sub); margin-top: 8px; }
 .tn.like { color: var(--like); } .tn.dislike { color: var(--hate); }
 .title { font-weight: 700; word-break: break-all; cursor: pointer; }
-.tagname { font-size: 12px; color: var(--pri2); word-break: break-all; margin: 2px 0 4px; }
 .drop { border: 2px dashed var(--line); border-radius: 14px; padding: 26px 12px; text-align: center; color: var(--sub); margin: 6px 0; }
 .bar-p { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: 6px; }
 .bar-p i { display: block; height: 100%; background: var(--pri2); }
@@ -216,7 +215,6 @@ h4 { margin: 14px 0 4px; }
     var open = !!S.open[n.id];
     var h = '<div class="card">';
     h += '<div class="row"><div class="grow title" role="button" tabindex="0" data-act="toggle" data-id="' + n.id + '">' + esc(n.title) + '</div><span class="muted">' + n.ext.toUpperCase() + ' · ' + fmtChars(n.totalChars) + '</span></div>';
-    h += '<div class="tagname">' + esc(tagName(n)) + '</div>';
     if (!hits.length) h += '<span class="muted">발견된 키워드 없음</span>';
     ['like', 'normal', 'dislike'].forEach(function (tone) {
       var g = hits.filter(function (x) { return x.kw.tone === tone; });
