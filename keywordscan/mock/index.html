@@ -87,6 +87,16 @@ button.chip { font: inherit; font-size: 13px; cursor: pointer; }
 .seg button.on { background: var(--pri); color: #fff; }
 .seg.tone button { font-size: 13px; }
 label.ck { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--sub); min-height: 32px; }
+.dt { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.dt th, .dt td { padding: 7px 4px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.dt thead th { color: var(--sub); font-weight: 600; font-size: 11px; border-bottom-color: var(--pri2); }
+.dt tbody th { font-weight: 700; font-size: 12.5px; word-break: keep-all; }
+.dt .num { text-align: right; }
+.dt tbody tr:last-child th, .dt tbody tr:last-child td { border-bottom: 0; }
+.dt .dist.nm { margin-left: 0; display: flex; height: 20px; }
+.dt .dk { color: var(--sub); font-size: 11px; margin-top: 2px; }
+.st { display: inline-block; font-size: 10px; font-weight: 700; border: 1px solid var(--line); border-radius: 8px; padding: 0 5px; margin-left: 2px; vertical-align: 1px; }
+.st.like { color: var(--like); border-color: var(--like); } .st.normal { color: #cbd5e1; border-color: var(--norm); } .st.dislike { color: var(--hate); border-color: var(--hate); }
 .kwrow { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); padding: 8px 0; }
 .kwrow:last-child { border-bottom: 0; }
 h4 { margin: 14px 0 4px; }
@@ -218,12 +228,20 @@ h4 { margin: 14px 0 4px; }
     });
     if (isStale(n)) h += '<div class="muted" style="margin-top:6px">⚠️ 키워드가 바뀌어 재분석이 필요해요</div>';
     if (open) {
-      h += '<h4>상세 (만자당 빈도 · 구간 분포)</h4>';
+      h += '<h4>상세</h4>';
       var rows = hits;
-      h += rows.length ? rows.map(function (x) {
-        var d = distOf(x.segs);
-        return '<div class="kwrow"><div class="grow"><b>' + esc(x.name) + '</b> <span class="muted">' + x.count + '회 · 1만자당 ' + x.density.toFixed(2) + '회 · 임계 ' + x.kw.threshold + '</span></div><div class="muted">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div>' + distHtml(x.segs) + '</div>';
-      }).join('') : '<div class="muted">발견된 키워드가 없어요</div>';
+      if (!rows.length) h += '<div class="muted">발견된 키워드가 없어요</div>';
+      else {
+        h += '<table class="dt"><colgroup><col style="width:33%"><col style="width:13%"><col style="width:16%"><col style="width:11%"><col style="width:27%"></colgroup>' +
+          '<thead><tr><th scope="col">키워드</th><th scope="col" class="num">횟수</th><th scope="col" class="num">1만자당</th><th scope="col" class="num">임계</th><th scope="col">분포</th></tr></thead><tbody>' +
+          rows.map(function (x) {
+            var d = distOf(x.segs);
+            return '<tr><th scope="row">' + esc(x.name) + (x.status ? ' <span class="st ' + x.kw.tone + '">' + x.status + '</span>' : '') + '</th>' +
+              '<td class="num">' + x.count + '회</td><td class="num">' + x.density.toFixed(2) + '</td><td class="num">' + x.kw.threshold + '</td>' +
+              '<td>' + distHtml(x.segs).replace('class="dist"', 'class="dist nm"') + '<div class="dk">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div></td></tr>';
+          }).join('') + '</tbody></table>' +
+          '<div class="muted" style="margin-top:6px">분포는 소설을 앞에서부터 10칸으로 나눈 구간별 등장 횟수예요. 1만자당은 글자 1만 개당 평균 횟수예요.</div>';
+      }
       h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-act="copyname" data-id="' + n.id + '">이름 복사</button><button class="btn sm sec" data-act="rescan" data-id="' + n.id + '">재분석</button><button class="btn sm dng" data-act="del" data-id="' + n.id + '">삭제</button></div>';
     }
     return h + '</div>';
