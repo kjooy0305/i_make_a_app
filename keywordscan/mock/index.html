@@ -175,11 +175,6 @@ h4 { margin: 14px 0 4px; }
   function hitsOf(n, list) {
     return list.map(function (k) { var r = n.results[k.id]; var c = r ? r.count : 0; return { kw: k, name: k.name, count: c, status: statusOf(c, k.threshold), segs: r ? r.segs : [], density: density(c, n.totalChars) }; });
   }
-  function tagName(n) {
-    var parts = hitsOf(n, keywords).filter(function (h) { return h.status; }).map(function (h) { return h.name + '(' + h.status + ')'; });
-    return parts.length ? n.title + '_' + parts.join('_') : n.title;
-  }
-
   // ---------- 상태 ----------
   var S = { tab: 'lib', tone: 'normal', form: null, editing: null, open: {}, q: '', sort: 'new', upper: {}, mode: 'or', noDislike: false, queue: [], overlay: null, toast: '', sel: null };
   var timer = null, toastTimer = null;
@@ -229,7 +224,7 @@ h4 { margin: 14px 0 4px; }
         var d = distOf(x.segs);
         return '<div class="kwrow"><div class="grow"><b>' + esc(x.name) + '</b> <span class="muted">' + x.count + '회 · 1만자당 ' + x.density.toFixed(2) + '회 · 임계 ' + x.kw.threshold + '</span></div><div class="muted">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div>' + distHtml(x.segs) + '</div>';
       }).join('') : '<div class="muted">발견된 키워드가 없어요</div>';
-      h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-act="copytag" data-id="' + n.id + '">태그 파일명 복사</button><button class="btn sm sec" data-act="rescan" data-id="' + n.id + '">재분석</button><button class="btn sm dng" data-act="del" data-id="' + n.id + '">삭제</button></div>';
+      h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-act="copyname" data-id="' + n.id + '">이름 복사</button><button class="btn sm sec" data-act="rescan" data-id="' + n.id + '">재분석</button><button class="btn sm dng" data-act="del" data-id="' + n.id + '">삭제</button></div>';
     }
     return h + '</div>';
   }
@@ -237,7 +232,7 @@ h4 { margin: 14px 0 4px; }
   function libList() {
     var list = filtered();
     var h = '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + novels.length + '개</span>' +
-      (list.length ? '<button class="btn sm sec" data-act="copyall">태그 파일명 복사</button><button class="btn sm sec" data-act="exporttxt">목록 txt 추출</button>' : '') + '</div>';
+      (list.length ? '<button class="btn sm sec" data-act="copyall">이름 복사</button><button class="btn sm sec" data-act="exporttxt">목록 txt 추출</button>' : '') + '</div>';
     h += list.length ? list.map(novelCard).join('') : '<div class="card muted" style="text-align:center">' + (novels.length ? '조건에 맞는 소설이 없어요' : '업로드 탭에서 TXT·ePub 파일을 추가하세요') + '</div>';
     return h;
   }
@@ -270,7 +265,7 @@ h4 { margin: 14px 0 4px; }
     var ed = S.editing;
     // 입력 중인 글자는 다시 그려도 남도록 상태에 둔다
     var f = S.form || (ed ? { name: ed.name, syn: ed.synonyms.join(', '), th: ed.threshold } : { name: '', syn: '', th: 5 });
-    var h = '<div class="muted">소설 본문에서 찾아서 검색·태그·목록에 보여줄 단어예요. 유의어는 한 키워드로 합산하고, 호감·일반·불호는 추가할 때 정해요.</div>';
+    var h = '<div class="muted">소설 본문에서 찾아서 검색·목록에 보여줄 단어예요. 유의어는 한 키워드로 합산하고, 호감·일반·불호는 추가할 때 정해요.</div>';
     var sn = staleCount();
     if (sn) h += '<div class="banner">키워드 변경으로 재분석이 필요한 소설: ' + sn + '개 <button class="btn sm" data-act="rescanstale" style="margin-left:6px">재분석</button></div>';
     h += '<div class="card"><b>' + (ed ? '키워드 수정' : '키워드 추가') + '</b>';
@@ -441,7 +436,7 @@ h4 { margin: 14px 0 4px; }
     switch (a.getAttribute('data-act')) {
       case 'toggle': S.open[id] = !S.open[id]; render(true); break;
       case 'fup': S.upper[id] = !S.upper[id]; render(true); break;
-      case 'copytag': toast('복사했어요'); render(true); break;
+      case 'copyname': toast('복사했어요'); render(true); break;
       case 'copyall': toast('복사했어요'); render(true); break;
       case 'exporttxt': toast('소설목록_20261028.txt 저장했어요'); render(true); break;
       case 'rescan': enqueue({ kind: 'rescan', label: (novels.filter(function (n) { return n.id === id; })[0] || {}).title, novelId: id }); S.tab = 'up'; render(); break;
