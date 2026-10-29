@@ -12,6 +12,7 @@ i_make_a_app/
 ├── novelwiki/
 │   ├── web/        ← 웹 원본 소스 (수정은 여기서)
 │   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
+├── musiclist/              # 🎵 음악 이름 관리 (web + android)
 ├── keywordscan/
 │   ├── web/        ← 웹 원본 소스 (수정은 여기서)
 │   └── android/    ← Android 래퍼 (빌드 시 web/ 자동 번들)
@@ -40,6 +41,7 @@ i_make_a_app/
 | 📜 스크립트 TRPG 작성 앱 | Android | .apk | [다운로드](../../releases?q=make123) |
 | 📖 소설 창작 위키 | Android | .apk | [다운로드](../../releases?q=novelwiki) |
 | 🔎 소설 키워드 분석기 | Android | .apk | [다운로드](../../releases?q=keywordscan) |
+| 🎵 음악 이름 관리 | Android | .apk | [다운로드](../../releases?q=musiclist) |
 | ⏰ 반복 알림 앱 | Android | .apk | [다운로드](../../releases?q=repeatalarm) |
 | 📚 RandomRead | Android | .apk | [다운로드](../../releases?q=randomread) |
 | 📖 EpubMaker | Android | .apk | [다운로드](../../releases?q=epubmaker) |
@@ -100,6 +102,14 @@ TRPG(테이블탑 롤플레잉 게임) 시나리오를 직접 쓰고, 그 자리
 3. APK 파일 실행 후 설치
 
 ---
+
+## 🎵 음악 이름 관리 (MusicList)
+
+음악 파일의 **이름만** 목록으로 관리하고 텍스트로 추출하는 앱입니다 (재생 기능 없음). 시안: https://kjooy0305.github.io/i_make_a_app/musiclist/mock/
+
+- 같은 이름은 따로 저장 / 덮어쓰기 / 지우기, 비슷한 이름은 다른 음악인지 확인 후 "비슷한 노래 묶음"으로 보관
+- 이름·가수 검색, 정렬, 이름·가수 수정, 삭제, 목록 txt 추출 · 이름 복사
+- 릴리즈: `git tag musiclist-v1.0.0 && git push origin musiclist-v1.0.0`
 
 ## 🔎 소설 키워드 분석기 (KeywordScan)
 
