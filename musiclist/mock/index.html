@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>내 음악 목록 시안</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: 위에 화면 고르는 줄, 가운데에 폰 비율(390×844) 한 대, 또는 전체 보기에서 폰 3대를 나란히. 디자인만 보는 시안이라 버튼은 눌러도 아무 일도 일어나지 않는다. */
+:root {
+  --bg: #15131a;        /* 바탕: 보라 기운 있는 먹색 */
+  --panel: #1f1c27;     /* 카드와 시트 */
+  --line: #353042;      /* 얇은 선 */
+  --text: #f3eff8;
+  --sub: #a59fb5;
+  --accent: #ff6a3d;    /* 레코드판 라벨 주황 */
+  --accent-ink: #1a0d08;
+  --warn: #ffd166;
+  --font-body: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-num: "Space Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
+.page { max-width: 1260px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -.02em; }
+.head p { margin: 4px 0 0; color: var(--sub); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; min-height: 36px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.chip:focus-visible, .btn:focus-visible, .opt:focus-visible, .nav button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+.stage { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: flex-start; }
+figure { margin: 0; display: grid; gap: 8px; justify-items: center; }
+figcaption { font-weight: 700; color: var(--sub); }
+.slot { transform-origin: top center; }
+
+/* ===== 폰 ===== */
+.phone { width: 390px; height: 844px; background: var(--bg); border: 2px solid var(--line); border-radius: 38px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.status { height: 30px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 8px 24px 0; font-family: var(--font-num); font-size: 12px; color: var(--sub); }
+.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.top { padding: 10px 18px 6px; display: flex; align-items: center; gap: 10px; flex: none; }
+.top h2 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -.02em; flex: 1; }
+.top .count { font-family: var(--font-num); color: var(--sub); font-size: 12px; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 18px 16px; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; color: var(--sub); margin: 4px 18px 8px; flex: none; }
+.sorts { display: flex; gap: 6px; padding: 0 18px 8px; flex: none; }
+.sorts .chip { min-height: 30px; padding: 3px 12px; font-size: 12px; }
+
+.track { display: grid; grid-template-columns: 46px minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.cover { width: 46px; height: 46px; border-radius: 8px; background: conic-gradient(from 20deg, #ff6a3d, #7a3dff, #3dc9ff, #ff6a3d); position: relative; }
+.cover::after { content: ""; position: absolute; inset: 17px; border-radius: 50%; background: var(--bg); }
+.track b { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.track small { color: var(--sub); }
+.track .meta { text-align: right; font-family: var(--font-num); font-size: 11px; color: var(--sub); }
+.track.on b { color: var(--accent); }
+.dots { color: var(--sub); font-size: 18px; letter-spacing: 1px; padding-left: 6px; }
+
+.mini { flex: none; margin: 0 12px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; }
+.mini .cover { width: 40px; height: 40px; }
+.mini .cover::after { inset: 14px; background: var(--panel); }
+.mini .bar2 { height: 3px; background: var(--line); border-radius: 2px; margin-top: 4px; }
+.mini .bar2 i { display: block; width: 38%; height: 100%; background: var(--accent); border-radius: 2px; }
+.ctl { font-size: 18px; letter-spacing: 6px; }
+
+.nav { flex: none; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); background: var(--panel); }
+.nav button { font: inherit; background: none; border: 0; color: var(--sub); padding: 12px 0 10px; display: grid; gap: 2px; justify-items: center; cursor: pointer; }
+.nav button[aria-current="true"] { color: var(--accent); font-weight: 700; }
+.nav span { font-size: 20px; line-height: 1; }
+.gesture { height: 18px; flex: none; display: flex; justify-content: center; align-items: center; background: var(--panel); }
+.gesture i { width: 110px; border-top: 3px solid var(--line); border-radius: 3px; }
+.fab { position: absolute; right: 18px; bottom: 84px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; font: inherit; font-weight: 900; padding: 12px 18px; box-shadow: 0 6px 18px rgba(0,0,0,.45); cursor: pointer; }
+
+.btn { font: inherit; font-weight: 700; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 12px 16px; min-height: 46px; cursor: pointer; }
+.btn.main { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.block { width: 100%; }
+.drop { border: 2px dashed var(--line); border-radius: 18px; padding: 26px 16px; text-align: center; display: grid; gap: 10px; justify-items: center; margin-bottom: 14px; color: var(--sub); }
+.drop .big { font-size: 34px; line-height: 1; }
+h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; letter-spacing: .04em; }
+.file { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; background: var(--panel); }
+.file b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file small { color: var(--sub); font-family: var(--font-num); font-size: 11px; }
+.tag { align-self: center; grid-row: span 2; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--sub); }
+.tag.dup { border-color: var(--warn); color: var(--warn); }
+.tag.ok { border-color: var(--accent); color: var(--accent); }
+.foot { flex: none; padding: 10px 18px 14px; display: grid; gap: 8px; border-top: 1px solid var(--line); }
+
+/* 중복 선택 시트 */
+.dim { position: absolute; inset: 0; background: rgba(8,6,12,.62); display: flex; align-items: flex-end; }
+.sheet { width: 100%; background: var(--panel); border-radius: 22px 22px 0 0; padding: 12px 18px 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; max-height: 92%; overflow-y: auto; }
+.grab { width: 44px; height: 4px; border-radius: 3px; background: var(--line); margin: 0 auto 2px; }
+.sheet h4 { margin: 0; font-size: 18px; font-weight: 900; }
+.sheet p { margin: 0; color: var(--sub); }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cmp div { border: 1px solid var(--line); border-radius: 12px; padding: 9px 10px; background: var(--bg); min-width: 0; }
+.cmp em { font-style: normal; font-size: 11px; color: var(--sub); display: block; }
+.cmp b { display: block; font-size: 13px; overflow-wrap: anywhere; }
+.cmp small { font-family: var(--font-num); font-size: 11px; color: var(--sub); }
+.cmp .new { border-color: var(--warn); }
+.opt { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; text-align: left; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; cursor: pointer; }
+.opt .ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); font-size: 16px; }
+.opt b { display: block; }
+.opt small { color: var(--sub); }
+.opt.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.opt.sel .ic { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.opt.danger .ic { color: #ff7b7b; }
+.chk { display: flex; align-items: center; gap: 8px; color: var(--sub); }
+.chk i { width: 18px; height: 18px; border: 1px solid var(--sub); border-radius: 5px; display: inline-block; }
+.row2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="head">
+    <h1>내 음악 목록 시안</h1>
+    <p>디자인만 확인하는 화면이에요. 버튼은 눌러도 동작하지 않아요. 아래에서 화면을 골라 보세요.</p>
+  </header>
+  <div class="bar" id="bar">
+    <button class="chip" data-v="home" aria-pressed="true">홈</button>
+    <button class="chip" data-v="up" aria-pressed="false">음악 업로드</button>
+    <button class="chip" data-v="dup" aria-pressed="false">같은 이름 선택</button>
+    <button class="chip" data-v="all" aria-pressed="false">전체 보기</button>
+  </div>
+  <div class="stage" id="stage"></div>
+</div>
+
+<template id="t-home">
+  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
+    <div class="screen">
+      <div class="top"><h2>내 음악</h2><span class="count">12곡 · 74.2MB</span></div>
+      <div class="search"><span style="color:var(--accent);font-weight:700">검색</span> <span>제목·가수 검색</span></div>
+      <div class="sorts"><button class="chip" aria-pressed="true">최근 추가</button><button class="chip" aria-pressed="false">제목순</button><button class="chip" aria-pressed="false">가수순</button></div>
+      <div class="scroll">
+        <div class="track on"><div class="cover"></div><div><b>밤편지</b><small>아이유</small></div><div class="meta">3:21<br>7.8MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Love wins all</b><small>아이유</small></div><div class="meta">4:12<br>9.6MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>어떻게 이별까지 사랑하겠어, 널 사랑하는 거지</b><small>AKMU</small></div><div class="meta">3:47<br>8.7MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Dynamite</b><small>BTS</small></div><div class="meta">3:19<br>7.6MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>사건의 지평선</b><small>윤하</small></div><div class="meta">4:57<br>11.3MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Hype Boy</b><small>NewJeans</small></div><div class="meta">2:59<br>6.8MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>봄날</b><small>BTS</small></div><div class="meta">4:34<br>10.5MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>첫눈처럼 너에게 가겠다</b><small>에일리</small></div><div class="meta">4:08<br>9.5MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Palette</b><small>아이유</small></div><div class="meta">3:37<br>8.3MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>그날처럼</b><small>장나라</small></div><div class="meta">4:21<br>10.0MB</div></div>
+      </div>
+      <button class="fab">＋ 음악 추가</button>
+      <div class="mini"><div class="cover"></div><div><b>밤편지</b><div class="bar2"><i></i></div></div><div class="ctl">‹ ▶ ›</div></div>
+    </div>
+    <div class="nav"><button aria-current="true"><span>♪</span>홈</button><button><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
+  </div>
+</template>
+
+<template id="t-up">
+  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
+    <div class="screen">
+      <div class="top"><h2>음악 업로드</h2></div>
+      <div class="scroll">
+        <div class="drop"><div class="big">⇪</div><b style="color:var(--text)">mp3 파일을 여기로 끌어놓거나</b><button class="btn main">파일 선택</button><small>여러 곡을 한 번에 고를 수 있어요</small></div>
+        <h3>선택한 파일 5개</h3>
+        <div class="file"><b>밤편지.mp3</b><span class="tag dup">같은 이름</span><small>7.8MB · 3:21</small></div>
+        <div class="file"><b>Palette (1).mp3</b><span class="tag dup">비슷한 이름</span><small>8.3MB · 3:37</small></div>
+        <div class="file"><b>이등병의 편지.mp3</b><span class="tag ok">새 파일</span><small>5.1MB · 3:40</small></div>
+        <div class="file"><b>Ditto.mp3</b><span class="tag ok">새 파일</span><small>5.4MB · 3:05</small></div>
+        <div class="file"><b>안녕.mp3</b><span class="tag ok">새 파일</span><small>6.2MB · 3:52</small></div>
+      </div>
+      <div class="foot"><div class="row2"><button class="btn">비우기</button><button class="btn main">업로드 시작</button></div></div>
+    </div>
+    <div class="nav"><button><span>♪</span>홈</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
+  </div>
+</template>
+
+<template id="t-dup">
+  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
+    <div class="screen">
+      <div class="top"><h2>음악 업로드</h2></div>
+      <div class="scroll">
+        <div class="file"><b>밤편지.mp3</b><span class="tag dup">같은 이름</span><small>7.8MB · 3:21</small></div>
+        <div class="file"><b>Palette (1).mp3</b><span class="tag dup">비슷한 이름</span><small>8.3MB · 3:37</small></div>
+        <div class="file"><b>이등병의 편지.mp3</b><span class="tag ok">새 파일</span><small>5.1MB · 3:40</small></div>
+      </div>
+      <div class="dim"><div class="sheet">
+        <div class="grab"></div>
+        <h4>같거나 비슷한 이름이 있어요</h4>
+        <p>1 / 2번째 확인 중이에요.</p>
+        <div class="cmp">
+          <div><em>이미 있는 파일</em><b>밤편지.mp3</b><small>7.8MB · 3:21<br>5월 2일 추가</small></div>
+          <div class="new"><em>새로 올릴 파일</em><b>밤편지.mp3</b><small>8.1MB · 3:21<br>방금 선택</small></div>
+        </div>
+        <button class="opt sel"><span class="ic">+</span><span><b>따로 저장</b><small>이름 뒤에 (1)을 붙여 둘 다 보관해요</small></span></button>
+        <button class="opt"><span class="ic">⇄</span><span><b>덮어쓰기</b><small>기존 파일을 새 파일로 바꿔요</small></span></button>
+        <button class="opt danger"><span class="ic">✕</span><span><b>지우기</b><small>새 파일은 올리지 않고 버려요</small></span></button>
+        <div class="chk"><i></i> 남은 파일도 같은 방식으로 처리</div>
+        <div class="row2"><button class="btn">취소</button><button class="btn main">확인</button></div>
+      </div></div>
+    </div>
+    <div class="nav"><button><span>♪</span>홈</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
+  </div>
+</template>
+
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  var names = { home: '홈', up: '음악 업로드', dup: '같은 이름 선택' };
+  function make(v) {
+    var fig = document.createElement('figure');
+    var slot = document.createElement('div'); slot.className = 'slot';
+    slot.appendChild(document.getElementById('t-' + v).content.cloneNode(true));
+    var cap = document.createElement('figcaption'); cap.textContent = names[v];
+    fig.appendChild(slot); fig.appendChild(cap); return fig;
+  }
+  function fit() {
+    var n = stage.querySelectorAll('.slot').length;
+    var avail = document.documentElement.clientWidth - 32;
+    var s = Math.min(1, avail / 390);
+    stage.querySelectorAll('.slot').forEach(function (el) {
+      el.style.transform = 'scale(' + s + ')';
+      el.style.width = '390px'; el.style.height = '844px';
+      el.parentNode.style.width = Math.round(390 * s) + 'px';
+      el.style.marginBottom = Math.round(-844 * (1 - s)) + 'px';
+    });
+  }
+  function show(v) {
+    stage.innerHTML = '';
+    (v === 'all' ? ['home', 'up', 'dup'] : [v]).forEach(function (k) { stage.appendChild(make(k)); });
+    document.querySelectorAll('#bar .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
+    fit();
+    try { location.hash = v; } catch (e) {}
+  }
+  document.getElementById('bar').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) show(b.dataset.v); });
+  window.addEventListener('resize', fit);
+  var h = (location.hash || '').slice(1);
+  show(['home', 'up', 'dup', 'all'].indexOf(h) >= 0 ? h : 'home');
+})();
+</script>
+</body>
+</html>

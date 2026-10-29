@@ -8,6 +8,7 @@ on:
       - 'storyeditor/**'
       - 'dayclean/**'
       - 'keywordscan/**'
+      - 'musiclist/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
