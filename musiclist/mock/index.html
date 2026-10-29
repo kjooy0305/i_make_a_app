@@ -9,11 +9,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: 위에 화면 고르는 줄, 가운데에 폰 비율(390×844) 한 대, 또는 전체 보기에서 폰 3대를 나란히. 디자인만 보는 시안이라 버튼은 눌러도 아무 일도 일어나지 않는다. */
+/* Layout: 위에 화면 고르는 줄, 가운데에 폰 비율(390×844) 한 대, 또는 전체 보기에서 폰 여러 대. 폰 안은 눌러볼 수 있고, 긴 목록은 스크롤된다. 파일 저장·복사 같은 실제 처리만 빠져 있다. */
 :root {
   --bg: #15131a;        /* 바탕: 보라 기운 있는 먹색 */
-  --panel: #1f1c27;     /* 카드와 시트 */
-  --line: #353042;      /* 얇은 선 */
+  --panel: #1f1c27;
+  --line: #353042;
+  --thumb: #6d6580;     /* 스크롤바 */
   --text: #f3eff8;
   --sub: #a59fb5;
   --accent: #ff6a3d;    /* 레코드판 라벨 주황 */
@@ -27,13 +28,13 @@
 html { background: var(--bg); }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.45;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
-.page { max-width: 1260px; margin: 0 auto; display: grid; gap: 16px; }
+.page { max-width: 1760px; margin: 0 auto; display: grid; gap: 16px; }
 h1 { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -.02em; }
-.head p { margin: 4px 0 0; color: var(--sub); }
+.head p { margin: 4px 0 0; color: var(--sub); max-width: 62ch; }
 .bar { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; min-height: 36px; cursor: pointer; }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
-.chip:focus-visible, .btn:focus-visible, .opt:focus-visible, .nav button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
 .stage { display: flex; flex-wrap: wrap; gap: 28px; justify-content: center; align-items: flex-start; }
 figure { margin: 0; display: grid; gap: 8px; justify-items: center; }
 figcaption { font-weight: 700; color: var(--sub); }
@@ -46,29 +47,44 @@ figcaption { font-weight: 700; color: var(--sub); }
 .top { padding: 10px 18px 6px; display: flex; align-items: center; gap: 10px; flex: none; }
 .top h2 { margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -.02em; flex: 1; }
 .top .count { font-family: var(--font-num); color: var(--sub); font-size: 12px; }
-.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 18px 16px; }
-.search { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; color: var(--sub); margin: 4px 18px 8px; flex: none; }
-.sorts { display: flex; gap: 6px; padding: 0 18px 8px; flex: none; }
+.sw { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 12px 24px 18px; scrollbar-width: thin; scrollbar-color: var(--thumb) transparent; }
+.scroll::-webkit-scrollbar, .sheet::-webkit-scrollbar, .pre::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll::-webkit-scrollbar-thumb, .sheet::-webkit-scrollbar-thumb, .pre::-webkit-scrollbar-thumb { background: var(--thumb); border-radius: 4px; }
+.fade { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; pointer-events: none; background: linear-gradient(to bottom, transparent, var(--bg)); opacity: 0; transition: opacity .15s; display: flex; align-items: flex-end; justify-content: center; color: var(--sub); font-size: 11px; padding-bottom: 3px; }
+.sw.more .fade { opacity: 1; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; margin: 4px 18px 8px; flex: none; }
+.search b { color: var(--accent); font-size: 13px; }
+.search input { flex: 1; min-width: 0; background: none; border: 0; color: var(--text); font: inherit; padding: 10px 0; outline: none; }
+.search input::placeholder { color: var(--sub); }
+.search:focus-within { border-color: var(--accent); }
+.sorts, .tools { display: flex; gap: 6px; padding: 0 18px 8px; flex: none; }
 .sorts .chip { min-height: 30px; padding: 3px 12px; font-size: 12px; }
 
 .track { display: grid; grid-template-columns: 46px minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
-.cover { width: 46px; height: 46px; border-radius: 8px; background: conic-gradient(from 20deg, #ff6a3d, #7a3dff, #3dc9ff, #ff6a3d); position: relative; }
+.track.sub { margin-left: 22px; padding-left: 12px; border-left: 2px solid var(--accent); grid-template-columns: 38px minmax(0,1fr) auto; }
+.track.sub .cover { width: 38px; height: 38px; }
+.track.sub .cover::after { inset: 13px; }
+.cover { width: 46px; height: 46px; border-radius: 8px; background: conic-gradient(from 20deg, #ff6a3d, #7a3dff, #3dc9ff, #ff6a3d); position: relative; flex: none; }
 .cover::after { content: ""; position: absolute; inset: 17px; border-radius: 50%; background: var(--bg); }
 .track b { display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .track small { color: var(--sub); }
 .track .meta { text-align: right; font-family: var(--font-num); font-size: 11px; color: var(--sub); }
-.track.on b { color: var(--accent); }
-.dots { color: var(--sub); font-size: 18px; letter-spacing: 1px; padding-left: 6px; }
-
-.tools { display: flex; gap: 6px; padding: 0 18px 8px; flex: none; }
-.btn.sm { min-height: 34px; padding: 6px 11px; font-size: 12px; border-radius: 10px; white-space: nowrap; }
-.pre { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-family: var(--font-num); font-size: 11.5px; line-height: 1.7; max-height: 190px; overflow: hidden; color: var(--text); white-space: pre; overflow-x: auto; }
-.mini { flex: none; margin: 0 12px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; }
-.mini .cover { width: 40px; height: 40px; }
-.mini .cover::after { inset: 14px; background: var(--panel); }
-.mini .bar2 { height: 3px; background: var(--line); border-radius: 2px; margin-top: 4px; }
-.mini .bar2 i { display: block; width: 38%; height: 100%; background: var(--accent); border-radius: 2px; }
-.ctl { font-size: 18px; letter-spacing: 6px; }
+.track.new b::after { content: " 새"; color: var(--accent); font-size: 11px; }
+.bundle { width: 100%; font: inherit; color: var(--text); text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin: 8px 0 2px; display: grid; grid-template-columns: 52px minmax(0,1fr) auto; gap: 12px; align-items: center; cursor: pointer; }
+.bundle[aria-expanded="true"] { border-color: var(--accent); }
+.stack { position: relative; width: 52px; height: 46px; }
+.stack .cover { position: absolute; top: 0; width: 38px; height: 38px; }
+.stack .cover::after { inset: 13px; background: var(--panel); }
+.stack .cover:nth-child(1) { left: 0; top: 8px; opacity: .55; }
+.stack .cover:nth-child(2) { left: 7px; top: 4px; opacity: .8; }
+.stack .cover:nth-child(3) { left: 14px; top: 0; }
+.bundle b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bundle small { color: var(--sub); }
+.badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); margin-left: 6px; }
+.chev { width: 9px; height: 9px; border-right: 2px solid var(--sub); border-bottom: 2px solid var(--sub); transform: rotate(45deg); margin-right: 4px; transition: transform .15s; }
+.bundle[aria-expanded="true"] .chev { transform: rotate(-135deg); border-color: var(--accent); }
+.empty { text-align: center; color: var(--sub); padding: 40px 0; }
 
 .nav { flex: none; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); background: var(--panel); }
 .nav button { font: inherit; background: none; border: 0; color: var(--sub); padding: 12px 0 10px; display: grid; gap: 2px; justify-items: center; cursor: pointer; }
@@ -76,25 +92,25 @@ figcaption { font-weight: 700; color: var(--sub); }
 .nav span { font-size: 20px; line-height: 1; }
 .gesture { height: 18px; flex: none; display: flex; justify-content: center; align-items: center; background: var(--panel); }
 .gesture i { width: 110px; border-top: 3px solid var(--line); border-radius: 3px; }
-.fab { position: absolute; right: 18px; bottom: 84px; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 999px; font: inherit; font-weight: 900; padding: 12px 18px; box-shadow: 0 6px 18px rgba(0,0,0,.45); cursor: pointer; }
 
 .btn { font: inherit; font-weight: 700; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 12px 16px; min-height: 46px; cursor: pointer; }
 .btn.main { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.btn.block { width: 100%; }
-.drop { border: 2px dashed var(--line); border-radius: 18px; padding: 26px 16px; text-align: center; display: grid; gap: 10px; justify-items: center; margin-bottom: 14px; color: var(--sub); }
+.btn.sm { min-height: 34px; padding: 6px 11px; font-size: 12px; border-radius: 10px; white-space: nowrap; }
+.btn:disabled { opacity: .4; cursor: default; }
+.drop { border: 2px dashed var(--line); border-radius: 18px; padding: 24px 16px; text-align: center; display: grid; gap: 10px; justify-items: center; margin-bottom: 14px; color: var(--sub); }
 .drop .big { font-size: 34px; line-height: 1; }
 h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; letter-spacing: .04em; }
-.file { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; background: var(--panel); }
+.file { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; background: var(--panel); }
 .file b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file small { color: var(--sub); font-family: var(--font-num); font-size: 11px; }
 .tag { align-self: center; grid-row: span 2; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--sub); }
 .tag.dup { border-color: var(--warn); color: var(--warn); }
 .tag.ok { border-color: var(--accent); color: var(--accent); }
 .foot { flex: none; padding: 10px 18px 14px; display: grid; gap: 8px; border-top: 1px solid var(--line); }
+.row2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
 
-/* 중복 선택 시트 */
-.dim { position: absolute; inset: 0; background: rgba(8,6,12,.62); display: flex; align-items: flex-end; }
-.sheet { width: 100%; background: var(--panel); border-radius: 22px 22px 0 0; padding: 12px 18px 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; max-height: 92%; overflow-y: auto; }
+.dim { position: absolute; inset: 0; background: rgba(8,6,12,.62); display: flex; align-items: flex-end; z-index: 5; }
+.sheet { width: 100%; background: var(--panel); border-radius: 22px 22px 0 0; padding: 12px 18px 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; max-height: 88%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--thumb) transparent; }
 .grab { width: 44px; height: 4px; border-radius: 3px; background: var(--line); margin: 0 auto 2px; }
 .sheet h4 { margin: 0; font-size: 18px; font-weight: 900; }
 .sheet p { margin: 0; color: var(--sub); }
@@ -103,168 +119,277 @@ h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; l
 .cmp em { font-style: normal; font-size: 11px; color: var(--sub); display: block; }
 .cmp b { display: block; font-size: 13px; overflow-wrap: anywhere; }
 .cmp small { font-family: var(--font-num); font-size: 11px; color: var(--sub); }
-.cmp .new { border-color: var(--warn); }
-.opt { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; text-align: left; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; cursor: pointer; }
+.cmp .nw { border-color: var(--warn); }
+.q { font-weight: 700; margin: 2px 0 0; }
+.opt { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: center; text-align: left; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 11px 12px; cursor: pointer; width: 100%; }
 .opt .ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); font-size: 16px; }
 .opt b { display: block; }
 .opt small { color: var(--sub); }
-.opt.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.opt.sel .ic { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.opt[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.opt[aria-checked="true"] .ic { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .opt.danger .ic { color: #ff7b7b; }
-.chk { display: flex; align-items: center; gap: 8px; color: var(--sub); }
-.chk i { width: 18px; height: 18px; border: 1px solid var(--sub); border-radius: 5px; display: inline-block; }
+.opt.danger[aria-checked="true"] .ic { color: var(--accent-ink); }
+.chk { display: flex; align-items: center; gap: 8px; color: var(--sub); background: none; border: 0; font: inherit; padding: 4px 0; cursor: pointer; text-align: left; }
+.chk i { width: 18px; height: 18px; border: 1px solid var(--sub); border-radius: 5px; display: grid; place-items: center; font-style: normal; font-size: 12px; color: var(--accent-ink); flex: none; }
+.chk[aria-checked="true"] i { background: var(--accent); border-color: var(--accent); }
 .muted2 { font-size: 12px; font-weight: 700; color: var(--sub); }
-.row2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+.pre { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-family: var(--font-num); font-size: 11.5px; line-height: 1.7; height: 150px; overflow: auto; white-space: pre; scrollbar-width: thin; scrollbar-color: var(--thumb) transparent; }
+.toast { position: absolute; left: 50%; bottom: 80px; transform: translateX(-50%); background: var(--text); color: var(--bg); font-weight: 700; padding: 9px 16px; border-radius: 999px; z-index: 9; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,.5); }
 </style>
 </head>
 <body>
 <div class="page">
   <header class="head">
     <h1>음악 이름 관리 시안</h1>
-    <p>디자인만 확인하는 화면이에요. 버튼은 눌러도 동작하지 않아요. 아래에서 화면을 골라 보세요.</p>
+    <p>폰 화면을 직접 눌러 보세요. 검색, 정렬, 묶음 펼치기, 업로드, 같은 이름·비슷한 이름 확인, 텍스트 추출이 시안 안에서 움직여요. 긴 목록은 스크롤돼요. 실제 파일 저장과 복사는 하지 않아요.</p>
   </header>
   <div class="bar" id="bar">
     <button class="chip" data-v="home" aria-pressed="true">목록(홈)</button>
     <button class="chip" data-v="up" aria-pressed="false">음악 업로드</button>
-    <button class="chip" data-v="dup" aria-pressed="false">같은 이름 선택</button>
+    <button class="chip" data-v="dup" aria-pressed="false">같은 이름</button>
+    <button class="chip" data-v="sim" aria-pressed="false">비슷한 이름</button>
     <button class="chip" data-v="txt" aria-pressed="false">텍스트 추출</button>
     <button class="chip" data-v="all" aria-pressed="false">전체 보기</button>
+    <button class="chip" id="reset" aria-pressed="false">처음으로</button>
   </div>
   <div class="stage" id="stage"></div>
 </div>
 
-<template id="t-home">
-  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
-    <div class="screen">
-      <div class="top"><h2>음악 이름 관리</h2><span class="count">12곡</span></div>
-      <div class="search"><span style="color:var(--accent);font-weight:700">검색</span> <span>이름·가수 검색</span></div>
-      <div class="sorts"><button class="chip" aria-pressed="true">최근 추가</button><button class="chip" aria-pressed="false">제목순</button><button class="chip" aria-pressed="false">가수순</button></div>
-      <div class="tools"><button class="btn sm">이름 복사</button><button class="btn sm main">목록 txt 추출</button><button class="btn sm">＋ 추가</button></div>
-      <div class="scroll">
-        <div class="track"><div class="cover"></div><div><b>밤편지</b><small>아이유</small></div><div class="meta">7.8MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Love wins all</b><small>아이유</small></div><div class="meta">9.6MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>어떻게 이별까지 사랑하겠어, 널 사랑하는 거지</b><small>AKMU</small></div><div class="meta">8.7MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Dynamite</b><small>BTS</small></div><div class="meta">7.6MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>사건의 지평선</b><small>윤하</small></div><div class="meta">11.3MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Hype Boy</b><small>NewJeans</small></div><div class="meta">6.8MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>봄날</b><small>BTS</small></div><div class="meta">10.5MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>첫눈처럼 너에게 가겠다</b><small>에일리</small></div><div class="meta">9.5MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Palette</b><small>아이유</small></div><div class="meta">8.3MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>그날처럼</b><small>장나라</small></div><div class="meta">10.0MB</div></div>
-      </div>
-    </div>
-    <div class="nav"><button aria-current="true"><span>☰</span>목록</button><button><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
-  </div>
-</template>
-
-<template id="t-up">
-  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
-    <div class="screen">
-      <div class="top"><h2>음악 업로드</h2></div>
-      <div class="scroll">
-        <div class="drop"><div class="big">⇪</div><b style="color:var(--text)">mp3 파일을 여기로 끌어놓거나</b><button class="btn main">파일 선택</button><small>여러 곡을 한 번에 고를 수 있어요</small></div>
-        <h3>선택한 파일 5개</h3>
-        <div class="file"><b>밤편지.mp3</b><span class="tag dup">같은 이름</span><small>7.8MB · 3:21</small></div>
-        <div class="file"><b>Palette (1).mp3</b><span class="tag dup">비슷한 이름</span><small>8.3MB · 3:37</small></div>
-        <div class="file"><b>이등병의 편지.mp3</b><span class="tag ok">새 파일</span><small>5.1MB · 3:40</small></div>
-        <div class="file"><b>Ditto.mp3</b><span class="tag ok">새 파일</span><small>5.4MB · 3:05</small></div>
-        <div class="file"><b>안녕.mp3</b><span class="tag ok">새 파일</span><small>6.2MB · 3:52</small></div>
-      </div>
-      <div class="foot"><div class="row2"><button class="btn">비우기</button><button class="btn main">업로드 시작</button></div></div>
-    </div>
-    <div class="nav"><button><span>☰</span>목록</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
-  </div>
-</template>
-
-<template id="t-dup">
-  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
-    <div class="screen">
-      <div class="top"><h2>음악 업로드</h2></div>
-      <div class="scroll">
-        <div class="file"><b>밤편지.mp3</b><span class="tag dup">같은 이름</span><small>7.8MB · 3:21</small></div>
-        <div class="file"><b>Palette (1).mp3</b><span class="tag dup">비슷한 이름</span><small>8.3MB · 3:37</small></div>
-        <div class="file"><b>이등병의 편지.mp3</b><span class="tag ok">새 파일</span><small>5.1MB · 3:40</small></div>
-      </div>
-      <div class="dim"><div class="sheet">
-        <div class="grab"></div>
-        <h4>같거나 비슷한 이름이 있어요</h4>
-        <p>1 / 2번째 확인 중이에요.</p>
-        <div class="cmp">
-          <div><em>이미 있는 파일</em><b>밤편지.mp3</b><small>7.8MB · 3:21<br>5월 2일 추가</small></div>
-          <div class="new"><em>새로 올릴 파일</em><b>밤편지.mp3</b><small>8.1MB · 3:21<br>방금 선택</small></div>
-        </div>
-        <button class="opt sel"><span class="ic">+</span><span><b>따로 저장</b><small>이름 뒤에 (1)을 붙여 둘 다 보관해요</small></span></button>
-        <button class="opt"><span class="ic">⇄</span><span><b>덮어쓰기</b><small>기존 파일을 새 파일로 바꿔요</small></span></button>
-        <button class="opt danger"><span class="ic">✕</span><span><b>지우기</b><small>새 파일은 올리지 않고 버려요</small></span></button>
-        <div class="chk"><i></i> 남은 파일도 같은 방식으로 처리</div>
-        <div class="row2"><button class="btn">취소</button><button class="btn main">확인</button></div>
-      </div></div>
-    </div>
-    <div class="nav"><button><span>☰</span>목록</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
-  </div>
-</template>
-
-<template id="t-txt">
-  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
-    <div class="screen">
-      <div class="top"><h2>음악 이름 관리</h2><span class="count">12곡</span></div>
-      <div class="scroll"><div class="track"><div class="cover"></div><div><b>밤편지</b><small>아이유</small></div><div class="meta">7.8MB</div></div></div>
-      <div class="dim"><div class="sheet">
-        <div class="grab"></div>
-        <h4>목록 텍스트 추출</h4>
-        <p>지금 보이는 12곡을 텍스트로 만들어요.</p>
-        <div class="muted2">형식</div>
-        <button class="opt sel"><span class="ic">1</span><span><b>이름만</b><small>밤편지</small></span></button>
-        <button class="opt"><span class="ic">2</span><span><b>가수 - 이름</b><small>아이유 - 밤편지</small></span></button>
-        <button class="opt"><span class="ic">3</span><span><b>이름 (확장자 포함)</b><small>밤편지.mp3</small></span></button>
-        <div class="muted2">미리보기</div>
-        <div class="pre">밤편지
-Love wins all
-어떻게 이별까지 사랑하겠어, 널 사랑하는 거지
-Dynamite
-사건의 지평선
-Hype Boy
-…</div>
-        <div class="row2"><button class="btn">이름 복사</button><button class="btn main">txt 파일로 저장</button></div>
-      </div></div>
-    </div>
-    <div class="nav"><button aria-current="true"><span>☰</span>목록</button><button><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
-  </div>
-</template>
-
 <script>
 (function () {
-  var stage = document.getElementById('stage');
-  var names = { home: '목록(홈)', txt: '텍스트 추출', up: '음악 업로드', dup: '같은 이름 선택' };
-  function make(v) {
-    var fig = document.createElement('figure');
-    var slot = document.createElement('div'); slot.className = 'slot';
-    slot.appendChild(document.getElementById('t-' + v).content.cloneNode(true));
-    var cap = document.createElement('figcaption'); cap.textContent = names[v];
-    fig.appendChild(slot); fig.appendChild(cap); return fig;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+
+  /* ---------- 예시 데이터 ---------- */
+  function seed() {
+    var L = [
+      ['밤편지', '아이유', 7.8, 'b1'], ['밤편지 (Live)', '아이유', 9.1, 'b1'], ['밤편지 (피아노)', '아이유', 6.4, 'b1'],
+      ['Love wins all', '아이유', 9.6], ['어떻게 이별까지 사랑하겠어, 널 사랑하는 거지', 'AKMU', 8.7], ['Dynamite', 'BTS', 7.6],
+      ['사건의 지평선', '윤하', 11.3], ['Hype Boy', 'NewJeans', 6.8], ['봄날', 'BTS', 10.5], ['첫눈처럼 너에게 가겠다', '에일리', 9.5],
+      ['Palette', '아이유', 8.3], ['그날처럼', '장나라', 10.0], ['눈의 꽃', '박효신', 9.9], ['Super Shy', 'NewJeans', 5.9]
+    ];
+    return L.map(function (r, i) { return { id: i + 1, name: r[0], artist: r[1], size: r[2], bundle: r[3] || null, t: i + 1, isNew: false }; });
   }
+  function sampleFiles() {
+    return [
+      { name: '밤편지', artist: '아이유', size: 8.1, kind: 'same', target: 1 },
+      { name: '밤편지 (어쿠스틱)', artist: '아이유', size: 7.2, kind: 'sim', target: 1 },
+      { name: 'Palette (Live)', artist: '아이유', size: 9.4, kind: 'sim', target: 11 },
+      { name: 'Ditto', artist: 'NewJeans', size: 5.4, kind: 'new' },
+      { name: '안녕', artist: '폴킴', size: 6.2, kind: 'new' }
+    ];
+  }
+  function fresh() {
+    return { screen: 'home', sheet: null, tracks: seed(), bundles: { b1: '밤편지' }, nb: 2, q: '', sort: 'new', open: { b1: false }, fmt: 1,
+      files: sampleFiles(), ask: [], ai: 0, all: false, toast: '', next: 100 };
+  }
+
+  /* ---------- 목록 만들기 ---------- */
+  function units(s) {
+    var q = s.q.trim().toLowerCase(), byB = {}, out = [];
+    s.tracks.forEach(function (t) {
+      var hit = !q || (t.name + ' ' + t.artist).toLowerCase().indexOf(q) >= 0;
+      if (t.bundle) { (byB[t.bundle] = byB[t.bundle] || { b: t.bundle, all: [], items: [] }).all.push(t); if (hit) byB[t.bundle].items.push(t); }
+      else if (hit) out.push({ single: t });
+    });
+    Object.keys(byB).forEach(function (k) { if (byB[k].items.length) out.push(byB[k]); });
+    var key = function (u) { var t = u.single || u.all[0]; return s.sort === 'title' ? (u.single ? t.name : s.bundles[u.b]) : s.sort === 'artist' ? t.artist : 0; };
+    var tm = function (u) { return u.single ? u.single.t : Math.max.apply(null, u.all.map(function (x) { return x.t; })); };
+    out.sort(function (a, b) { return s.sort === 'new' ? tm(b) - tm(a) : String(key(a)).localeCompare(String(key(b)), 'ko'); });
+    return out;
+  }
+  function flat(s) {
+    var r = [];
+    units(s).forEach(function (u) { if (u.single) r.push(u.single); else u.items.forEach(function (t) { r.push(t); }); });
+    return r;
+  }
+  function textLines(s) {
+    return flat(s).map(function (t) { return s.fmt === 2 ? t.artist + ' - ' + t.name : s.fmt === 3 ? t.name + '.mp3' : t.name; });
+  }
+
+  /* ---------- 화면 조각 ---------- */
+  function row(t, sub) {
+    return '<div class="track' + (sub ? ' sub' : '') + (t.isNew ? ' new' : '') + '"><div class="cover"></div><div><b>' + esc(t.name) + '</b><small>' + esc(t.artist) + '</small></div><div class="meta">' + t.size.toFixed(1) + 'MB</div></div>';
+  }
+  function homeList(s) {
+    var us = units(s);
+    if (!us.length) return '<div class="empty">찾는 이름이 없어요</div>';
+    return us.map(function (u) {
+      if (u.single) return row(u.single, false);
+      var open = s.open[u.b] || !!s.q.trim();
+      var h = '<button class="bundle" data-a="tog" data-b="' + u.b + '" aria-expanded="' + open + '"><span class="stack"><span class="cover"></span><span class="cover"></span><span class="cover"></span></span>' +
+        '<span><b>' + esc(s.bundles[u.b]) + ' 계열<span class="badge">' + u.all.length + '곡</span></b><small>비슷한 노래 묶음 · ' + (open ? '탭해서 접기' : '탭해서 펼치기') + '</small></span><span class="chev"></span></button>';
+      if (open) h += u.items.map(function (t) { return row(t, true); }).join('');
+      return h;
+    }).join('');
+  }
+  function homeScreen(s) {
+    var bn = Object.keys(s.bundles).length;
+    return '<div class="top"><h2>음악 이름 관리</h2><span class="count">' + s.tracks.length + '곡 · 묶음 ' + bn + '</span></div>' +
+      '<div class="search"><b>검색</b><input id="q" type="text" placeholder="이름·가수 검색" value="' + esc(s.q) + '"></div>' +
+      '<div class="sorts">' + [['new', '최근 추가'], ['title', '제목순'], ['artist', '가수순']].map(function (o) { return '<button class="chip" data-a="sort" data-v="' + o[0] + '" aria-pressed="' + (s.sort === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="tools"><button class="btn sm" data-a="copy">이름 복사</button><button class="btn sm main" data-a="txt">목록 txt 추출</button><button class="btn sm" data-a="goup">＋ 추가</button></div>' +
+      '<div class="sw"><div class="scroll">' + homeList(s) + '</div><div class="fade">↓ 아래로 스크롤</div></div>';
+  }
+  var KIND = { same: ['같은 이름', 'dup'], sim: ['비슷한 이름', 'dup'], 'new': ['새 파일', 'ok'] };
+  function upScreen(s) {
+    var h = '<div class="top"><h2>음악 업로드</h2></div><div class="sw"><div class="scroll">';
+    h += '<div class="drop"><div class="big">⇪</div><b style="color:var(--text)">mp3 파일을 여기로 끌어놓거나</b><button class="btn main" data-a="pick">파일 선택</button><small>여러 곡을 한 번에 고를 수 있어요</small></div>';
+    if (s.files.length) {
+      h += '<h3>선택한 파일 ' + s.files.length + '개</h3>' + s.files.map(function (f) {
+        return '<div class="file"><b>' + esc(f.name) + '.mp3</b><span class="tag ' + KIND[f.kind][1] + '">' + KIND[f.kind][0] + '</span><small>' + f.size.toFixed(1) + 'MB</small></div>';
+      }).join('');
+    } else h += '<div class="empty">선택한 파일이 없어요<br>파일 선택을 눌러 보세요</div>';
+    h += '</div><div class="fade">↓ 아래로 스크롤</div></div>';
+    h += '<div class="foot"><div class="row2"><button class="btn" data-a="clear"' + (s.files.length ? '' : ' disabled') + '>비우기</button><button class="btn main" data-a="start"' + (s.files.length ? '' : ' disabled') + '>업로드 시작</button></div></div>';
+    return h;
+  }
+  function find(s, id) { return s.tracks.filter(function (t) { return t.id === id; })[0]; }
+  function opt(v, cur, ic, title, desc, cls) {
+    return '<button class="opt ' + (cls || '') + '" role="radio" aria-checked="' + (cur === v) + '" data-a="choose" data-v="' + v + '"><span class="ic">' + ic + '</span><span><b>' + title + '</b><small>' + desc + '</small></span></button>';
+  }
+  function dupSheet(s) {
+    var f = s.ask[s.ai], old = find(s, f.target), sim = f.kind === 'sim', cur = f.res || (sim ? 'diff' : 'copy');
+    var left = s.ask.length - s.ai - 1;
+    var h = '<div class="sheet"><div class="grab"></div><h4>' + (sim ? '비슷한 이름이 있어요' : '같은 이름이 있어요') + '</h4><p>' + (s.ai + 1) + ' / ' + s.ask.length + '번째 확인 중이에요.</p>';
+    h += '<div class="cmp"><div><em>이미 있는 파일</em><b>' + esc(old.name) + '.mp3</b><small>' + old.size.toFixed(1) + 'MB<br>' + esc(old.artist) + '</small></div><div class="nw"><em>새로 올릴 파일</em><b>' + esc(f.name) + '.mp3</b><small>' + f.size.toFixed(1) + 'MB<br>' + esc(f.artist) + '</small></div></div>';
+    if (sim) {
+      h += '<div class="q">이 파일은 다른 음악인가요?</div>';
+      h += opt('diff', cur, '≈', '다른 음악이에요', '비슷한 노래 묶음에 같이 넣어요 (이름은 그대로)');
+      h += opt('over', cur, '⇄', '같은 음악이에요 · 덮어쓰기', '기존 파일을 새 파일로 바꿔요');
+      h += opt('skip', cur, '✕', '같은 음악이에요 · 지우기', '새 파일은 올리지 않고 버려요', 'danger');
+    } else {
+      h += opt('copy', cur, '+', '따로 저장', '이름 뒤에 (1)을 붙여 둘 다 보관해요');
+      h += opt('over', cur, '⇄', '덮어쓰기', '기존 파일을 새 파일로 바꿔요');
+      h += opt('skip', cur, '✕', '지우기', '새 파일은 올리지 않고 버려요', 'danger');
+    }
+    if (left > 0) h += '<button class="chk" role="checkbox" aria-checked="' + s.all + '" data-a="all"><i>' + (s.all ? '✓' : '') + '</i> 남은 ' + (sim ? '비슷한 이름' : '같은 이름') + ' 파일도 같은 방식으로 처리</button>';
+    h += '<div class="row2"><button class="btn" data-a="cancel">취소</button><button class="btn main" data-a="ok">' + (left > 0 && !s.all ? '다음' : '확인') + '</button></div></div>';
+    return h;
+  }
+  function txtSheet(s) {
+    var L = textLines(s), head = '음악 목록 (' + L.length + '곡)';
+    var ex = flat(s)[0], e = function (n) { return ex ? (n === 2 ? ex.artist + ' - ' + ex.name : n === 3 ? ex.name + '.mp3' : ex.name) : ''; };
+    return '<div class="sheet"><div class="grab"></div><h4>목록 텍스트 추출</h4><p>지금 보이는 ' + L.length + '곡을 텍스트로 만들어요. 비슷한 노래 묶음은 나란히 적혀요.</p><div class="muted2">형식</div>' +
+      opt(1, s.fmt, '1', '이름만', esc(e(1))) + opt(2, s.fmt, '2', '가수 - 이름', esc(e(2))) + opt(3, s.fmt, '3', '이름 (확장자 포함)', esc(e(3))) +
+      '<div class="muted2">미리보기 (스크롤해 보세요)</div><div class="pre">' + esc(head + '\n' + L.join('\n')) + '</div>' +
+      '<div class="row2"><button class="btn" data-a="copy2">이름 복사</button><button class="btn main" data-a="save">txt 파일로 저장</button></div></div>';
+  }
+  function view(s) {
+    var h = '<div class="status"><span>9:41</span><span>●●● 100%</span></div><div class="screen">' + (s.screen === 'home' ? homeScreen(s) : upScreen(s));
+    if (s.sheet) h += '<div class="dim" data-a="dimclick">' + (s.sheet === 'txt' ? txtSheet(s) : dupSheet(s)) + '</div>';
+    if (s.toast) h += '<div class="toast">' + esc(s.toast) + '</div>';
+    h += '</div><div class="nav"><button data-a="gohome" aria-current="' + (s.screen === 'home') + '"><span>☰</span>목록</button><button data-a="goup" aria-current="' + (s.screen === 'up') + '"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>';
+    return h;
+  }
+
+  /* ---------- 동작 ---------- */
+  function toast(ph, msg) { ph.s.toast = msg; draw(ph); clearTimeout(ph.tt); ph.tt = setTimeout(function () { ph.s.toast = ''; draw(ph); }, 1800); }
+  function startAsk(ph, from) {
+    var s = ph.s; s.files.forEach(function (f) { delete f.res; });
+    s.ask = s.files.filter(function (f) { return f.kind !== 'new'; }); s.ai = from || 0; s.all = false;
+    if (!s.ask.length) { finish(ph); return; }
+    s.sheet = 'ask'; draw(ph);
+  }
+  function finish(ph) {
+    var s = ph.s, added = 0, skipped = 0;
+    s.tracks.forEach(function (t) { t.isNew = false; });
+    s.files.forEach(function (f) {
+      var res = f.kind === 'new' ? 'add' : (f.res || (f.kind === 'sim' ? 'diff' : 'copy')), t0 = f.target ? find(s, f.target) : null;
+      var mk = function (name) { return { id: s.next++, name: name, artist: f.artist, size: f.size, bundle: null, t: s.next, isNew: true }; };
+      if (res === 'skip') { skipped++; return; }
+      if (res === 'over') { t0.size = f.size; t0.t = ++s.next; t0.isNew = true; added++; return; }
+      var n = mk(res === 'copy' ? f.name + ' (1)' : f.name);
+      if (res === 'diff') {
+        if (!t0.bundle) { var k = 'b' + (s.nb++); s.bundles[k] = t0.name; t0.bundle = k; s.open[k] = true; }
+        n.bundle = t0.bundle; s.open[t0.bundle] = true;
+      }
+      s.tracks.push(n); added++;
+    });
+    s.files = []; s.sheet = null; s.screen = 'home'; s.sort = 'new'; s.q = '';
+    toast(ph, added + '곡을 추가했어요' + (skipped ? ' · ' + skipped + '곡은 올리지 않았어요' : ''));
+  }
+  function act(ph, el) {
+    var s = ph.s, a = el.dataset.a;
+    switch (a) {
+      case 'gohome': s.screen = 'home'; s.sheet = null; break;
+      case 'goup': s.screen = 'up'; s.sheet = null; break;
+      case 'sort': s.sort = el.dataset.v; break;
+      case 'tog': s.open[el.dataset.b] = !s.open[el.dataset.b]; break;
+      case 'copy': toast(ph, flat(s).length + '곡의 이름을 복사했어요 (시안)'); return;
+      case 'copy2': toast(ph, '복사했어요 (시안)'); return;
+      case 'save': s.sheet = null; toast(ph, '음악목록.txt를 저장했어요 (시안)'); return;
+      case 'txt': s.sheet = 'txt'; break;
+      case 'pick': s.files = sampleFiles(); break;
+      case 'clear': s.files = []; break;
+      case 'start': startAsk(ph, 0); return;
+      case 'choose': if (s.sheet === 'txt') s.fmt = parseInt(el.dataset.v, 10); else s.ask[s.ai].res = el.dataset.v; break;
+      case 'all': s.all = !s.all; break;
+      case 'cancel': s.sheet = null; break;
+      case 'dimclick': if (!(event.target.closest('.sheet'))) s.sheet = null; break;
+      case 'ok': {
+        var f = s.ask[s.ai], cur = f.res || (f.kind === 'sim' ? 'diff' : 'copy');
+        f.res = cur;
+        if (s.all) s.ask.forEach(function (x) { if (x.kind === f.kind && !x.res) x.res = cur; });
+        do { s.ai++; } while (s.ai < s.ask.length && s.ask[s.ai].res);
+        if (s.ai >= s.ask.length) finish(ph); else s.all = false;
+        if (s.ai < s.ask.length) break;
+        return;
+      }
+    }
+    draw(ph);
+  }
+  function draw(ph) {
+    var el = ph.el, keep = {};
+    ['.scroll', '.sheet', '.pre'].forEach(function (q) { var n = $(q, el); if (n) keep[q] = n.scrollTop; });
+    var focus = document.activeElement && document.activeElement.id === 'q' ? document.activeElement.selectionStart : null;
+    el.innerHTML = view(ph.s);
+    ['.scroll', '.sheet', '.pre'].forEach(function (q) { var n = $(q, el); if (n && keep[q] != null) n.scrollTop = keep[q]; });
+    if (focus != null) { var i = $('#q', el); i.focus(); i.setSelectionRange(focus, focus); }
+    more(el);
+  }
+  function more(el) {
+    var sc = $('.scroll', el), sw = $('.sw', el); if (!sc || !sw) return;
+    sw.classList.toggle('more', sc.scrollHeight - sc.scrollTop - sc.clientHeight > 6);
+  }
+
+  /* ---------- 폰 만들기 ---------- */
+  var phones = [];
+  function make(v) {
+    var ph = { s: fresh(), v: v };
+    var fig = document.createElement('figure'), slot = document.createElement('div'), cap = document.createElement('figcaption');
+    slot.className = 'slot'; var el = document.createElement('div'); el.className = 'phone'; slot.appendChild(el);
+    cap.textContent = { home: '목록(홈)', up: '음악 업로드', dup: '같은 이름', sim: '비슷한 이름', txt: '텍스트 추출' }[v];
+    fig.appendChild(slot); fig.appendChild(cap); ph.el = el; ph.fig = fig;
+    el.addEventListener('click', function (e) { var b = e.target.closest('[data-a]'); if (b && el.contains(b)) { window.event = e; act(ph, b); } });
+    el.addEventListener('input', function (e) { if (e.target.id === 'q') { ph.s.q = e.target.value; draw(ph); } });
+    el.addEventListener('scroll', function (e) { if (e.target.classList && e.target.classList.contains('scroll')) more(el); }, true);
+    var s = ph.s;
+    if (v === 'up') s.screen = 'up';
+    if (v === 'dup' || v === 'sim') { s.screen = 'up'; startAsk(ph, v === 'sim' ? 1 : 0); }
+    if (v === 'txt') s.sheet = 'txt';
+    s.toast = ''; el.innerHTML = view(s); setTimeout(function () { more(el); }, 0);
+    phones.push(ph); return fig;
+  }
+  var stage = $('#stage');
   function fit() {
-    var n = stage.querySelectorAll('.slot').length;
-    var avail = document.documentElement.clientWidth - 32;
-    var s = Math.min(1, avail / 390);
+    var s = Math.min(1, (document.documentElement.clientWidth - 32) / 390);
     stage.querySelectorAll('.slot').forEach(function (el) {
-      el.style.transform = 'scale(' + s + ')';
-      el.style.width = '390px'; el.style.height = '844px';
-      el.parentNode.style.width = Math.round(390 * s) + 'px';
-      el.style.marginBottom = Math.round(-844 * (1 - s)) + 'px';
+      el.style.transform = 'scale(' + s + ')'; el.style.width = '390px'; el.style.height = '844px';
+      el.parentNode.style.width = Math.round(390 * s) + 'px'; el.style.marginBottom = Math.round(-844 * (1 - s)) + 'px';
     });
   }
+  var ALL = ['home', 'up', 'dup', 'sim', 'txt'], cur = 'home';
   function show(v) {
-    stage.innerHTML = '';
-    (v === 'all' ? ['home', 'up', 'dup', 'txt'] : [v]).forEach(function (k) { stage.appendChild(make(k)); });
-    document.querySelectorAll('#bar .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
-    fit();
-    try { location.hash = v; } catch (e) {}
+    cur = v; stage.innerHTML = ''; phones = [];
+    (v === 'all' ? ALL : [v]).forEach(function (k) { stage.appendChild(make(k)); });
+    document.querySelectorAll('#bar .chip[data-v]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
+    fit(); try { history.replaceState(null, '', '#' + v); } catch (e) {}
   }
-  document.getElementById('bar').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) show(b.dataset.v); });
+  $('#bar').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (!b) return; show(b.id === 'reset' ? cur : b.dataset.v); });
   window.addEventListener('resize', fit);
   var h = (location.hash || '').slice(1);
-  show(['home', 'up', 'dup', 'txt', 'all'].indexOf(h) >= 0 ? h : 'home');
+  show(ALL.concat(['all']).indexOf(h) >= 0 ? h : 'home');
 })();
 </script>
 </body>
