@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>내 음악 목록 시안</title>
+<title>음악 이름 관리 시안</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -60,6 +60,9 @@ figcaption { font-weight: 700; color: var(--sub); }
 .track.on b { color: var(--accent); }
 .dots { color: var(--sub); font-size: 18px; letter-spacing: 1px; padding-left: 6px; }
 
+.tools { display: flex; gap: 6px; padding: 0 18px 8px; flex: none; }
+.btn.sm { min-height: 34px; padding: 6px 11px; font-size: 12px; border-radius: 10px; white-space: nowrap; }
+.pre { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-family: var(--font-num); font-size: 11.5px; line-height: 1.7; max-height: 190px; overflow: hidden; color: var(--text); white-space: pre; overflow-x: auto; }
 .mini { flex: none; margin: 0 12px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; }
 .mini .cover { width: 40px; height: 40px; }
 .mini .cover::after { inset: 14px; background: var(--panel); }
@@ -110,19 +113,21 @@ h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; l
 .opt.danger .ic { color: #ff7b7b; }
 .chk { display: flex; align-items: center; gap: 8px; color: var(--sub); }
 .chk i { width: 18px; height: 18px; border: 1px solid var(--sub); border-radius: 5px; display: inline-block; }
+.muted2 { font-size: 12px; font-weight: 700; color: var(--sub); }
 .row2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
 </style>
 </head>
 <body>
 <div class="page">
   <header class="head">
-    <h1>내 음악 목록 시안</h1>
+    <h1>음악 이름 관리 시안</h1>
     <p>디자인만 확인하는 화면이에요. 버튼은 눌러도 동작하지 않아요. 아래에서 화면을 골라 보세요.</p>
   </header>
   <div class="bar" id="bar">
-    <button class="chip" data-v="home" aria-pressed="true">홈</button>
+    <button class="chip" data-v="home" aria-pressed="true">목록(홈)</button>
     <button class="chip" data-v="up" aria-pressed="false">음악 업로드</button>
     <button class="chip" data-v="dup" aria-pressed="false">같은 이름 선택</button>
+    <button class="chip" data-v="txt" aria-pressed="false">텍스트 추출</button>
     <button class="chip" data-v="all" aria-pressed="false">전체 보기</button>
   </div>
   <div class="stage" id="stage"></div>
@@ -131,25 +136,24 @@ h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; l
 <template id="t-home">
   <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
     <div class="screen">
-      <div class="top"><h2>내 음악</h2><span class="count">12곡 · 74.2MB</span></div>
-      <div class="search"><span style="color:var(--accent);font-weight:700">검색</span> <span>제목·가수 검색</span></div>
+      <div class="top"><h2>음악 이름 관리</h2><span class="count">12곡</span></div>
+      <div class="search"><span style="color:var(--accent);font-weight:700">검색</span> <span>이름·가수 검색</span></div>
       <div class="sorts"><button class="chip" aria-pressed="true">최근 추가</button><button class="chip" aria-pressed="false">제목순</button><button class="chip" aria-pressed="false">가수순</button></div>
+      <div class="tools"><button class="btn sm">이름 복사</button><button class="btn sm main">목록 txt 추출</button><button class="btn sm">＋ 추가</button></div>
       <div class="scroll">
-        <div class="track on"><div class="cover"></div><div><b>밤편지</b><small>아이유</small></div><div class="meta">3:21<br>7.8MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Love wins all</b><small>아이유</small></div><div class="meta">4:12<br>9.6MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>어떻게 이별까지 사랑하겠어, 널 사랑하는 거지</b><small>AKMU</small></div><div class="meta">3:47<br>8.7MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Dynamite</b><small>BTS</small></div><div class="meta">3:19<br>7.6MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>사건의 지평선</b><small>윤하</small></div><div class="meta">4:57<br>11.3MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Hype Boy</b><small>NewJeans</small></div><div class="meta">2:59<br>6.8MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>봄날</b><small>BTS</small></div><div class="meta">4:34<br>10.5MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>첫눈처럼 너에게 가겠다</b><small>에일리</small></div><div class="meta">4:08<br>9.5MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>Palette</b><small>아이유</small></div><div class="meta">3:37<br>8.3MB</div></div>
-        <div class="track"><div class="cover"></div><div><b>그날처럼</b><small>장나라</small></div><div class="meta">4:21<br>10.0MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>밤편지</b><small>아이유</small></div><div class="meta">7.8MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Love wins all</b><small>아이유</small></div><div class="meta">9.6MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>어떻게 이별까지 사랑하겠어, 널 사랑하는 거지</b><small>AKMU</small></div><div class="meta">8.7MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Dynamite</b><small>BTS</small></div><div class="meta">7.6MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>사건의 지평선</b><small>윤하</small></div><div class="meta">11.3MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Hype Boy</b><small>NewJeans</small></div><div class="meta">6.8MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>봄날</b><small>BTS</small></div><div class="meta">10.5MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>첫눈처럼 너에게 가겠다</b><small>에일리</small></div><div class="meta">9.5MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>Palette</b><small>아이유</small></div><div class="meta">8.3MB</div></div>
+        <div class="track"><div class="cover"></div><div><b>그날처럼</b><small>장나라</small></div><div class="meta">10.0MB</div></div>
       </div>
-      <button class="fab">＋ 음악 추가</button>
-      <div class="mini"><div class="cover"></div><div><b>밤편지</b><div class="bar2"><i></i></div></div><div class="ctl">‹ ▶ ›</div></div>
     </div>
-    <div class="nav"><button aria-current="true"><span>♪</span>홈</button><button><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
+    <div class="nav"><button aria-current="true"><span>☰</span>목록</button><button><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
   </div>
 </template>
 
@@ -168,7 +172,7 @@ h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; l
       </div>
       <div class="foot"><div class="row2"><button class="btn">비우기</button><button class="btn main">업로드 시작</button></div></div>
     </div>
-    <div class="nav"><button><span>♪</span>홈</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
+    <div class="nav"><button><span>☰</span>목록</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
   </div>
 </template>
 
@@ -196,14 +200,42 @@ h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; l
         <div class="row2"><button class="btn">취소</button><button class="btn main">확인</button></div>
       </div></div>
     </div>
-    <div class="nav"><button><span>♪</span>홈</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
+    <div class="nav"><button><span>☰</span>목록</button><button aria-current="true"><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
+  </div>
+</template>
+
+<template id="t-txt">
+  <div class="phone"><div class="status"><span>9:41</span><span>●●● 100%</span></div>
+    <div class="screen">
+      <div class="top"><h2>음악 이름 관리</h2><span class="count">12곡</span></div>
+      <div class="scroll"><div class="track"><div class="cover"></div><div><b>밤편지</b><small>아이유</small></div><div class="meta">7.8MB</div></div></div>
+      <div class="dim"><div class="sheet">
+        <div class="grab"></div>
+        <h4>목록 텍스트 추출</h4>
+        <p>지금 보이는 12곡을 텍스트로 만들어요.</p>
+        <div class="muted2">형식</div>
+        <button class="opt sel"><span class="ic">1</span><span><b>이름만</b><small>밤편지</small></span></button>
+        <button class="opt"><span class="ic">2</span><span><b>가수 - 이름</b><small>아이유 - 밤편지</small></span></button>
+        <button class="opt"><span class="ic">3</span><span><b>이름 (확장자 포함)</b><small>밤편지.mp3</small></span></button>
+        <div class="muted2">미리보기</div>
+        <div class="pre">밤편지
+Love wins all
+어떻게 이별까지 사랑하겠어, 널 사랑하는 거지
+Dynamite
+사건의 지평선
+Hype Boy
+…</div>
+        <div class="row2"><button class="btn">이름 복사</button><button class="btn main">txt 파일로 저장</button></div>
+      </div></div>
+    </div>
+    <div class="nav"><button aria-current="true"><span>☰</span>목록</button><button><span>⇪</span>업로드</button></div><div class="gesture"><i></i></div>
   </div>
 </template>
 
 <script>
 (function () {
   var stage = document.getElementById('stage');
-  var names = { home: '홈', up: '음악 업로드', dup: '같은 이름 선택' };
+  var names = { home: '목록(홈)', txt: '텍스트 추출', up: '음악 업로드', dup: '같은 이름 선택' };
   function make(v) {
     var fig = document.createElement('figure');
     var slot = document.createElement('div'); slot.className = 'slot';
@@ -224,7 +256,7 @@ h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; l
   }
   function show(v) {
     stage.innerHTML = '';
-    (v === 'all' ? ['home', 'up', 'dup'] : [v]).forEach(function (k) { stage.appendChild(make(k)); });
+    (v === 'all' ? ['home', 'up', 'dup', 'txt'] : [v]).forEach(function (k) { stage.appendChild(make(k)); });
     document.querySelectorAll('#bar .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
     fit();
     try { location.hash = v; } catch (e) {}
@@ -232,7 +264,7 @@ h3 { margin: 14px 0 6px; font-size: 13px; color: var(--sub); font-weight: 700; l
   document.getElementById('bar').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) show(b.dataset.v); });
   window.addEventListener('resize', fit);
   var h = (location.hash || '').slice(1);
-  show(['home', 'up', 'dup', 'all'].indexOf(h) >= 0 ? h : 'home');
+  show(['home', 'up', 'dup', 'txt', 'all'].indexOf(h) >= 0 ? h : 'home');
 })();
 </script>
 </body>
