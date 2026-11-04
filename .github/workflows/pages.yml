@@ -9,6 +9,7 @@ on:
       - 'dayclean/**'
       - 'keywordscan/**'
       - 'musiclist/**'
+      - 'uswsync/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 

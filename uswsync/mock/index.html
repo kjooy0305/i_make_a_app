@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>USW SYNC 시안</title>
+<style>
+:root{--bg:#eef1f6;--card:#fff;--ink:#14213d;--sub:#6b7488;--line:#e3e7ef;--pri:#1f4fd8;--pri-soft:#e6edff;--ok:#12a36b;--warn:#e8890c;--m0:#f1f3f8;--m1:#cfe0ff;--m2:#8fb4ff;--m3:#4f84f2;--m4:#1f4fd8}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;display:flex;justify-content:center;padding:16px}
+.phone{width:100%;max-width:400px;height:min(780px,calc(100vh - 32px));min-height:560px;background:var(--bg);border-radius:28px;box-shadow:0 10px 40px rgba(20,33,61,.18);overflow:hidden;display:flex;flex-direction:column;position:relative;border:1px solid var(--line)}
+header{background:var(--card);padding:14px 18px 10px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:17px}header small{color:var(--sub)}
+main{flex:1;overflow-y:auto;padding:14px 16px 28px;position:relative;scrollbar-width:thin;scrollbar-color:#b8c0d2 transparent}
+main::-webkit-scrollbar{width:6px}main::-webkit-scrollbar-thumb{background:#b8c0d2;border-radius:3px}
+.fade{position:absolute;left:0;right:0;bottom:58px;height:26px;background:linear-gradient(transparent,var(--bg));pointer-events:none;z-index:2}
+nav{display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0)}
+nav button{flex:1;border:0;background:none;padding:9px 0 8px;font:inherit;font-size:11px;color:var(--sub);cursor:pointer}
+nav button b{display:block;font-size:19px;font-weight:400;line-height:1.1}
+nav button.on{color:var(--pri);font-weight:700}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;border:1px solid var(--line)}
+.card h2{margin:0 0 8px;font-size:14px}
+.row{display:flex;align-items:center;gap:8px}.sp{flex:1}
+.muted{color:var(--sub);font-size:12px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:5px 11px;font:inherit;font-size:12px;cursor:pointer;color:var(--ink)}
+.chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.dot{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex:none}
+.btn{border:0;background:var(--pri);color:#fff;border-radius:10px;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}
+.btn.ghost{background:var(--pri-soft);color:var(--pri)}.btn.full{width:100%}
+.bar{height:8px;background:var(--m0);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ok);transition:width .3s}
+.grid{display:grid;grid-template-columns:34px repeat(5,1fr);gap:3px}
+.grid .h{font-size:11px;color:var(--sub);text-align:center;padding:2px 0}
+.cell{height:30px;border-radius:6px;border:2px solid transparent;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+.cell.sel{border-color:var(--ink)}
+.legend{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--sub);margin-top:8px}
+.legend i{width:14px;height:14px;border-radius:4px;display:inline-block}
+.rec{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}.rec:first-of-type{border-top:0}
+.tag{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--pri-soft);color:var(--pri);font-weight:700}
+.tag.ok{background:#dcf5ea;color:var(--ok)}.tag.warn{background:#fdeed7;color:var(--warn)}
+.todo{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}.todo:first-child{border-top:0}
+.chk{width:22px;height:22px;border-radius:7px;border:2px solid #b8c0d2;background:#fff;cursor:pointer;flex:none;color:#fff;font-size:13px;line-height:18px;text-align:center;padding:0}
+.chk.on{background:var(--ok);border-color:var(--ok)}
+.todo.done .t{text-decoration:line-through;color:var(--sub)}
+.vote{display:flex;gap:6px;margin-top:8px}
+.vote button{flex:1}
+.sheet-bg{position:absolute;inset:0;background:rgba(20,33,61,.4);display:none;align-items:flex-end;z-index:5}
+.sheet-bg.on{display:flex}
+.sheet{background:var(--card);width:100%;border-radius:20px 20px 0 0;padding:18px 16px 22px;max-height:80%;overflow-y:auto}
+.sheet h3{margin:0 0 12px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit;margin-bottom:10px;background:#fff}
+.toast{position:absolute;left:50%;bottom:76px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:20px;font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9;white-space:nowrap}
+.toast.on{opacity:1}
+.note{text-align:center;color:var(--sub);font-size:11px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <header><h1 id="ttl">USW SYNC</h1><small id="sub"></small></header>
+  <main id="main"></main>
+  <div class="fade"></div>
+  <nav id="nav"></nav>
+  <div class="sheet-bg" id="bg"><div class="sheet" id="sheet"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+const DAYS=['월','화','수','목','금'], HOURS=[9,10,11,12,13,14,15,16,17];
+const M=[{n:'나',c:'#1f4fd8'},{n:'민수',c:'#12a36b'},{n:'지훈',c:'#e8890c'},{n:'서연',c:'#a23fd0'}];
+// 수업 있는 시간(막힘): [member][day] = 시작시각 배열
+const busy=[
+ {0:[9,10,13],1:[11,12],2:[9,10],3:[13,14],4:[]},
+ {0:[10,11],1:[9,10,14],2:[13,14],3:[11,12],4:[9]},
+ {0:[9,13,14],1:[13],2:[10,11],3:[9,10],4:[14,15]},
+ {0:[11,12],1:[10,14,15],2:[9],3:[10,11,15],4:[13]}
+];
+const free=(m,d,h)=>!busy[m][d].includes(h);
+const S={tab:0,mem:[true,true,true,true],sel:null,
+ cands:[
+  {id:1,d:2,h:15,v:{}, },{id:2,d:4,h:11,v:{}},{id:3,d:0,h:15,v:{}}
+ ],confirmed:null,filter:'전체',
+ todos:[
+  {t:'발표 자료 초안',w:1,due:'11/08',done:true},
+  {t:'설문조사 문항 작성',w:2,due:'11/10',done:false},
+  {t:'참고문헌 정리',w:3,due:'11/11',done:false},
+  {t:'중간 보고서 제출',w:0,due:'11/14',done:false},
+  {t:'발표 리허설',w:0,due:'11/18',done:false},
+  {t:'최종 PPT 디자인',w:3,due:'11/20',done:false}
+ ]};
+S.cands[0].v={1:1,2:1};
+const $=s=>document.querySelector(s);
+const cand=c=>`${DAYS[c.d]} ${c.h}:00–${c.h+1}:00`;
+function freeCount(d,h){return M.reduce((a,_,i)=>a+(S.mem[i]&&free(i,d,h)?1:0),0)}
+function active(){return S.mem.filter(Boolean).length}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),1600)}
+function sheet(html){ $('#sheet').innerHTML=html; $('#bg').classList.add('on') }
+function close(){ $('#bg').classList.remove('on') }
+$('#bg').addEventListener('click',e=>{if(e.target.id==='bg')close()});
+
+function recs(){ // 선택된 팀원 모두 가능한 연속 슬롯
+  const out=[];
+  DAYS.forEach((_,d)=>HOURS.forEach(h=>{ if(freeCount(d,h)===active()&&active()>0) out.push({d,h}) }));
+  return out;
+}
+function renderNav(){
+  const t=[['🏠','홈'],['🗓','공강'],['🗳','회의'],['✅','할 일']];
+  $('#nav').innerHTML=t.map((x,i)=>`<button class="${S.tab===i?'on':''}" data-t="${i}"><b>${x[0]}</b>${x[1]}</button>`).join('');
+  $('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.tab=+b.dataset.t;S.sel=null;render();$('#main').scrollTop=0});
+}
+function pct(){const d=S.todos.filter(x=>x.done).length;return Math.round(d/S.todos.length*100)}
+
+function home(){
+  const next=S.confirmed?cand(S.confirmed):'아직 확정된 회의가 없어요';
+  return `<div class="card"><div class="row"><div><b style="font-size:16px">소프트웨어공학 3조</b><div class="muted">팀원 4명 · 중간 발표 D-14</div></div><div class="sp"></div>
+   <span class="tag">초대 링크 복사</span></div>
+   <div class="row" style="margin-top:10px">${M.map(m=>`<span class="dot" style="background:${m.c}">${m.n[0]}</span>`).join('')}</div></div>
+   <div class="card"><h2>다음 회의</h2><div class="row"><b>${next}</b><div class="sp"></div>${S.confirmed?'<span class="tag ok">확정</span>':'<span class="tag warn">투표 중</span>'}</div>
+   <button class="btn ghost full" style="margin-top:10px" data-go="${S.confirmed?1:2}">${S.confirmed?'공강 확인하기':'투표하러 가기'}</button></div>
+   <div class="card"><h2>팀 진행률</h2><div class="row"><div class="bar sp"><i style="width:${pct()}%"></i></div><b>${pct()}%</b></div>
+   <div class="muted" style="margin-top:6px">할 일 ${S.todos.filter(x=>x.done).length}/${S.todos.length} 완료</div></div>
+   <div class="card"><h2>임박한 마감</h2>${S.todos.filter(x=>!x.done).slice(0,3).map(x=>`<div class="row" style="padding:5px 0"><span class="dot" style="background:${M[x.w].c}">${M[x.w].n[0]}</span><span>${x.t}</span><div class="sp"></div><span class="muted">${x.due}</span></div>`).join('')}</div>
+   <div class="note">※ 시안입니다. 실제 저장·로그인은 동작하지 않아요.</div>`;
+}
+function gong(){
+  const r=recs();
+  let g='<div class="grid"><div></div>'+DAYS.map(d=>`<div class="h">${d}</div>`).join('');
+  const col=['var(--m0)','var(--m1)','var(--m2)','var(--m3)','var(--m4)'];
+  HOURS.forEach(h=>{ g+=`<div class="h" style="line-height:30px">${h}</div>`;
+    DAYS.forEach((_,d)=>{const n=freeCount(d,h),a=active();const lvl=a?Math.round(n/a*4):0;
+      const sel=S.sel&&S.sel.d===d&&S.sel.h===h;
+      g+=`<div class="cell ${sel?'sel':''}" style="background:${col[lvl]};color:${lvl<2?'#6b7488':'#fff'}" data-d="${d}" data-h="${h}">${n===a&&a?'★':n||''}</div>`})});
+  g+='</div>';
+  let det='';
+  if(S.sel){const {d,h}=S.sel;det=`<div class="card" style="margin-top:12px"><h2>${DAYS[d]} ${h}:00 상세</h2>`+M.map((m,i)=>`<div class="row" style="padding:3px 0"><span class="dot" style="background:${m.c}">${m.n[0]}</span>${m.n}<div class="sp"></div>${free(i,d,h)?'<span class="tag ok">공강</span>':'<span class="tag warn">수업</span>'}</div>`).join('')+'</div>'}
+  return `<div class="chips">${M.map((m,i)=>`<button class="chip ${S.mem[i]?'on':''}" data-m="${i}">${m.n}</button>`).join('')}</div>
+   <div class="card">${g}<div class="legend">적음 ${['m0','m1','m2','m3','m4'].map(c=>`<i style="background:var(--${c})"></i>`).join('')} 많음 · ★ 전원 가능</div></div>${det}
+   <div class="card"><h2>추천 회의 시간 <span class="muted">(${r.length}곳)</span></h2>
+   ${r.length?r.slice(0,6).map(x=>`<div class="rec"><b>${DAYS[x.d]} ${x.h}:00–${x.h+1}:00</b><div class="sp"></div><button class="btn ghost" data-add="${x.d},${x.h}">후보 추가</button></div>`).join(''):'<div class="muted">선택한 팀원 모두 가능한 시간이 없어요.</div>'}</div>`;
+}
+function meet(){
+  const total=4;
+  return `<div class="card"><h2>${S.confirmed?'확정된 회의':'회의 시간 투표'}</h2>${S.confirmed?`<div class="row"><b style="font-size:16px">${cand(S.confirmed)}</b><div class="sp"></div><span class="tag ok">확정</span></div><button class="btn ghost full" style="margin-top:10px" data-unconfirm>확정 취소</button>`:'<div class="muted">후보에 투표하고, 가장 많은 표를 받은 시간을 확정해요.</div>'}</div>
+  ${S.cands.map(c=>{const n=Object.values(c.v).filter(x=>x===1).length;const mine=c.v[0];
+   return `<div class="card"><div class="row"><b>${cand(c)}</b><div class="sp"></div><span class="tag">${n}/${total}표</span></div>
+   <div class="bar" style="margin-top:8px"><i style="width:${n/total*100}%;background:var(--pri)"></i></div>
+   <div class="row" style="margin-top:8px">${M.map((m,i)=>`<span class="dot" style="background:${c.v[i]===1?m.c:'#cfd5e2'}" title="${m.n}">${m.n[0]}</span>`).join('')}</div>
+   <div class="vote"><button class="btn ${mine===1?'':'ghost'}" data-vote="${c.id}">${mine===1?'투표함 ✓':'가능해요'}</button>${S.confirmed?'':`<button class="btn ghost" data-conf="${c.id}">이 시간 확정</button>`}</div></div>`}).join('')}
+  <button class="btn ghost full" data-go="1">＋ 공강 화면에서 후보 추가</button>`;
+}
+function todo(){
+  const f=S.filter;const list=S.todos.map((x,i)=>({...x,i})).filter(x=>f==='전체'||M[x.w].n===f);
+  return `<div class="card"><div class="row"><div class="bar sp"><i style="width:${pct()}%"></i></div><b>${pct()}%</b></div></div>
+   <div class="chips">${['전체',...M.map(m=>m.n)].map(n=>`<button class="chip ${f===n?'on':''}" data-f="${n}">${n}</button>`).join('')}</div>
+   <div class="card">${list.length?list.map(x=>`<div class="todo ${x.done?'done':''}"><button class="chk ${x.done?'on':''}" data-chk="${x.i}">${x.done?'✓':''}</button><div class="sp"><div class="t">${x.t}</div><div class="muted">마감 ${x.due}</div></div><span class="dot" style="background:${M[x.w].c}">${M[x.w].n[0]}</span></div>`).join(''):'<div class="muted">할 일이 없어요.</div>'}</div>
+   <button class="btn full" data-new>＋ 할 일 추가</button>`;
+}
+const titles=['USW SYNC','공통 공강','회의 투표','할 일 · 마감'];
+const subs=['소프트웨어공학 3조','팀원 시간표를 겹쳐서 보여줘요','후보를 고르고 확정해요','역할 분담과 진행 상황'];
+function render(){
+  $('#ttl').textContent=titles[S.tab];$('#sub').textContent=subs[S.tab];
+  $('#main').innerHTML=[home,gong,meet,todo][S.tab]();renderNav();
+}
+$('#main').addEventListener('click',e=>{
+  const t=e.target.closest('[data-go],[data-m],[data-d],[data-add],[data-vote],[data-conf],[data-unconfirm],[data-f],[data-chk],[data-new]');if(!t)return;const keep=$('#main').scrollTop;const D=t.dataset;
+  if('go' in D){S.tab=+D.go;S.sel=null}
+  else if('m' in D){S.mem[+D.m]=!S.mem[+D.m];S.sel=null}
+  else if('d' in D&&'h' in D){const d=+D.d,h=+D.h;S.sel=S.sel&&S.sel.d===d&&S.sel.h===h?null:{d,h}}
+  else if('add' in D){const [d,h]=D.add.split(',').map(Number);if(S.cands.some(c=>c.d===d&&c.h===h))return toast('이미 후보에 있어요');S.cands.push({id:Date.now(),d,h,v:{}});toast('투표 후보에 추가했어요')}
+  else if('vote' in D){const c=S.cands.find(c=>c.id==D.vote);c.v[0]=c.v[0]===1?0:1}
+  else if('conf' in D){S.confirmed=S.cands.find(c=>c.id==D.conf);toast('회의를 확정했어요')}
+  else if('unconfirm' in D){S.confirmed=null}
+  else if('f' in D){S.filter=D.f}
+  else if('chk' in D){S.todos[+D.chk].done=!S.todos[+D.chk].done}
+  else if('new' in D){return openNew()}
+  render();$('#main').scrollTop=(('go' in D)?0:keep);
+});
+function openNew(){
+  sheet(`<h3>할 일 추가</h3><input id="nt" placeholder="할 일 내용"><select id="nw">${M.map((m,i)=>`<option value="${i}">${m.n}</option>`).join('')}</select><input id="nd" placeholder="마감일 (예: 11/25)"><button class="btn full" id="ns">추가</button>`);
+  $('#ns').onclick=()=>{const t=$('#nt').value.trim();if(!t)return toast('내용을 입력해 주세요');S.todos.push({t,w:+$('#nw').value,due:$('#nd').value||'미정',done:false});close();render();toast('추가했어요');const m=$('#main');m.scrollTop=m.scrollHeight}
+}
+render();
+</script>
+</body>
+</html>
