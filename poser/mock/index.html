@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="body-data.js"></script>
 <style>
 /* Layout: 위에 화면 고르는 줄, 가운데에 폰 비율(390×844) 한 대. 폰 안에서 3D 마네킹을 직접 돌려 볼 수 있다. */
 :root {
@@ -98,12 +99,12 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 
 /* 시트 */
 .dim { position: absolute; inset: 0; background: rgba(8,9,12,.6); display: flex; align-items: flex-end; z-index: 5; }
-.sheet { width: 100%; background: var(--panel); border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); padding: 10px 16px 16px; display: grid; gap: 10px; max-height: 80%; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.sheet { width: 100%; background: var(--panel); border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); padding: 10px 16px 16px; display: grid; gap: 10px; max-height: 80%; grid-template-rows: auto auto auto minmax(0, 1fr) auto; }
 .sheet.full { max-height: 92%; }
 .grab { width: 44px; height: 4px; border-radius: 3px; background: var(--line); margin: 0 auto; }
 .sheet h4 { margin: 0; font-size: 17px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
 .sheet h4 .x { margin-left: auto; }
-.tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-height: 36px; align-items: center; }
 .tabs::-webkit-scrollbar { display: none; }
 .tabs .chip { min-height: 32px; padding: 3px 12px; font-size: 12px; flex: none; }
 .body { overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: #6a7283 transparent; padding-right: 4px; }
@@ -133,14 +134,14 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 <div class="page">
   <header class="head">
     <h1>포저 시안</h1>
-    <p>3D 마네킹으로 포즈를 잡는 앱의 시안이에요. 폰 안에서 직접 해 보세요: 관절(노란 점)을 눌러 고르고 아래 슬라이더로 돌리고, 배경을 끌면 카메라가 돌아요. 모델 추가, 완성된 포즈, 카메라·조명, 저장·불러오기가 움직여요. 손가락, 소품, 상점은 화면만 있어요.</p>
+    <p>3D 마네킹으로 포즈를 잡는 앱의 시안이에요. 폰 안에서 직접 해 보세요: 관절(노란 점)을 눌러 고르고 아래 슬라이더로 돌리고, 배경을 끌면 카메라가 돌아요. 모델 10종, 완성된 포즈 25개, 손가락 편집과 핸드포즈, 소품·헤어·의상, 카메라·조명, 저장·불러오기가 움직여요. 동물·탈것 팩과 상점은 화면만 있어요.</p>
   </header>
   <div class="bar" id="bar">
     <button class="chip" data-v="menu" aria-pressed="false">메인 메뉴</button>
     <button class="chip" data-v="work" aria-pressed="true">작업 화면</button>
     <button class="chip" data-v="add" aria-pressed="false">모델 추가</button>
     <button class="chip" data-v="pose" aria-pressed="false">완성된 포즈</button>
-    <button class="chip" data-v="hand" aria-pressed="false">손·소품</button>
+    <button class="chip" data-v="hand" aria-pressed="false">손·꾸미기</button>
     <button class="chip" data-v="cam" aria-pressed="false">카메라</button>
     <button class="chip" data-v="light" aria-pressed="false">조명</button>
     <button class="chip" data-v="save" aria-pressed="false">저장·불러오기</button>
@@ -154,177 +155,281 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var D2R = Math.PI / 180;
+  var V3 = function (a) { return new THREE.Vector3(a[0], a[1], a[2]); };
 
-  /* ---------- 관절 정의 (EasyPose 분석: 몸중심·허리·가슴·목·얼굴·쇄골과 어깨·팔·팔꿈치·손목과 손·고관절·무릎·발목) ---------- */
-  // [id, 한글 이름, 부모, 위치[x,y,z], 뼈대 {len, r, dir}, 좌우 짝]
-  var J = [
-    ['hip', '몸중심', null, [0, 0.98, 0], { len: 0.0, r: 0.12 }, null],
-    ['waist', '허리', 'hip', [0, 0.02, 0], { len: 0.2, r: 0.13, dir: 1 }, null],
-    ['chest', '가슴', 'waist', [0, 0.2, 0], { len: 0.22, r: 0.16, dir: 1 }, null],
-    ['neck', '목', 'chest', [0, 0.24, 0], { len: 0.08, r: 0.05, dir: 1 }, null],
-    ['head', '얼굴', 'neck', [0, 0.08, 0], { len: 0.0, r: 0.11, head: true }, null],
-    ['shL', '왼쪽 쇄골과 어깨', 'chest', [0.17, 0.2, 0], { len: 0.0, r: 0.06 }, 'shR'],
-    ['shR', '오른쪽 쇄골과 어깨', 'chest', [-0.17, 0.2, 0], { len: 0.0, r: 0.06 }, 'shL'],
-    ['armL', '왼쪽 팔', 'shL', [0.04, 0, 0], { len: 0.3, r: 0.045, dir: -1 }, 'armR'],
-    ['armR', '오른쪽 팔', 'shR', [-0.04, 0, 0], { len: 0.3, r: 0.045, dir: -1 }, 'armL'],
-    ['elbL', '왼쪽 팔꿈치', 'armL', [0, -0.3, 0], { len: 0.27, r: 0.04, dir: -1 }, 'elbR'],
-    ['elbR', '오른쪽 팔꿈치', 'armR', [0, -0.3, 0], { len: 0.27, r: 0.04, dir: -1 }, 'elbL'],
-    ['handL', '왼쪽 손목과 손', 'elbL', [0, -0.27, 0], { len: 0.09, r: 0.035, dir: -1, hand: true }, 'handR'],
-    ['handR', '오른쪽 손목과 손', 'elbR', [0, -0.27, 0], { len: 0.09, r: 0.035, dir: -1, hand: true }, 'handL'],
-    ['legL', '왼쪽 고관절', 'hip', [0.09, -0.04, 0], { len: 0.45, r: 0.065, dir: -1 }, 'legR'],
-    ['legR', '오른쪽 고관절', 'hip', [-0.09, -0.04, 0], { len: 0.45, r: 0.065, dir: -1 }, 'legL'],
-    ['kneeL', '왼쪽 무릎', 'legL', [0, -0.45, 0], { len: 0.43, r: 0.05, dir: -1 }, 'kneeR'],
-    ['kneeR', '오른쪽 무릎', 'legR', [0, -0.45, 0], { len: 0.43, r: 0.05, dir: -1 }, 'kneeL'],
-    ['footL', '왼쪽 발목', 'kneeL', [0, -0.43, 0], { len: 0.0, r: 0.045, foot: true }, 'footR'],
-    ['footR', '오른쪽 발목', 'kneeR', [0, -0.43, 0], { len: 0.0, r: 0.045, foot: true }, 'footL']
-  ];
-  var JID = J.map(function (j) { return j[0]; });
-  var JBY = {}; J.forEach(function (j) { JBY[j[0]] = j; });
+  /* ---------- 뼈대: 관절 이름과 계층 (EasyPose 분석 기준 71개 관절) ---------- */
+  var FING = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'], FKO = { Thumb: '엄지', Index: '검지', Middle: '중지', Ring: '약지', Pinky: '새끼' };
+  var PARENT = { Spine: 'Hips', Spine1: 'Spine', Spine2: 'Spine1', Neck: 'Spine2', Head: 'Neck', HeadTop_End: 'Head' };
+  ['Left', 'Right'].forEach(function (s) {
+    PARENT[s + 'Shoulder'] = 'Spine2'; PARENT[s + 'Arm'] = s + 'Shoulder'; PARENT[s + 'ArmTwist'] = s + 'Arm'; PARENT[s + 'ForeArm'] = s + 'ArmTwist';
+    PARENT[s + 'HandTwist'] = s + 'ForeArm'; PARENT[s + 'Hand'] = s + 'HandTwist';
+    FING.forEach(function (f) { for (var k = 1; k <= 4; k++) PARENT[s + 'Hand' + f + k] = k === 1 ? s + 'Hand' : s + 'Hand' + f + (k - 1); });
+    PARENT[s + 'UpLeg'] = 'Hips'; PARENT[s + 'UpLegTwist'] = s + 'UpLeg'; PARENT[s + 'Leg'] = s + 'UpLegTwist'; PARENT[s + 'Foot'] = s + 'Leg'; PARENT[s + 'ToeBase'] = s + 'Foot'; PARENT[s + 'Toe_End'] = s + 'ToeBase';
+  });
+  // 눌러서 고를 수 있는 관절 (이름, 한글)
+  var MAIN = [['Hips', '몸중심'], ['Spine', '허리'], ['Spine1', '가슴'], ['Spine2', '윗가슴'], ['Neck', '목'], ['Head', '얼굴']];
+  var SIDE_MAIN = [['Shoulder', '쇄골과 어깨'], ['Arm', '팔'], ['ForeArm', '팔꿈치'], ['Hand', '손목과 손'], ['UpLeg', '고관절'], ['Leg', '무릎'], ['Foot', '발목'], ['ToeBase', '발가락']];
+  var KO = {}, SELECTABLE = [];
+  MAIN.forEach(function (m) { KO[m[0]] = m[1]; SELECTABLE.push(m[0]); });
+  ['Left', 'Right'].forEach(function (s) { SIDE_MAIN.forEach(function (m) { KO[s + m[0]] = (s === 'Left' ? '왼쪽 ' : '오른쪽 ') + m[1]; SELECTABLE.push(s + m[0]); }); });
+  var TWIST_OF = {}; ['Left', 'Right'].forEach(function (s) { TWIST_OF[s + 'Arm'] = s + 'ArmTwist'; TWIST_OF[s + 'ForeArm'] = s + 'HandTwist'; TWIST_OF[s + 'UpLeg'] = s + 'UpLegTwist'; });
+  var ALLJ = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'HeadTop_End'];
+  ['Left', 'Right'].forEach(function (s) { ['Shoulder', 'Arm', 'ArmTwist', 'ForeArm', 'HandTwist', 'Hand', 'UpLeg', 'UpLegTwist', 'Leg', 'Foot', 'ToeBase', 'Toe_End'].forEach(function (n) { ALLJ.push(s + n); }); FING.forEach(function (f) { for (var k = 1; k <= 4; k++) ALLJ.push(s + 'Hand' + f + k); }); });
+  var mirName = function (n) { return n.indexOf('Left') === 0 ? 'Right' + n.slice(4) : n.indexOf('Right') === 0 ? 'Left' + n.slice(5) : null; };
 
-  /* ---------- 모델 종류 (EasyPose 분석: 일반 / 소형(4등신) / 히어로 / 빅맨 …) ---------- */
+  /* ---------- 모델 종류 (원본의 남·여 일반 / 소형 / 4등신 / 히어로 / 빅맨 / 운동소년 비율을 참고) ---------- */
   var TYPES = [
-    { id: 'male', name: '남자 일반', sex: '남', s: 1, limb: 1, head: 1, thick: 1 },
-    { id: 'female', name: '여자 일반', sex: '여', s: 0.94, limb: 1, head: 0.95, thick: 0.85 },
-    { id: 'male4', name: '남자 4등신', sex: '남', s: 0.6, limb: 0.62, head: 1.9, thick: 1.35 },
-    { id: 'female4', name: '여자 4등신', sex: '여', s: 0.58, limb: 0.6, head: 1.9, thick: 1.3 },
-    { id: 'hero', name: '히어로(남)', sex: '남', s: 1.06, limb: 1, head: 1, thick: 1.4 },
-    { id: 'herof', name: '히어로(여)', sex: '여', s: 1, limb: 1.02, head: 0.95, thick: 1.05 },
-    { id: 'big', name: '빅맨', sex: '남', s: 1.12, limb: 1, head: 1, thick: 1.9 }
+    { id: 'male', name: '남자 일반', d: 'male', f: false }, { id: 'female', name: '여자 일반', d: 'female', f: true },
+    { id: 'maleS', name: '남자 소형', d: 'maleS', f: false }, { id: 'femaleS', name: '여자 소형', d: 'femaleS', f: true },
+    { id: 'tiny', name: '남자 4등신', d: 'tiny', f: false }, { id: 'tinyf', name: '여자 4등신', d: 'tiny', f: true },
+    { id: 'hero', name: '히어로(남)', d: 'hero', f: false }, { id: 'herof', name: '히어로(여)', d: 'herof', f: true },
+    { id: 'big', name: '빅맨', d: 'big', f: false }, { id: 'fit', name: '운동소년', d: 'fit', f: false }
   ];
   var TBY = {}; TYPES.forEach(function (t) { TBY[t.id] = t; });
   var SKINS = ['#e9e4dc', '#f0c7a8', '#c98f62', '#8a5a3b', '#9fb3c8', '#c8d6a0', '#e8a0a8'];
+  var TOPS = ['#e8edf5', '#2f4d8f', '#c23b3b', '#2e7d5b', '#e0b030', '#222428'], BOTS = ['#2b2f3a', '#6b7280', '#3f5f9f', '#8a5a3b', '#d8d2c4', '#7a2f4f'], HAIRS_C = ['#2a1d17', '#6b4a2f', '#c9a14a', '#b23a3a', '#e8e8ee', '#3a5fa0'];
+  var CLOTH = { none: ['맨몸', {}], tee: ['티셔츠·반바지', { torso: 'top', upperArm: 'top', thigh: 'bot' }], sport: ['운동복', { torso: 'top', upperArm: 'top', foreArm: 'top', thigh: 'bot', shin: 'bot' }], school: ['교복', { torso: 'top', upperArm: 'top', thigh: 'bot', shin: 'bot', foot: 'shoe', skirt: 1 }], armor: ['중세 갑옷', { torso: 'metal', upperArm: 'metal', foreArm: 'metal', thigh: 'metal', shin: 'metal', foot: 'metal', hand: 'metal' }] };
+  var HAIRS = [['없음', 'none'], ['짧은 머리', 'short'], ['뾰족 머리', 'spiky'], ['단발', 'bob'], ['긴 머리', 'long'], ['양갈래', 'twin'], ['포니테일', 'pony'], ['올림머리', 'bun'], ['야구 모자', 'cap']];
+  var PROPS = [['검', 'sword'], ['단검', 'dagger'], ['도끼', 'axe'], ['메이스', 'mace'], ['창', 'spear'], ['활', 'bow'], ['지팡이', 'staff'], ['방패', 'shield'], ['권총', 'pistol'], ['소총', 'rifle'], ['기타', 'guitar'], ['우산', 'umbrella']];
+  var HANDP = { '기본': {}, '쥐기': { all: [38, 52, 40] }, '주먹': { all: [70, 85, 60], Thumb: [30, 40, 30] }, '가리키기': { Index: [0, 0, 0], Middle: [75, 90, 60], Ring: [75, 90, 60], Pinky: [75, 90, 60], Thumb: [25, 35, 25] }, 'V': { Index: [0, 0, 0], Middle: [0, 0, 0], Ring: [75, 90, 60], Pinky: [75, 90, 60], Thumb: [30, 40, 30], spread: { Index: 10, Middle: -10 } }, '펼치기': { spread: { Index: 12, Middle: 0, Ring: -8, Pinky: -16 } } };
+
+  // 완성된 포즈: 관절 이름 줄임말 → 실제 관절
+  var AB = { hip: 'Hips', waist: 'Spine', chest: 'Spine1', uchest: 'Spine2', neck: 'Neck', head: 'Head', armL: 'LeftArm', armR: 'RightArm', elbL: 'LeftForeArm', elbR: 'RightForeArm', handL: 'LeftHand', handR: 'RightHand', legL: 'LeftUpLeg', legR: 'RightUpLeg', kneeL: 'LeftLeg', kneeR: 'RightLeg', footL: 'LeftFoot', footR: 'RightFoot', toeL: 'LeftToeBase', toeR: 'RightToeBase', shL: 'LeftShoulder', shR: 'RightShoulder' };
+  function P(name, p, hy, fing) { return { id: name, name: name, p: p, hy: hy || 0, fing: fing }; }
   var POSES = {
     '일반': [
-      { id: 'a', name: '기본 서기', p: {} },
-      { id: 't', name: 'T 자세', p: { armL: [0, 0, 90], armR: [0, 0, -90] } },
-      { id: 'hi', name: '손 흔들기', p: { armL: [0, 0, 135], elbL: [0, 0, 25], head: [0, 0, -6] } },
-      { id: 'think', name: '생각하기', p: { armR: [-105, 0, -8], elbR: [-125, 0, 0], head: [12, 0, 0], waist: [4, 0, 0] } },
-      { id: 'point', name: '앞 가리키기', p: { armR: [-90, 0, -4], elbR: [-4, 0, 0], waist: [0, -12, 0], head: [0, -12, 0] } }
+      P('기본 서기', {}), P('T 자세', { armL: [0, 0, 90], armR: [0, 0, -90] }), P('손 흔들기', { armL: [0, 0, 135], elbL: [0, 0, 25], head: [0, 0, -6] }, 0, { Left: '펼치기' }),
+      P('생각하기', { armR: [-105, 0, -8], elbR: [-125, 0, 0], head: [12, 0, 0], waist: [4, 0, 0] }), P('앞 가리키기', { armR: [-90, 0, -4], elbR: [-4, 0, 0], waist: [0, -12, 0], head: [0, -12, 0] }, 0, { Right: '가리키기' }),
+      P('팔짱 끼기', { armL: [-30, 0, 30], armR: [-30, 0, -30], elbL: [-125, -30, 0], elbR: [-125, 30, 0], head: [4, 0, 0] }), P('허리에 손', { armL: [0, 0, 38], armR: [0, 0, -38], elbL: [0, 0, -75], elbR: [0, 0, 75], legL: [0, 0, 6], legR: [0, 0, -6] }),
+      P('만세', { armL: [0, 0, 170], armR: [0, 0, -170], head: [-8, 0, 0] }), P('경례', { armR: [-60, 0, -75], elbR: [0, 0, 105], head: [0, 0, 0] })
     ],
     '앉기': [
-      { id: 'sit', name: '의자에 앉기', p: { legL: [-90, 0, 4], legR: [-90, 0, -4], kneeL: [90, 0, 0], kneeR: [90, 0, 0], armL: [-35, 0, 8], armR: [-35, 0, -8], elbL: [-60, 0, 0], elbR: [-60, 0, 0], waist: [-4, 0, 0] }, hy: -0.45 },
-      { id: 'sit2', name: '다리 꼬기', p: { legL: [-90, 0, 0], legR: [-90, 25, -16], kneeL: [90, 0, 0], kneeR: [100, 0, 0], waist: [-6, 0, 0], armL: [-30, 0, 10], elbL: [-70, 0, 0], armR: [-50, 0, -6], elbR: [-80, 0, 0] }, hy: -0.45 }
+      P('의자에 앉기', { legL: [-90, 0, 4], legR: [-90, 0, -4], kneeL: [90, 0, 0], kneeR: [90, 0, 0], armL: [-35, 0, 8], armR: [-35, 0, -8], elbL: [-60, 0, 0], elbR: [-60, 0, 0], waist: [-4, 0, 0] }, -1.05),
+      P('다리 꼬기', { legL: [-90, 0, 0], legR: [-90, 25, -16], kneeL: [90, 0, 0], kneeR: [100, 0, 0], waist: [-6, 0, 0], armL: [-30, 0, 10], elbL: [-70, 0, 0], armR: [-50, 0, -6], elbR: [-80, 0, 0] }, -1.05),
+      P('무릎 꿇기', { legL: [-90, 0, 2], legR: [8, 0, -2], kneeL: [90, 0, 0], kneeR: [100, 0, 0], waist: [-4, 0, 0] }, -1.05),
+      P('바닥에 앉기', { legL: [-80, 0, 30], legR: [-80, 0, -30], kneeL: [100, 0, 0], kneeR: [100, 0, 0], armL: [20, 0, 10], armR: [20, 0, -10], waist: [8, 0, 0] }, -1.5),
+      P('쪼그려 앉기', { legL: [-120, 0, 15], legR: [-120, 0, -15], kneeL: [130, 0, 0], kneeR: [130, 0, 0], waist: [20, 0, 0], armL: [-60, 0, 10], armR: [-60, 0, -10], elbL: [-70, 0, 0], elbR: [-70, 0, 0] }, -0.95)
     ],
     '다이나믹': [
-      { id: 'run', name: '달리기', p: { legL: [-62, 0, 3], kneeL: [75, 0, 0], legR: [30, 0, -3], kneeR: [22, 0, 0], armL: [38, 0, 10], elbL: [-70, 0, 0], armR: [-52, 0, -10], elbR: [-85, 0, 0], waist: [-10, 14, 0], chest: [-6, -14, 0] }, hy: -0.04 },
-      { id: 'win', name: '승리 포즈', p: { armL: [0, 0, 150], armR: [0, 0, -150], head: [-12, 0, 0], waist: [-6, 0, 0], legL: [0, 0, 8], legR: [0, 0, -8] } },
-      { id: 'punch', name: '펀치', p: { armR: [-92, 0, -8], elbR: [-4, 0, 0], armL: [-60, 0, 14], elbL: [-110, 0, 0], waist: [4, 22, 0], chest: [0, 18, 0], legL: [-14, 0, 8], legR: [18, 0, -10], kneeL: [14, 0, 0], kneeR: [20, 0, 0] }, hy: -0.04 }
+      P('달리기', { legL: [-62, 0, 3], kneeL: [75, 0, 0], legR: [30, 0, -3], kneeR: [22, 0, 0], armL: [38, 0, 10], elbL: [-70, 0, 0], armR: [-52, 0, -10], elbR: [-85, 0, 0], waist: [-10, 14, 0], chest: [-6, -14, 0] }, -0.1),
+      P('승리 포즈', { armL: [0, 0, 150], armR: [0, 0, -150], head: [-12, 0, 0], waist: [-6, 0, 0], legL: [0, 0, 8], legR: [0, 0, -8] }),
+      P('펀치', { armR: [-92, 0, -8], elbR: [-4, 0, 0], armL: [-60, 0, 14], elbL: [-110, 0, 0], waist: [4, 22, 0], chest: [0, 18, 0], legL: [-14, 0, 8], legR: [18, 0, -10], kneeL: [14, 0, 0], kneeR: [20, 0, 0] }, -0.1, { Right: '주먹', Left: '주먹' }),
+      P('킥', { legR: [-95, 0, -6], kneeR: [10, 0, 0], legL: [8, 0, 6], armL: [-20, 0, 40], armR: [-30, 0, -50], waist: [-12, 0, 0], chest: [-8, 0, 0] }, -0.05),
+      P('점프', { legL: [-45, 0, 8], legR: [-30, 0, -8], kneeL: [70, 0, 0], kneeR: [55, 0, 0], armL: [-70, 0, 40], armR: [-70, 0, -40], waist: [4, 0, 0] }, 0.35),
+      P('걷기', { legL: [-28, 0, 3], kneeL: [10, 0, 0], legR: [20, 0, -3], kneeR: [28, 0, 0], armL: [24, 0, 8], elbL: [-18, 0, 0], armR: [-26, 0, -8], elbR: [-24, 0, 0], waist: [0, 8, 0], chest: [0, -8, 0] })
     ],
     '특수': [
-      { id: 'bow', name: '인사하기', p: { waist: [38, 0, 0], chest: [14, 0, 0], head: [10, 0, 0], armL: [8, 0, 6], armR: [8, 0, -6] } },
-      { id: 'kneel', name: '무릎 꿇기', p: { legL: [-90, 0, 2], legR: [8, 0, -2], kneeL: [90, 0, 0], kneeR: [100, 0, 0], waist: [-4, 0, 0] }, hy: -0.45 }
+      P('인사하기', { waist: [38, 0, 0], chest: [14, 0, 0], head: [10, 0, 0], armL: [8, 0, 6], armR: [8, 0, -6] }), P('기지개', { armL: [-175, 0, 10], armR: [-175, 0, -10], waist: [-8, 0, 0], chest: [-8, 0, 0], head: [-14, 0, 0] }),
+      P('검 휘두르기', { armR: [-130, 0, -20], elbR: [-50, 0, 0], armL: [-40, 0, 40], waist: [0, 28, 0], chest: [0, 18, 0], legL: [-20, 0, 12], legR: [20, 0, -14], kneeL: [26, 0, 0], kneeR: [30, 0, 0] }, -0.12, { Right: '쥐기' }),
+      P('조준하기', { armR: [-92, 0, -6], elbR: [-4, 0, 0], armL: [-80, 0, 18], elbL: [-58, 0, 0], head: [0, -14, 0], legL: [0, 0, 12], legR: [0, 0, -12] }, 0, { Right: '쥐기', Left: '쥐기' }),
+      P('엎드려 쓰러짐', { waist: [86, 0, 0], legL: [0, 0, 6], armL: [90, 0, 70], armR: [90, 0, -70], head: [-20, 0, 0] }, -0.62)
     ]
   };
-  var PROPS = [['검', 'sword'], ['방패', 'shield'], ['지팡이', 'staff'], ['도끼', 'axe'], ['활', 'bow'], ['단검', 'dagger']];
-  var HAIRS = [['없음', 'none'], ['짧은 머리', 'short'], ['긴 머리', 'long'], ['묶음 머리', 'bun']];
-  var HANDS = ['기본', '쥐기', '가리키기', 'V', '펼치기', '주먹'];
+  Object.keys(POSES).forEach(function (c) { POSES[c].forEach(function (p, i) { p.id = c + i; var q = {}; Object.keys(p.p).forEach(function (k) { q[AB[k]] = p.p[k]; }); p.q = q; }); });
 
   /* ---------- 상태 ---------- */
   var S = { screen: 'work', sheet: null, tab: null, models: [], sel: { m: -1, j: null }, sym: true, mode: 'camera', lock: {}, guide: true,
-    fov: 38, light: { dir: 40, back: 30, pow: 70 }, hair: 'none', prop: null, handFinger: 'thumb', hs: null, undo: [], redo: [], toast: '', capture: null,
+    fov: 38, light: { dir: 40, back: 30, pow: 70 }, hs: null, finger: 'Index', side: 'Left', undo: [], redo: [], toast: '', capture: null,
     set: { aa: true, shadow: true, res: 'best', ui: 'phone' }, view: 'front', saveMsg: null, confirm: null, hideUI: false, nid: 1 };
-  var T = {}; // three 객체
+  var T = {};
 
   function newModel(type, pos) {
-    var joints = {}; JID.forEach(function (id) { joints[id] = [0, 0, 0]; });
-    joints.armL = [0, 0, 10]; joints.armR = [0, 0, -10];
-    return { id: S.nid++, type: type, skin: 0, pos: pos || [0, 0], ry: 0, hy: 0, joints: joints, hair: 'none', prop: null, vis: true };
+    var joints = {}; ALLJ.forEach(function (n) { joints[n] = [0, 0, 0]; });
+    return { id: S.nid++, type: type, skin: 0, pos: pos || [0, 0], ry: 0, hyF: 0, joints: joints, hair: 'none', hairC: 0, prop: null, cloth: 'none', top: 1, bot: 0, shoe: 5, gaze: 0, vis: true };
   }
 
-  /* ---------- 3D ---------- */
-  function mat(color, extra) { return new THREE.MeshStandardMaterial(Object.assign({ color: color, roughness: 0.65, metalness: 0.05 }, extra || {})); }
-  function build(m) {
-    var t = TBY[m.type], g = new THREE.Group(), nodes = {}, hits = [];
-    var skin = new THREE.Color(SKINS[m.skin]);
-    var scale = t.s;
-    g.userData.model = m.id;
-    J.forEach(function (j) {
-      var o = new THREE.Object3D(), pos = j[3].slice();
-      var isLimbPos = j[0] !== 'hip';
-      o.position.set(pos[0] * scale * (j[0].indexOf('sh') === 0 || j[0].indexOf('leg') === 0 ? t.thick > 1.5 ? 1.15 : 1 : 1), pos[1] * scale * (j[2] && (j[0].indexOf('arm') === 0 || j[0].indexOf('elb') === 0 || j[0].indexOf('hand') === 0 || j[0].indexOf('leg') === 0 || j[0].indexOf('knee') === 0 || j[0].indexOf('foot') === 0) ? t.limb : 1), pos[2] * scale);
-      if (j[0] === 'hip') o.position.y = pos[1] * scale * (0.5 + 0.5 * t.limb) + m.hy * scale;
-      nodes[j[0]] = o;
-      (j[2] ? nodes[j[2]] : g).add(o);
-      var sp = j[4], r = sp.r * t.thick * scale * (sp.head ? t.head / t.thick : 1);
-      if (sp.head) r = 0.11 * t.head * scale;
-      if (sp.len > 0) {
-        var len = sp.len * scale * (sp.dir === -1 ? t.limb : 1);
-        var cy = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, len, 14), mat(skin));
-        cy.position.y = sp.dir * len / 2; o.add(cy);
-      }
-      if (sp.head) { var hd = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 16), mat(skin)); hd.position.y = r * 0.85; o.add(hd); o.userData.headR = r; }
-      if (sp.hand) { var ha = new THREE.Mesh(new THREE.BoxGeometry(r * 2.1, len0(sp, scale, t) * 1.0, r * 1.1), mat(skin)); ha.position.y = -len0(sp, scale, t) / 2; o.add(ha); }
-      if (sp.foot) { var ft = new THREE.Mesh(new THREE.BoxGeometry(r * 2.2, 0.06 * scale, 0.2 * scale * (t.limb > 0.8 ? 1 : 0.8)), mat(skin)); ft.position.set(0, -0.035 * scale, 0.05 * scale); o.add(ft); }
-      // 선택용 관절 점
-      var jr = Math.max(0.035, r * 0.95) * (sp.head ? 0.5 : 1);
-      var dot = new THREE.Mesh(new THREE.SphereGeometry(jr, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.0 }));
-      dot.userData = { joint: j[0], model: m.id, base: jr }; o.add(dot); hits.push(dot);
-      if (sp.head) dot.position.y = r * 0.85;
+  /* ---------- 3D 몸 만들기 ---------- */
+  function mat(color, extra) { return new THREE.MeshStandardMaterial(Object.assign({ color: color, roughness: 0.62, metalness: 0.04 }, extra || {})); }
+  var REST = {}; // 종류별 관절 위치 (팔을 내린 기본 자세)
+  function restOf(dk) {
+    if (REST[dk]) return REST[dk];
+    var D = window.BODY[dk], P = {}, pivots = {};
+    D.joints.forEach(function (j) { P[j[0]] = new THREE.Vector3(j[1], j[2], j[3]); });
+    var rotOf = {};
+    ['Left', 'Right'].forEach(function (s) {
+      var piv = P[s + 'Arm'].clone(), dir = P[s + 'Hand'].clone().sub(piv), ang = Math.atan2(dir.y, dir.x), th = -Math.PI / 2 - ang + (s === 'Left' ? 1 : -1) * 9 * D2R;
+      rotOf[s] = th;
+      ALLJ.forEach(function (n) {
+        if (n.indexOf(s) !== 0 || n === s + 'Shoulder') return;
+        var a = n, inArm = false; while (a) { if (a === s + 'Arm') { inArm = true; break; } a = PARENT[a]; }
+        if (!inArm) return;
+        var v = P[n].clone().sub(piv); v.applyAxisAngle(new THREE.Vector3(0, 0, 1), th); P[n] = piv.clone().add(v);
+      });
     });
-    // 적용
-    JID.forEach(function (id) { var a = m.joints[id]; nodes[id].rotation.set(a[0] * D2R, a[1] * D2R, a[2] * D2R); });
-    // 머리카락·소품
-    applyHair(m, nodes.head, skin);
-    if (m.prop) { var p = makeProp(m.prop); if (p) { p.scale.setScalar(scale); nodes.handR.add(p); } }
-    g.position.set(m.pos[0], 0, m.pos[1]); g.rotation.y = m.ry * D2R;
-    return { group: g, nodes: nodes, hits: hits, id: m.id };
+    return (REST[dk] = { P: P, D: D, th: rotOf });
   }
-  function len0(sp, scale, t) { return sp.len * scale * t.limb; }
-  function applyHair(m, headNode, skin) {
+  var CATS = function (a) {
+    if (/^(Hips|Spine|Spine1|Spine2|.*Shoulder)$/.test(a)) return 'torso';
+    if (a === 'Neck') return 'neck'; if (a === 'Head') return 'head';
+    if (/Arm$|ArmTwist$/.test(a)) return 'upperArm'; if (/ForeArm$|HandTwist$/.test(a)) return 'foreArm';
+    if (/Hand/.test(a)) return 'hand'; if (/UpLegTwist$|UpLeg$/.test(a)) return 'thigh'; if (/Leg$/.test(a)) return 'shin'; if (/Foot$|Toe/.test(a)) return 'foot';
+    return 'torso';
+  };
+  function segGeometry(P, Q, rows, capEnds) {
+    var ax = Q.clone().sub(P), L = ax.length(); ax.normalize();
+    var e1 = new THREE.Vector3().crossVectors(ax, new THREE.Vector3(0, 0, 1)); if (e1.length() < 1e-3) e1.crossVectors(ax, new THREE.Vector3(1, 0, 0)); e1.normalize();
+    var e2 = new THREE.Vector3().crossVectors(ax, e1).normalize();
+    var st = []; var r0 = rows[0], r1 = rows[rows.length - 1], rm = rows[Math.floor(rows.length / 2)];
+    st.push([0, r0, 0.94]); if (rows.length > 1) { st.push([0.15, r0, 1]); st.push([0.5, rm, 1]); st.push([0.85, r1, 1]); } else { st.push([0.5, r0, 1]); }
+    st.push([1, r1, 0.94]);
+    var N = 14, pos = [], idx = [], i, k;
+    st.forEach(function (s) {
+      var r = s[1], t = s[0], sc = s[2];
+      for (k = 0; k < N; k++) {
+        var th = k / N * Math.PI * 2, a = (r[1] + Math.max(0.006, r[3]) * sc * Math.cos(th)), b = (r[2] + Math.max(0.006, r[4]) * sc * Math.sin(th));
+        var v = ax.clone().multiplyScalar(t * L).add(e1.clone().multiplyScalar(a)).add(e2.clone().multiplyScalar(b)); pos.push(v.x, v.y, v.z);
+      }
+    });
+    for (i = 0; i < st.length - 1; i++) for (k = 0; k < N; k++) { var a0 = i * N + k, a1 = i * N + (k + 1) % N, b0 = (i + 1) * N + k, b1 = (i + 1) * N + (k + 1) % N; idx.push(a0, b0, a1, a1, b0, b1); }
+    // 끝 막기
+    [0, st.length - 1].forEach(function (e) {
+      var c = ax.clone().multiplyScalar(st[e][0] * L).add(e1.clone().multiplyScalar(st[e][1][1])).add(e2.clone().multiplyScalar(st[e][1][2])), ci = pos.length / 3; pos.push(c.x, c.y, c.z);
+      for (k = 0; k < N; k++) { var u = e * N + k, w = e * N + (k + 1) % N; if (e === 0) idx.push(ci, w, u); else idx.push(ci, u, w); }
+    });
+    var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  }
+  function build(m) {
+    var t = TBY[m.type], R = restOf(t.d), P = R.P, D = R.D, g = new THREE.Group(), nodes = {}, hits = [], mats = {};
+    g.userData.model = m.id;
+    var skin = new THREE.Color(SKINS[m.skin]), cl = CLOTH[m.cloth][1];
+    function colorFor(cat) {
+      var u = cl[cat];
+      if (!u) return mat(skin);
+      if (u === 'top') return mat(new THREE.Color(TOPS[m.top]), { roughness: 0.85 });
+      if (u === 'bot') return mat(new THREE.Color(BOTS[m.bot]), { roughness: 0.85 });
+      if (u === 'shoe') return mat(new THREE.Color(BOTS[m.shoe % BOTS.length] === '#d8d2c4' ? '#2b2f3a' : '#222428'), { roughness: 0.7 });
+      if (u === 'metal') return mat(0x9aa3b2, { metalness: 0.75, roughness: 0.35 });
+      return mat(skin);
+    }
+    var thighLen = P.LeftUpLegTwist.distanceTo(P.LeftLeg);
+    ALLJ.forEach(function (n) {
+      var o = new THREE.Object3D(); nodes[n] = o;
+      var par = PARENT[n]; if (par) { o.position.copy(P[n]).sub(P[par]); nodes[par].add(o); } else { o.position.copy(P[n]); g.add(o); }
+    });
+    nodes.Hips.position.y = P.Hips.y + m.hyF * thighLen;
+    // 세그먼트
+    D.segs.forEach(function (s) {
+      var a = s[0], b = s[1], rows = s[3]; if (!rows.length || !nodes[a] || !P[b]) return;
+      var cat = CATS(a), mt = colorFor(cat), geo = segGeometry(P[a], P[b], rows);
+      var me = new THREE.Mesh(geo, mt); me.castShadow = true; nodes[a].add(me);
+      if (/Arm$|ArmTwist$|ForeArm$|Leg$|UpLegTwist$|HandTwist$|Neck$/.test(a) && !/Hand\w+\d/.test(a)) {
+        var r = rows[0], br = Math.max(0.01, (r[3] + r[4]) / 2 * 0.98), ball = new THREE.Mesh(new THREE.SphereGeometry(br, 14, 10), mt); ball.castShadow = true; nodes[a].add(ball);
+      }
+    });
+    // 골반·머리·손바닥
+    var bl = D.blobs;
+    function blob(name, node, parts, mt, rotZ) {
+      var b = bl[name]; if (!b) return null; var c = V3(b[0]).add(V3(b[1])).multiplyScalar(0.5), h = V3(b[1]).sub(V3(b[0])).multiplyScalar(0.5);
+      var mesh = new THREE.Mesh(parts === 'box' ? new THREE.BoxGeometry(2, 2, 2) : new THREE.SphereGeometry(1, 24, 18), mt); mesh.scale.copy(h);
+      var rel = c.clone().sub(P0(name)); if (rotZ) { rel.applyAxisAngle(new THREE.Vector3(0, 0, 1), rotZ); mesh.rotation.z = rotZ; }
+      mesh.position.copy(rel); mesh.castShadow = true; node.add(mesh); return { mesh: mesh, c: c, h: h };
+    }
+    function P0(name) { // 블롭 기준 관절의 "원래(T) 위치"
+      var dd = {}; D.joints.forEach(function (j) { dd[j[0]] = new THREE.Vector3(j[1], j[2], j[3]); }); return dd[name];
+    }
+    blob('Hips', nodes.Hips, 'ell', colorFor(cl.thigh ? 'thigh' : 'torso'));
+    var hd = blob('Head', nodes.Head, 'ell', mat(skin));
+    var lh = blob('LeftHand', nodes.LeftHand, 'ell', colorFor('hand'), R.th.Left), rh = blob('RightHand', nodes.RightHand, 'ell', colorFor('hand'), R.th.Right); [lh, rh].forEach(function (x) { if (x) x.mesh.scale.multiplyScalar(0.9); });
+    // 눈·코, 머리카락
+    if (hd) {
+      var hx = hd.h.x, hy = hd.h.y, hz = hd.h.z, hc = hd.c.clone().sub(P0('Head')), pupils = [];
+      [-1, 1].forEach(function (sd) {
+        var ex = sd * hx * 0.36, ey = hy * 0.12, ez = hz * Math.sqrt(Math.max(0.05, 1 - (ex / hx) * (ex / hx) - (ey / hy) * (ey / hy)));
+        var w = new THREE.Mesh(new THREE.SphereGeometry(hx * 0.13, 12, 10), mat(0xf4f4f4)); w.position.set(hc.x + ex, hc.y + ey, hc.z + ez * 0.97); nodes.Head.add(w);
+        var pu = new THREE.Mesh(new THREE.SphereGeometry(hx * 0.075, 10, 8), mat(0x1c1c22)); pu.position.set(hc.x + ex + m.gaze * hx * 0.05, hc.y + ey, hc.z + ez * 0.97 + hx * 0.085); nodes.Head.add(pu); pupils.push(pu);
+      });
+      var ns = new THREE.Mesh(new THREE.SphereGeometry(hx * 0.1, 10, 8), mat(skin)); ns.position.set(hc.x, hc.y - hy * 0.12, hc.z + hz * 0.98); ns.scale.set(0.8, 1, 1.1); nodes.Head.add(ns);
+      applyHair(m, nodes.Head, hc, hx, hy, hz);
+    }
+    // 치마
+    if (cl.skirt && t.f) {
+      var hb = bl.Hips, hw = (hb[1][0] - hb[0][0]) / 2, sk = new THREE.Mesh(new THREE.CylinderGeometry(hw * 1.25, hw * 2.0, thighLen * 0.62, 24, 1, true), mat(new THREE.Color(BOTS[m.bot]), { side: THREE.DoubleSide, roughness: 0.9 }));
+      sk.position.set(0, -thighLen * 0.12, 0); sk.castShadow = true; nodes.Hips.add(sk);
+    }
+    // 소품
+    if (m.prop) { var pr = makeProp(m.prop, D); if (pr) { var grip = P.RightHandMiddle2.clone().sub(P.RightHand), dir = P.RightHandMiddle4.clone().sub(P.RightHand).normalize(); var w = new THREE.Group(); w.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir); w.position.copy(grip); w.add(pr); nodes.RightHand.add(w); } }
+    // 선택 점
+    SELECTABLE.forEach(function (n) {
+      var rr = n === 'Hips' ? 0.06 : (n === 'Head' ? 0.07 : 0.04) * (t.d === 'tiny' ? 0.8 : 1);
+      var dot = new THREE.Mesh(new THREE.SphereGeometry(rr, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0, depthTest: false }));
+      dot.renderOrder = 10; dot.userData = { joint: n, model: m.id }; nodes[n].add(dot); hits.push(dot);
+    });
+    // 회전 적용
+    ALLJ.forEach(function (n) { applyRot(nodes[n], n, m.joints[n], t.d); });
+    g.position.set(m.pos[0], 0, m.pos[1]); g.rotation.y = m.ry * D2R;
+    return { group: g, nodes: nodes, hits: hits, id: m.id, type: t.d };
+  }
+  // 보조 관절(Twist)은 뼈 방향 축으로, 나머지는 X·Y·Z 순서
+  function axisOf(n, dk) { var R = restOf(dk).P, c = { 'ArmTwist': 'ForeArm', 'HandTwist': 'Hand', 'UpLegTwist': 'Leg' }, s = n.indexOf('Left') === 0 ? 'Left' : 'Right', key = n.slice(s.length); if (!c[key]) return null; return R[s + c[key]].clone().sub(R[n]).normalize(); }
+  function applyRot(node, n, a, dk) {
+    var ax = /Twist$/.test(n) ? axisOf(n, dk) : null;
+    if (ax) node.quaternion.setFromAxisAngle(ax, a[0] * D2R); else node.rotation.set(a[0] * D2R, a[1] * D2R, a[2] * D2R);
+  }
+  function applyHair(m, headNode, c, hx, hy, hz) {
     if (!m.hair || m.hair === 'none') return;
-    var r = headNode.userData.headR, hc = 0x3a2a22, h = new THREE.Group();
-    var cap = new THREE.Mesh(new THREE.SphereGeometry(r * 1.07, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.62), mat(hc)); cap.position.y = r * 0.9; h.add(cap);
-    if (m.hair === 'long') { var back = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.95, r * 0.7, r * 2.6, 14, 1, true), mat(hc, { side: THREE.DoubleSide })); back.position.set(0, r * 0.1, -r * 0.25); h.add(back); }
-    if (m.hair === 'bun') { var bun = new THREE.Mesh(new THREE.SphereGeometry(r * 0.42, 12, 10), mat(hc)); bun.position.set(0, r * 2.05, -r * 0.3); h.add(bun); }
+    var col = new THREE.Color(HAIRS_C[m.hairC]), mt = mat(col, { roughness: 0.8 }), h = new THREE.Group(); h.position.copy(c);
+    function cap(scale, y0) { var cp = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.58), mt); cp.scale.set(hx * 1.07, hy * 1.07 * (scale || 1), hz * 1.08); cp.position.set(0, y0 || hy * 0.04, -hz * 0.04); cp.castShadow = true; h.add(cp); return cp; }
+    var k = m.hair;
+    if (k === 'cap') { var c1 = cap(1); c1.material = mat(new THREE.Color(TOPS[m.top]), { roughness: 0.8 }); var br = new THREE.Mesh(new THREE.BoxGeometry(hx * 1.7, hy * 0.05, hz * 0.9), c1.material); br.position.set(0, hy * 0.42, hz * 1.05); h.add(br); }
+    else {
+      cap(1);
+      if (k === 'spiky') for (var i = 0; i < 7; i++) { var a = (i / 7) * Math.PI * 2, cn = new THREE.Mesh(new THREE.ConeGeometry(hx * 0.2, hy * 0.55, 8), mt); cn.position.set(Math.cos(a) * hx * 0.6, hy * 0.95, Math.sin(a) * hz * 0.6); cn.rotation.set(Math.sin(a) * 0.5, 0, -Math.cos(a) * 0.5); h.add(cn); }
+      if (k === 'bob') { var bb = new THREE.Mesh(new THREE.CylinderGeometry(hx * 1.12, hx * 1.1, hy * 1.2, 22, 1, true, Math.PI * 0.3, Math.PI * 1.4), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.8 })); bb.scale.z = hz / hx * 1.05; bb.position.set(0, -hy * 0.18, -hz * 0.06); h.add(bb); }
+      if (k === 'long') { var lb = new THREE.Mesh(new THREE.CylinderGeometry(hx * 1.12, hx * 0.85, hy * 3.0, 22, 1, true, Math.PI * 0.32, Math.PI * 1.36), new THREE.MeshStandardMaterial({ color: col, side: THREE.DoubleSide, roughness: 0.8 })); lb.scale.z = hz / hx * 1.05; lb.position.set(0, -hy * 0.85, -hz * 0.1); h.add(lb); }
+      if (k === 'twin') [-1, 1].forEach(function (sd) { var tl = new THREE.Mesh(new THREE.CylinderGeometry(hx * 0.2, hx * 0.1, hy * 2.2, 10), mt); tl.position.set(sd * hx * 1.15, -hy * 0.7, -hz * 0.1); tl.rotation.z = sd * 0.12; h.add(tl); });
+      if (k === 'pony') { var pt = new THREE.Mesh(new THREE.CylinderGeometry(hx * 0.22, hx * 0.1, hy * 2.2, 10), mt); pt.position.set(0, -hy * 0.2, -hz * 1.2); pt.rotation.x = -0.45; h.add(pt); }
+      if (k === 'bun') { var bn = new THREE.Mesh(new THREE.SphereGeometry(hx * 0.45, 14, 10), mt); bn.position.set(0, hy * 1.12, -hz * 0.25); h.add(bn); }
+    }
     headNode.add(h);
   }
   function makeProp(kind) {
-    var g = new THREE.Group(), steel = mat(0xc0c8d6, { metalness: 0.5, roughness: 0.35 }), wood = mat(0x7a5638);
-    function add(geo, mt, x, y, z, rx, ry, rz) { var o = new THREE.Mesh(geo, mt); o.position.set(x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); g.add(o); return o; }
+    var g = new THREE.Group(), steel = mat(0xc0c8d6, { metalness: 0.55, roughness: 0.3 }), wood = mat(0x7a5638), dark = mat(0x2a2d35, { metalness: 0.4 });
+    function add(geo, mt, x, y, z, rx, ry, rz) { var o = new THREE.Mesh(geo, mt); o.position.set(x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); o.castShadow = true; g.add(o); return o; }
     var C = THREE.CylinderGeometry, B = THREE.BoxGeometry;
-    if (kind === 'sword') { add(new C(0.015, 0.015, 0.14, 8), wood, 0, -0.1, 0); add(new B(0.14, 0.02, 0.03), steel, 0, -0.17, 0); add(new B(0.035, 0.7, 0.012), steel, 0, -0.55, 0); }
-    if (kind === 'shield') { add(new C(0.22, 0.22, 0.03, 20), mat(0x8a3b3b), 0, -0.1, 0.08, Math.PI / 2, 0, 0); }
-    if (kind === 'staff') { add(new C(0.02, 0.02, 1.5, 8), wood, 0, -0.3, 0); add(new THREE.SphereGeometry(0.06, 12, 10), mat(0x66aaff, { emissive: 0x2244aa }), 0, -1.08, 0); }
-    if (kind === 'axe') { add(new C(0.02, 0.02, 0.8, 8), wood, 0, -0.35, 0); add(new B(0.22, 0.2, 0.025), steel, 0.1, -0.7, 0); }
-    if (kind === 'bow') { add(new THREE.TorusGeometry(0.4, 0.015, 6, 20, Math.PI), wood, 0, -0.3, 0, 0, 0, Math.PI / 2); }
-    if (kind === 'dagger') { add(new B(0.025, 0.28, 0.01), steel, 0, -0.22, 0); add(new C(0.012, 0.012, 0.1, 8), wood, 0, -0.07, 0); }
+    if (kind === 'sword') { add(new C(0.015, 0.015, 0.14, 8), wood, 0, 0, 0); add(new B(0.16, 0.025, 0.04), steel, 0, -0.08, 0); add(new B(0.04, 0.8, 0.012), steel, 0, -0.5, 0); }
+    if (kind === 'dagger') { add(new C(0.014, 0.014, 0.1, 8), wood, 0, 0, 0); add(new B(0.08, 0.02, 0.03), steel, 0, -0.06, 0); add(new B(0.028, 0.28, 0.01), steel, 0, -0.2, 0); }
+    if (kind === 'axe') { add(new C(0.02, 0.02, 0.9, 8), wood, 0, -0.3, 0); add(new B(0.24, 0.22, 0.025), steel, 0.12, -0.7, 0); }
+    if (kind === 'mace') { add(new C(0.02, 0.02, 0.7, 8), wood, 0, -0.2, 0); add(new THREE.SphereGeometry(0.1, 14, 10), steel, 0, -0.62, 0); }
+    if (kind === 'spear') { add(new C(0.016, 0.016, 1.9, 8), wood, 0, -0.1, 0); add(new THREE.ConeGeometry(0.04, 0.22, 8), steel, 0, -1.15, 0, Math.PI, 0, 0); }
+    if (kind === 'bow') { add(new THREE.TorusGeometry(0.5, 0.014, 6, 24, Math.PI), wood, 0, -0.1, 0, 0, 0, Math.PI / 2); add(new C(0.003, 0.003, 1.0, 4), dark, -0.001, -0.1, 0); }
+    if (kind === 'staff') { add(new C(0.02, 0.02, 1.7, 8), wood, 0, -0.45, 0); add(new THREE.SphereGeometry(0.07, 12, 10), mat(0x66aaff, { emissive: 0x2244aa }), 0, -1.3, 0); }
+    if (kind === 'shield') { add(new C(0.26, 0.26, 0.035, 22), mat(0x8a3b3b), 0, -0.1, 0.12, Math.PI / 2, 0, 0); add(new THREE.SphereGeometry(0.06, 10, 8), steel, 0, -0.1, 0.15); }
+    if (kind === 'pistol') { add(new B(0.04, 0.12, 0.05), dark, 0, -0.02, 0); add(new B(0.035, 0.04, 0.2), dark, 0, -0.1, 0.1); }
+    if (kind === 'rifle') { add(new B(0.04, 0.1, 0.05), dark, 0, -0.02, 0); add(new B(0.045, 0.06, 0.75), dark, 0, -0.08, 0.3); add(new B(0.04, 0.12, 0.18), wood, 0, -0.06, -0.2); }
+    if (kind === 'guitar') { add(new THREE.SphereGeometry(0.17, 16, 12), mat(0xb5733f), 0, -0.1, 0.1).scale.set(1, 1.2, 0.3); add(new B(0.05, 0.6, 0.03), wood, 0, -0.55, 0.1); }
+    if (kind === 'umbrella') { add(new C(0.012, 0.012, 0.9, 8), wood, 0, -0.35, 0); add(new THREE.ConeGeometry(0.45, 0.22, 16, 1, true), mat(0xb23a3a, { side: THREE.DoubleSide }), 0, -0.9, 0, Math.PI, 0, 0); }
     return g;
   }
 
+  /* ---------- 3D 장면 ---------- */
   function initThree() {
-    var vp = $('#vp'); if (!vp || !window.THREE) return;
-    if (T.renderer) { T.renderer.dispose(); }
-    var canvas = document.createElement('canvas'); vp.insertBefore(canvas, vp.firstChild);
-    T.canvas = canvas;
+    var vp = $('#vp'); if (!vp || !window.THREE || !window.BODY) return;
+    if (T.renderer) T.renderer.dispose();
+    var canvas = document.createElement('canvas'); vp.insertBefore(canvas, vp.firstChild); T.canvas = canvas;
     T.renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: S.set.aa, alpha: false, preserveDrawingBuffer: true });
-    T.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    T.renderer.shadowMap.enabled = true;
+    T.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); T.renderer.shadowMap.enabled = true;
     T.scene = new THREE.Scene(); T.scene.background = new THREE.Color(0x232833);
     T.camera = new THREE.PerspectiveCamera(S.fov, 1, 0.1, 50);
-    T.az = 0; T.el = 0.12; T.dist = 4.6; T.target = new THREE.Vector3(0, 0.9, 0);
-    T.amb = new THREE.HemisphereLight(0xffffff, 0x334455, 0.7); T.scene.add(T.amb);
-    T.dl = new THREE.DirectionalLight(0xffffff, 0.9); T.dl.castShadow = true; T.dl.shadow.mapSize.set(1024, 1024); T.scene.add(T.dl);
+    if (T.az === undefined) { T.az = 0; T.el = 0.12; T.dist = 4.6; }
+    T.target = new THREE.Vector3(0, 0.9, 0);
+    T.scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.7));
+    T.dl = new THREE.DirectionalLight(0xffffff, 0.9); T.dl.castShadow = true; T.dl.shadow.mapSize.set(1024, 1024); var sc = T.dl.shadow.camera; sc.left = -3; sc.right = 3; sc.top = 3; sc.bottom = -3; T.scene.add(T.dl);
     T.bl = new THREE.DirectionalLight(0x9db8ff, 0.4); T.scene.add(T.bl);
     var floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), mat(0x2d3340, { roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; T.scene.add(floor);
-    T.grid = new THREE.GridHelper(14, 28, 0x56607a, 0x3a4152); T.grid.position.y = 0.002; T.scene.add(T.grid);
-    T.grid.visible = S.guide;
-    T.root = new THREE.Group(); T.scene.add(T.root);
-    T.ray = new THREE.Raycaster();
-    updateLights(); rebuildModels(); resize(); loop();
-    bindPointer(vp);
+    T.grid = new THREE.GridHelper(14, 28, 0x56607a, 0x3a4152); T.grid.position.y = 0.002; T.grid.visible = S.guide; T.scene.add(T.grid);
+    T.root = new THREE.Group(); T.scene.add(T.root); T.ray = new THREE.Raycaster();
+    updateLights(); rebuildModels(); resize(); loop(); bindPointer(vp);
   }
   function updateLights() {
-    if (!T.dl) return;
-    var a = S.light.dir * D2R;
+    if (!T.dl) return; var a = S.light.dir * D2R;
     T.dl.position.set(Math.sin(a) * 4, 5, Math.cos(a) * 4); T.dl.intensity = 0.2 + S.light.pow / 100 * 1.2;
-    var b = (S.light.dir + 180) * D2R; T.bl.position.set(Math.sin(b) * 4, 3, Math.cos(b) * 4); T.bl.intensity = S.light.back / 100 * 0.9;
-    T.dl.castShadow = S.set.shadow;
+    var b = (S.light.dir + 180) * D2R; T.bl.position.set(Math.sin(b) * 4, 3, Math.cos(b) * 4); T.bl.intensity = S.light.back / 100 * 0.9; T.dl.castShadow = S.set.shadow;
   }
   function rebuildModels() {
     if (!T.root) return;
-    while (T.root.children.length) { var c = T.root.children.pop(); T.root.remove(c); }
+    while (T.root.children.length) T.root.remove(T.root.children[0]);
     T.objs = [];
-    S.models.forEach(function (m) { var o = build(m); o.group.visible = m.vis; T.root.add(o.group); T.objs.push(o); o.group.traverse(function (n) { if (n.isMesh && !n.userData.joint) n.castShadow = true; }); });
+    S.models.forEach(function (m) { var o = build(m); o.group.visible = m.vis; T.root.add(o.group); T.objs.push(o); });
     markSel();
   }
   function markSel() {
@@ -332,56 +437,44 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
     T.objs.forEach(function (o) {
       o.hits.forEach(function (d) {
         var on = S.sel.m === o.id && S.sel.j === d.userData.joint, mine = S.sel.m === o.id;
-        d.material.opacity = on ? 0.95 : (mine ? 0.45 : 0.0); d.material.color.set(on ? 0xff7a45 : 0xffd23f);
-        d.scale.setScalar(on ? 1.35 : 1);
+        d.material.opacity = on ? 0.95 : (mine ? 0.4 : 0.0); d.material.color.set(on ? 0xff7a45 : 0xffd23f); d.scale.setScalar(on ? 1.4 : 1);
       });
     });
   }
-  function resize() {
-    var vp = $('#vp'); if (!vp || !T.renderer) return;
-    var w = vp.clientWidth, h = vp.clientHeight; if (!w || !h) return;
-    T.renderer.setSize(w, h, false); T.camera.aspect = w / h; T.camera.updateProjectionMatrix();
-  }
+  function resize() { var vp = $('#vp'); if (!vp || !T.renderer) return; var w = vp.clientWidth, h = vp.clientHeight; if (!w || !h) return; T.renderer.setSize(w, h, false); T.camera.aspect = w / h; T.camera.updateProjectionMatrix(); }
   var raf = 0;
   function loop() {
     cancelAnimationFrame(raf);
     var step = function () {
-      if (!T.renderer || !document.body.contains(T.canvas)) return;
+      if (!T.renderer || !T.canvas || !document.body.contains(T.canvas)) return;
       var cp = T.target.clone().add(new THREE.Vector3(Math.sin(T.az) * Math.cos(T.el), Math.sin(T.el), Math.cos(T.az) * Math.cos(T.el)).multiplyScalar(T.dist));
-      T.camera.position.copy(cp); T.camera.lookAt(T.target);
-      T.renderer.render(T.scene, T.camera); raf = requestAnimationFrame(step);
+      T.camera.position.copy(cp); T.camera.lookAt(T.target); T.renderer.render(T.scene, T.camera); raf = requestAnimationFrame(step);
     };
     step();
   }
   function setView(v) { S.view = v; T.az = v === 'left' ? Math.PI / 2 : v === 'right' ? -Math.PI / 2 : 0; T.el = 0.12; }
-
   function pick(ev) {
-    var vp = $('#vp'), r = vp.getBoundingClientRect(), sc = r.width / vp.offsetWidth || 1;
+    var vp = $('#vp'), r = vp.getBoundingClientRect();
     var x = (ev.clientX - r.left) / r.width * 2 - 1, y = -((ev.clientY - r.top) / r.height) * 2 + 1;
     T.ray.setFromCamera({ x: x, y: y }, T.camera);
-    var all = []; T.objs.forEach(function (o) { if (o.group.visible) all = all.concat(o.hits); });
-    all.forEach(function (d) { d.material.opacity = Math.max(d.material.opacity, 0.001); });
-    var hit = T.ray.intersectObjects(all, false)[0];
-    return hit ? hit.object.userData : null;
+    var all = []; T.objs.forEach(function (o) { if (o.group.visible && (S.sel.m === o.id || S.sel.m < 0 || true)) all = all.concat(o.hits); });
+    var hits = T.ray.intersectObjects(all, false);
+    // 투명 점도 잡히도록: 선택된 모델 쪽을 우선
+    hits.sort(function (a, b) { return (b.object.userData.model === S.sel.m) - (a.object.userData.model === S.sel.m) || a.distance - b.distance; });
+    return hits[0] ? hits[0].object.userData : null;
   }
   function bindPointer(vp) {
     var drag = null;
-    vp.addEventListener('pointerdown', function (e) {
-      if (e.target.closest('.models,.hint,.sel-tag')) return;
-      vp.setPointerCapture(e.pointerId);
-      drag = { x: e.clientX, y: e.clientY, moved: 0, hit: pick(e), t: Date.now() };
-    });
+    vp.addEventListener('pointerdown', function (e) { if (e.target.closest('.models,.hint,.sel-tag')) return; vp.setPointerCapture(e.pointerId); drag = { x: e.clientX, y: e.clientY, moved: 0, hit: pick(e) }; });
     vp.addEventListener('pointermove', function (e) {
-      if (!drag) return;
-      var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
-      if (drag.moved < 6) return;
+      if (!drag) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy); if (drag.moved < 6) return;
       var m = curModel();
       if (S.mode === 'model' && m) { var k = 0.006 * T.dist / 4; m.pos[0] += (Math.cos(T.az) * dx + Math.sin(T.az) * dy) * k; m.pos[1] += (-Math.sin(T.az) * dx + Math.cos(T.az) * dy) * k; syncPos(m); drag.posChanged = true; }
       else { T.az -= dx * 0.008; T.el = Math.max(-0.2, Math.min(1.3, T.el + dy * 0.006)); }
     });
     vp.addEventListener('pointerup', function () {
       if (!drag) return;
-      if (drag.moved < 6) { if (drag.hit) { S.sel = { m: drag.hit.model, j: drag.hit.joint }; markSel(); renderCtl(); renderTop(); } else if (S.sel.j) { S.sel.j = null; markSel(); renderCtl(); renderTop(); } }
+      if (drag.moved < 6) { if (drag.hit) { S.sel = { m: drag.hit.model, j: drag.hit.joint }; if (/Hand$/.test(drag.hit.joint)) S.side = drag.hit.joint.indexOf('Left') === 0 ? 'Left' : 'Right'; markSel(); renderCtl(); renderTop(); } else if (S.sel.j) { S.sel.j = null; markSel(); renderCtl(); renderTop(); } }
       else if (drag.posChanged) pushUndo();
       drag = null;
     });
@@ -389,54 +482,57 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   }
   function syncPos(m) { var o = T.objs.filter(function (x) { return x.id === m.id; })[0]; if (o) o.group.position.set(m.pos[0], 0, m.pos[1]); }
   var curModel = function () { return S.models.filter(function (m) { return m.id === S.sel.m; })[0] || null; };
+  var objOf = function (m) { return T.objs && T.objs.filter(function (x) { return x.id === m.id; })[0]; };
 
-  /* ---------- 실행 취소 ---------- */
+  /* ---------- 되돌리기 ---------- */
   function snap() { return JSON.stringify({ models: S.models, nid: S.nid, sel: S.sel }); }
-  function pushUndo() { S.undo.push(snap()); if (S.undo.length > 60) S.undo.shift(); S.redo = []; renderTop(); }
+  function pushUndo() { S.undo.push(snap()); if (S.undo.length > 40) S.undo.shift(); S.redo = []; renderTop(); }
   function restore(str) { var o = JSON.parse(str); S.models = o.models; S.nid = o.nid; S.sel = o.sel; rebuildModels(); renderAll(); }
   function undo() { if (!S.undo.length) return; S.redo.push(snap()); restore(S.undo.pop()); }
   function redo() { if (!S.redo.length) return; S.undo.push(snap()); restore(S.redo.pop()); }
 
-  /* ---------- 관절 회전 ---------- */
-  function setJoint(m, id, axis, val, fromSym) {
-    if (S.lock[m.id + id] && !fromSym) return;
-    m.joints[id][axis] = val;
-    var o = T.objs.filter(function (x) { return x.id === m.id; })[0];
-    if (o) o.nodes[id].rotation[['x', 'y', 'z'][axis]] = val * D2R;
-    var mir = JBY[id][5];
+  /* ---------- 관절 돌리기 ---------- */
+  function setJoint(m, n, axis, val, fromSym) {
+    if (S.lock[m.id + n] && !fromSym) return;
+    m.joints[n][axis] = val; var o = objOf(m); if (o) applyRot(o.nodes[n], n, m.joints[n], TBY[m.type].d);
+    var mir = mirName(n);
     if (S.sym && mir && !fromSym && !S.lock[m.id + mir]) setJoint(m, mir, axis, axis === 0 ? val : -val, true);
   }
+  function setFingers(m, side, name) {
+    var pp = HANDP[name] || {}, sg = side === 'Left' ? -1 : 1;
+    FING.forEach(function (f) {
+      var c = pp[f] || pp.all || [0, 0, 0], sp = (pp.spread && pp.spread[f]) || 0;
+      m.joints[side + 'Hand' + f + '1'] = [sp, 0, sg * c[0]]; m.joints[side + 'Hand' + f + '2'] = [0, 0, sg * c[1]]; m.joints[side + 'Hand' + f + '3'] = [0, 0, sg * c[2]];
+      if (!pp[f] && !pp.all) m.joints[side + 'Hand' + f + '1'] = [sp, 0, 0];
+    });
+  }
   function applyPose(m, pose) {
-    JID.forEach(function (id) { m.joints[id] = [0, 0, 0]; });
-    m.joints.armL = [0, 0, 10]; m.joints.armR = [0, 0, -10];
-    Object.keys(pose.p).forEach(function (k) { m.joints[k] = pose.p[k].slice(); });
-    m.hy = pose.hy || 0; rebuildModels();
+    ALLJ.forEach(function (n) { m.joints[n] = [0, 0, 0]; });
+    Object.keys(pose.q).forEach(function (k) { m.joints[k] = pose.q[k].slice(); });
+    m.hyF = pose.hy || 0;
+    if (pose.fing) Object.keys(pose.fing).forEach(function (s) { setFingers(m, s, pose.fing[s]); });
+    rebuildModels();
   }
 
-  /* ---------- 저장 슬롯 ---------- */
-  var KEY = 'poser-mock-slots';
+  var KEY = 'poser-mock-slots2';
   function slots() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
   function putSlots(a) { try { localStorage.setItem(KEY, JSON.stringify(a)); return true; } catch (e) { return false; } }
 
-  /* ---------- 화면 조각 ---------- */
+  /* ---------- 화면 ---------- */
   var phone = $('#phone');
-  function icon(name) { return { undo: '↶', redo: '↷', sym: '⇋', cam: '◎', model: '✥', shot: '◉', hide: '▣', menu: '☰', lock: '⚿' }[name] || name; }
+  var icon = function (n) { return { undo: '↶', redo: '↷', sym: '⇋', cam: '◎', model: '✥', shot: '◉', hide: '▣', menu: '☰' }[n] || n; };
   function renderAll() { phone.innerHTML = view(); afterView(); }
   function view() {
-    var h = '<div class="status"><span>9:41</span><span>●●● 100%</span></div><div class="screen">';
-    h += S.screen === 'menu' ? menuView() : workView();
+    var h = '<div class="status"><span>9:41</span><span>●●● 100%</span></div><div class="screen">' + (S.screen === 'menu' ? menuView() : workView());
     if (S.sheet) h += '<div class="dim" data-a="dim">' + sheetView() + '</div>';
     if (S.toast) h += '<div class="toast">' + esc(S.toast) + '</div>';
     return h + '</div><div class="gesture"><i></i></div>';
   }
   function menuView() {
     return '<div class="menu"><div class="logo"><div class="fig"><svg width="70" height="86" viewBox="0 0 70 86" fill="none" stroke="#ffd23f" stroke-width="5" stroke-linecap="round"><circle cx="35" cy="12" r="8"/><path d="M35 22v28M35 30L15 42M35 30l20 8M35 50L22 76M35 50l16 26"/></svg></div><h2>포저</h2><small>3D 마네킹 포즈 모델 만들기</small></div>' +
-      '<button class="btn main" data-a="start">시작하기<span>작업 화면으로</span></button>' +
-      '<button class="btn" data-a="newproj">새 프로젝트<span>모두 비우고 시작</span></button>' +
-      '<button class="btn" data-a="open" data-s="save">작업 불러오기<span>저장 슬롯</span></button>' +
-      '<button class="btn" data-a="open" data-s="shop">상점<span>팩 · 시안</span></button>' +
-      '<button class="btn" data-a="open" data-s="set">환경설정</button>' +
-      '<button class="btn" data-a="open" data-s="help">튜토리얼 · 도움말</button><div class="ver">v0.1 · 시안</div></div>';
+      '<button class="btn main" data-a="start">시작하기<span>작업 화면으로</span></button><button class="btn" data-a="newproj">새 프로젝트<span>모두 비우고 시작</span></button>' +
+      '<button class="btn" data-a="open" data-s="save">작업 불러오기<span>저장 슬롯</span></button><button class="btn" data-a="open" data-s="shop">상점<span>팩 · 시안</span></button>' +
+      '<button class="btn" data-a="open" data-s="set">환경설정</button><button class="btn" data-a="open" data-s="help">튜토리얼 · 도움말</button><div class="ver">v0.2 · 시안</div></div>';
   }
   function workView() {
     return '<div class="tb" id="tb">' + topHTML() + '</div>' +
@@ -444,93 +540,76 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
       (S.hideUI ? '' : '<div class="ctl" id="ctl">' + ctlHTML() + '</div><div class="nav" id="nav">' + navHTML() + '</div>');
   }
   function topHTML() {
-    var m = curModel();
-    return '<button class="ib" data-a="back" title="메뉴">' + icon('menu') + '</button>' +
-      '<button class="ib" data-a="undo" ' + (S.undo.length ? '' : 'disabled') + ' title="되돌리기">' + icon('undo') + '</button>' +
-      '<button class="ib" data-a="redo" ' + (S.redo.length ? '' : 'disabled') + ' title="되돌리기 취소">' + icon('redo') + '</button>' +
-      '<span class="grow"></span>' +
-      '<button class="ib" data-a="sym" aria-pressed="' + S.sym + '" title="좌우 대칭">' + icon('sym') + '</button>' +
-      '<button class="ib" data-a="mode" aria-pressed="' + (S.mode === 'model') + '" title="조작 모드 (모델 이동/카메라)">' + (S.mode === 'camera' ? icon('cam') : icon('model')) + '</button>' +
-      '<button class="ib" data-a="hideui" title="UI 감추기">' + icon('hide') + '</button>' +
-      '<button class="ib" data-a="shot" title="캡처">' + icon('shot') + '</button>';
+    return '<button class="ib" data-a="back" title="메뉴">' + icon('menu') + '</button><button class="ib" data-a="undo" ' + (S.undo.length ? '' : 'disabled') + ' title="되돌리기">' + icon('undo') + '</button><button class="ib" data-a="redo" ' + (S.redo.length ? '' : 'disabled') + ' title="되돌리기 취소">' + icon('redo') + '</button><span class="grow"></span>' +
+      '<button class="ib" data-a="sym" aria-pressed="' + S.sym + '" title="좌우 대칭">' + icon('sym') + '</button><button class="ib" data-a="mode" aria-pressed="' + (S.mode === 'model') + '" title="조작 모드">' + (S.mode === 'camera' ? icon('cam') : icon('model')) + '</button><button class="ib" data-a="hideui" title="UI 감추기">' + icon('hide') + '</button><button class="ib" data-a="shot" title="캡처">' + icon('shot') + '</button>';
   }
-  function selTag() { var m = curModel(); return m ? esc(TBY[m.type].name) + (S.sel.j ? ' · ' + esc(JBY[S.sel.j][1]) : '') : '모델 없음'; }
-  function modelsHTML() {
-    return S.models.map(function (m, i) { return '<button class="mchip" data-a="selmodel" data-id="' + m.id + '" aria-pressed="' + (S.sel.m === m.id) + '">' + (i + 1) + ' ' + esc(TBY[m.type].name) + '</button>'; }).join('') + '<button class="mchip" data-a="open" data-s="add">＋ 모델</button>';
-  }
+  function selTag() { var m = curModel(); return m ? esc(TBY[m.type].name) + (S.sel.j ? ' · ' + esc(jname(S.sel.j)) : '') : '모델 없음'; }
+  function jname(n) { if (KO[n]) return KO[n]; var s = n.indexOf('Left') === 0 ? '왼쪽 ' : '오른쪽 ', f = FING.filter(function (x) { return n.indexOf(x) >= 0; })[0]; return f ? s + FKO[f] : n; }
+  function modelsHTML() { return S.models.map(function (m, i) { return '<button class="mchip" data-a="selmodel" data-id="' + m.id + '" aria-pressed="' + (S.sel.m === m.id) + '">' + (i + 1) + ' ' + esc(TBY[m.type].name) + '</button>'; }).join('') + '<button class="mchip" data-a="open" data-s="add">＋ 모델</button>'; }
+  function slider(label, ax, val, dis, min, max, extra) { return '<div class="sl' + (dis ? ' dis' : '') + '"><label>' + label + '</label><input type="range" min="' + (min || -180) + '" max="' + (max || 180) + '" step="1" value="' + val + '" data-a="rot" data-ax="' + ax + '" ' + (extra || '') + (dis ? ' disabled' : '') + '><output>' + val + '°</output></div>'; }
   function ctlHTML() {
     var m = curModel();
     if (!m) return '<div class="ttl"><b>모델이 없어요</b></div><div class="sub">우선 "모델 추가"로 모델을 추가해 주세요.</div><div class="row"><button class="btn main" data-a="open" data-s="add">모델 추가</button></div>';
     var id = S.sel.j;
-    if (!id) return '<div class="ttl"><b>' + esc(TBY[m.type].name) + '</b><small>관절(노란 점)을 눌러 고르세요</small></div>' +
-      '<div class="row"><button class="btn sm" data-a="copymodel">모델 복사</button><button class="btn sm" data-a="open" data-s="add">모델 변경</button><button class="btn sm" data-a="resetpose">포즈 리셋</button><button class="btn sm" data-a="delmodel">모델 삭제</button></div>' +
-      '<div class="sub">몸중심 선택 후 "위치 조정"으로 높이를 바꿀 수 있어요.</div>';
-    var a = m.joints[id], lk = !!S.lock[m.id + id];
-    var s = '<div class="ttl"><b>' + esc(JBY[id][1]) + '</b><small>' + (JBY[id][5] ? '대칭 ' + (S.sym ? '켜짐' : '꺼짐') : '') + '</small></div>';
-    ['X축 회전', 'Y축 회전', 'Z축 회전'].forEach(function (lab, ax) {
-      s += '<div class="sl' + (lk ? ' dis' : '') + '"><label>' + lab.replace('축 회전', ' ROT') + '</label><input type="range" min="-180" max="180" step="1" value="' + a[ax] + '" data-a="rot" data-ax="' + ax + '" ' + (lk ? 'disabled' : '') + '><output>' + a[ax] + '°</output></div>';
-    });
-    s += '<div class="row"><button class="btn sm" data-a="resetjoint">초기값</button><button class="btn sm" data-a="lock" aria-pressed="' + lk + '">관절 잠금</button><button class="btn sm" data-a="open" data-s="hand">손·소품</button><button class="btn sm" data-a="deselect">선택 해제</button></div>';
+    if (!id) return '<div class="ttl"><b>' + esc(TBY[m.type].name) + '</b><small>관절(노란 점)을 눌러 고르세요</small></div><div class="row"><button class="btn sm" data-a="copymodel">모델 복사</button><button class="btn sm" data-a="open" data-s="add" data-swap="1">모델 변경</button><button class="btn sm" data-a="resetpose">포즈 리셋</button><button class="btn sm" data-a="delmodel">모델 삭제</button></div><div class="sub">몸중심을 고르면 위아래 위치를 바꿀 수 있어요.</div>';
+    var a = m.joints[id], lk = !!S.lock[m.id + id], tw = TWIST_OF[id];
+    var s = '<div class="ttl"><b>' + esc(jname(id)) + '</b><small>' + (mirName(id) ? '대칭 ' + (S.sym ? '켜짐' : '꺼짐') : '') + '</small></div>';
+    s += slider('X ROT', 0, a[0], lk) + slider('Y ROT', 1, a[1], lk) + slider('Z ROT', 2, a[2], lk);
+    if (tw) s += '<div class="sl"><label>보조</label><input type="range" min="-180" max="180" value="' + m.joints[tw][0] + '" data-a="twist" data-j="' + tw + '"><output>' + m.joints[tw][0] + '°</output></div>';
+    if (id === 'Head') s += '<div class="sl"><label>시선</label><input type="range" min="-10" max="10" value="' + m.gaze + '" data-a="gaze"><output>' + m.gaze + '</output></div>';
+    if (id === 'Hips') s += '<div class="sl"><label>높이</label><input type="range" min="-100" max="60" value="' + Math.round(m.hyF * 100) + '" data-a="hipy"><output>' + Math.round(m.hyF * 100) + '</output></div>';
+    s += '<div class="row"><button class="btn sm" data-a="resetjoint">초기값</button><button class="btn sm" data-a="lock" aria-pressed="' + lk + '">관절 잠금</button>' + (/Hand$/.test(id) ? '<button class="btn sm" data-a="open" data-s="hand" data-tab="손가락 편집">손가락</button>' : '<button class="btn sm" data-a="open" data-s="hand">꾸미기</button>') + '<button class="btn sm" data-a="deselect">선택 해제</button></div>';
     return s;
   }
-  function navHTML() {
-    var it = [['add', '＋', '모델'], ['pose', '☺', '완성포즈'], ['hand', '✋', '손·소품'], ['cam', '◎', '카메라'], ['light', '☀', '조명'], ['save', '▤', '저장']];
-    return it.map(function (x) { return '<button data-a="open" data-s="' + x[0] + '" aria-pressed="' + (S.sheet === x[0]) + '"><i>' + x[1] + '</i>' + x[2] + '</button>'; }).join('');
-  }
+  function navHTML() { return [['add', '＋', '모델'], ['pose', '☺', '완성포즈'], ['hand', '✋', '손·꾸미기'], ['cam', '◎', '카메라'], ['light', '☀', '조명'], ['save', '▤', '저장']].map(function (x) { return '<button data-a="open" data-s="' + x[0] + '" aria-pressed="' + (S.sheet === x[0]) + '"><i>' + x[1] + '</i>' + x[2] + '</button>'; }).join(''); }
   function renderTop() { var e = $('#tb'); if (e) e.innerHTML = topHTML(); var t = $('#seltag'); if (t) t.innerHTML = selTag(); var md = $('#models'); if (md) md.innerHTML = modelsHTML(); }
   function renderCtl() { var e = $('#ctl'); if (e) e.innerHTML = ctlHTML(); }
-
-  function tile(label, pic, attrs, opt) {
-    opt = opt || {};
-    return '<button class="tile' + (opt.locked ? ' locked' : '') + '" ' + attrs + (opt.on ? ' aria-pressed="true"' : '') + '><span class="pic">' + pic + '</span><b>' + esc(label) + '</b>' + (opt.locked ? '<span class="lock">' + esc(opt.locked) + '</span>' : '') + '</button>';
-  }
-  function manSvg(thick, head) { thick = thick || 1; head = head || 1; var hr = 7 * head;
-    return '<svg viewBox="0 0 60 60" width="64%" fill="none" stroke="#9fb0c8" stroke-width="' + (3 * thick) + '" stroke-linecap="round"><circle cx="30" cy="' + (9 + hr / 2) + '" r="' + hr + '"/><path d="M30 ' + (17 + hr) + 'v14M30 ' + (22 + hr) + 'l-10 8M30 ' + (22 + hr) + 'l10 8M30 ' + (31 + hr) + 'l-7 14M30 ' + (31 + hr) + 'l7 14"/></svg>'; }
+  function tile(label, pic, attrs, opt) { opt = opt || {}; return '<button class="tile' + (opt.locked ? ' locked' : '') + '" ' + attrs + (opt.on ? ' aria-pressed="true"' : '') + '><span class="pic">' + pic + '</span><b>' + esc(label) + '</b>' + (opt.locked ? '<span class="lock">' + esc(opt.locked) + '</span>' : '') + '</button>'; }
+  function manSvg(thick, head) { thick = thick || 1; head = head || 1; var hr = 7 * head; return '<svg viewBox="0 0 60 60" width="64%" fill="none" stroke="#9fb0c8" stroke-width="' + (3 * thick) + '" stroke-linecap="round"><circle cx="30" cy="' + (9 + hr / 2) + '" r="' + hr + '"/><path d="M30 ' + (17 + hr) + 'v14M30 ' + (22 + hr) + 'l-10 8M30 ' + (22 + hr) + 'l10 8M30 ' + (31 + hr) + 'l-7 14M30 ' + (31 + hr) + 'l7 14"/></svg>'; }
+  function swatches(list, cur, act) { return '<div class="sw">' + list.map(function (c, i) { return '<button style="background:' + c + '" data-a="' + act + '" data-i="' + i + '" aria-pressed="' + (cur === i) + '"></button>'; }).join('') + '</div>'; }
   function sheetView() {
-    var k = S.sheet, h = '<div class="sheet' + (k === 'add' || k === 'hand' ? ' full' : '') + '"><div class="grab"></div>', title = { add: '모델 추가', pose: '완성된 포즈', hand: '손포즈 · 소품 · 헤어', cam: '카메라', light: '조명', save: '작업 저장 · 불러오기', set: '환경설정', help: '튜토리얼 · 도움말', shop: '상점', shot: '캡처', confirm: '확인' }[k] || '';
+    var k = S.sheet, h = '<div class="sheet' + (k === 'add' || k === 'hand' ? ' full' : '') + '"><div class="grab"></div>', title = { add: '모델 추가', pose: '완성된 포즈', hand: '손 · 소품 · 꾸미기', cam: '카메라', light: '조명', save: '작업 저장 · 불러오기', set: '환경설정', help: '튜토리얼 · 도움말', shop: '상점', shot: '캡처', confirm: '확인' }[k] || '';
     h += '<h4>' + title + '<button class="btn sm x" data-a="close">닫기</button></h4>';
-    var tabs = '', body = '', foot = '';
+    var tabs = '', body = '', foot = '', cm = curModel();
     if (k === 'add') {
       var tab = S.tab || '사람'; tabs = ['사람', '동물', '탈것', '특수'].map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tab === t) + '">' + t + '</button>'; }).join('');
-      if (tab === '사람') body = '<div class="grid">' + TYPES.map(function (t) { return tile(t.name, manSvg(t.thick > 1.3 ? 1.5 : 1, t.head > 1.5 ? 1.6 : 1), 'data-a="addmodel" data-t="' + t.id + '"'); }).join('') + '</div><p class="sub">고르면 화면에 새 모델이 서요. 선택된 모델이 있고 "모델 변경"으로 열었다면 같은 자리에서 바뀌어요.</p>';
+      if (tab === '사람') body = '<div class="grid">' + TYPES.map(function (t) { return tile(t.name, manSvg(t.d === 'big' ? 1.8 : t.d === 'hero' ? 1.4 : 1, t.d === 'tiny' ? 1.7 : t.d.indexOf('S') > 0 ? 1.25 : 1), 'data-a="addmodel" data-t="' + t.id + '"'); }).join('') + '</div><p class="sub">' + (S.swap ? '선택한 모델을 이 종류로 바꿔요.' : '고르면 화면에 새 모델이 서요.') + '</p>';
       else body = '<div class="grid">' + { '동물': ['말', '드래곤', '공룡', '고양이'], '탈것': ['자전거', '오토바이', '승용차', '스쿠터'], '특수': ['중세 기사', '교복', '운동복'] }[tab].map(function (n) { return tile(n, '<svg viewBox="0 0 60 60" width="60%" fill="none" stroke="#667" stroke-width="3"><rect x="10" y="14" width="40" height="32" rx="8"/></svg>', 'data-a="locked"', { locked: 'DLC' }); }).join('') + '</div><p class="sub">추가 팩은 시안에서는 잠겨 있어요.</p>';
-      var ch = curModel(); if (ch) foot = '<div><div class="sub" style="margin-bottom:6px">피부 색상</div><div class="sw">' + SKINS.map(function (c, i) { return '<button style="background:' + c + '" data-a="skin" data-i="' + i + '" aria-pressed="' + (ch.skin === i) + '"></button>'; }).join('') + '</div></div>';
     }
     if (k === 'pose') {
       var cat = S.tab && POSES[S.tab] ? S.tab : '일반'; tabs = Object.keys(POSES).map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (cat === t) + '">' + t + '</button>'; }).join('');
-      body = (curModel() ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<div class="list">' + POSES[cat].map(function (p) { return '<button class="li" data-a="applypose" data-c="' + cat + '" data-id="' + p.id + '"><span>' + p.name + '<small>' + Object.keys(p.p).length + '개 관절</small></span><span class="sub">적용</span></button>'; }).join('') + '</div>';
+      body = (cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<div class="list">' + POSES[cat].map(function (p) { return '<button class="li" data-a="applypose" data-c="' + cat + '" data-id="' + p.id + '"><span>' + p.name + '<small>' + Object.keys(p.p).length + '개 관절' + (p.fing ? ' · 손 포함' : '') + '</small></span><span class="sub">적용</span></button>'; }).join('') + '</div>';
     }
     if (k === 'hand') {
-      var tb = S.tab || '핸드포즈'; tabs = ['핸드포즈', '소품', '헤어스타일', '손가락 편집'].map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tb === t) + '">' + t + '</button>'; }).join('');
-      var cm = curModel();
-      if (tb === '핸드포즈') body = '<p class="sub">왼손이나 오른손을 터치해 선택해 주세요. (시안: 선택만 표시돼요)</p><div class="grid">' + HANDS.map(function (n, i) { return tile(n, '<svg viewBox="0 0 60 60" width="55%" fill="none" stroke="#9fb0c8" stroke-width="3" stroke-linecap="round"><path d="M18 44V26M26 44V16M34 44V14M42 44V20M12 36l8 8h22"/></svg>', 'data-a="handpose" data-i="' + i + '"', { on: S.hs === i }); }).join('') + '</div>';
-      if (tb === '소품') body = (cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<p class="sub">고르면 오른손에 쥐어요.</p><div class="grid">' + tile('없음', '<span class="sub">–</span>', 'data-a="prop" data-k=""', { on: !(cm && cm.prop) }) + PROPS.map(function (p) { return tile(p[0], '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + p[1] + '</span>', 'data-a="prop" data-k="' + p[1] + '"', { on: !!cm && cm.prop === p[1] }); }).join('') + '</div>';
-      if (tb === '헤어스타일') body = (cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<div class="grid">' + HAIRS.map(function (p) { return tile(p[0], '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + p[1] + '</span>', 'data-a="hair" data-k="' + p[1] + '"', { on: !!cm && (cm.hair || 'none') === p[1] }); }).join('') + '</div>';
-      if (tb === '손가락 편집') { var fs = ['thumb', '엄지', 'index', '검지', 'middle', '중지', 'ring', '약지', 'pinky', '새끼']; body = '<div class="fing"><div class="row">' + [0, 2, 4, 6, 8].map(function (i) { return '<button class="btn" data-a="finger" data-f="' + fs[i] + '" aria-pressed="' + (S.handFinger === fs[i]) + '">' + fs[i + 1] + '</button>'; }).join('') + '</div>' + ['좌우 회전', '관절 1', '관절 2', '관절 3'].map(function (l, i) { return '<div class="sl"><label>' + l + '</label><input type="range" min="-90" max="90" value="0" data-a="fake"><output>0°</output></div>'; }).join('') + '<p class="sub">손가락 편집은 시안에서 화면만 있어요.</p></div>'; }
+      var tb = S.tab || '핸드포즈'; tabs = ['핸드포즈', '손가락 편집', '소품', '헤어', '의상', '피부·눈'].map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tb === t) + '">' + t + '</button>'; }).join('');
+      var need = cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>';
+      var sideBtn = '<div class="row" style="margin-bottom:8px"><button class="btn sm" data-a="side" data-v="Left" aria-pressed="' + (S.side === 'Left') + '">왼손</button><button class="btn sm" data-a="side" data-v="Right" aria-pressed="' + (S.side === 'Right') + '">오른손</button></div>';
+      if (tb === '핸드포즈') body = need + sideBtn + '<div class="grid">' + Object.keys(HANDP).map(function (n) { return tile(n, handSvg(n), 'data-a="handpose" data-n="' + n + '"', { on: S.hs === n }); }).join('') + '</div>';
+      if (tb === '손가락 편집') {
+        var f = S.finger, jn = S.side + 'Hand' + f, cur = cm ? [cm.joints[jn + '1'], cm.joints[jn + '2'], cm.joints[jn + '3']] : [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        var sg = S.side === 'Left' ? -1 : 1;
+        body = need + sideBtn + '<div class="row" style="margin-bottom:8px">' + FING.map(function (x) { return '<button class="btn sm" data-a="finger" data-f="' + x + '" aria-pressed="' + (f === x) + '">' + FKO[x] + '</button>'; }).join('') + '</div><div class="fing">' +
+          '<div class="sl"><label>좌우 회전</label><input type="range" min="-45" max="45" value="' + cur[0][0] + '" data-a="fing" data-k="0"><output>' + cur[0][0] + '°</output></div>' +
+          [1, 2, 3].map(function (i) { var v = Math.round(cur[i - 1][2] * sg); return '<div class="sl"><label>관절' + i + '</label><input type="range" min="-30" max="110" value="' + v + '" data-a="fing" data-k="' + i + '"><output>' + v + '°</output></div>'; }).join('') + '</div><p class="sub">고른 손가락의 마디를 구부려요. 손(노란 점)을 눌러도 그 손이 선택돼요.</p>';
+      }
+      if (tb === '소품') body = need + '<p class="sub">고르면 오른손에 쥐어요. 손 모양은 "핸드포즈"에서 쥐기를 고르면 자연스러워요.</p><div class="grid">' + tile('없음', '<span class="sub">–</span>', 'data-a="prop" data-k=""', { on: !(cm && cm.prop) }) + PROPS.map(function (p) { return tile(p[0], propSvg(p[1]), 'data-a="prop" data-k="' + p[1] + '"', { on: !!cm && cm.prop === p[1] }); }).join('') + '</div>';
+      if (tb === '헤어') body = need + '<div class="grid">' + HAIRS.map(function (p) { return tile(p[0], '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + p[1] + '</span>', 'data-a="hair" data-k="' + p[1] + '"', { on: !!cm && cm.hair === p[1] }); }).join('') + '</div><div class="sub" style="margin:10px 0 6px">헤어 색상</div>' + swatches(HAIRS_C, cm ? cm.hairC : -1, 'hairc');
+      if (tb === '의상') body = need + '<div class="list">' + Object.keys(CLOTH).map(function (c) { return '<button class="li" data-a="cloth" data-k="' + c + '" aria-pressed="' + (cm && cm.cloth === c) + '"><span>' + CLOTH[c][0] + '</span><span class="sub">' + (cm && cm.cloth === c ? '입는 중' : '입기') + '</span></button>'; }).join('') + '</div><div class="sub" style="margin:10px 0 6px">상의 색상</div>' + swatches(TOPS, cm ? cm.top : -1, 'topc') + '<div class="sub" style="margin:10px 0 6px">하의 색상</div>' + swatches(BOTS, cm ? cm.bot : -1, 'botc') + (cm && !TBY[cm.type].f ? '<p class="sub">교복의 치마는 여성 모델에서만 보여요.</p>' : '');
+      if (tb === '피부·눈') body = need + '<div class="sub" style="margin-bottom:6px">피부 색상</div>' + swatches(SKINS, cm ? cm.skin : -1, 'skin') + '<p class="sub" style="margin-top:10px">눈동자 방향은 얼굴(머리) 관절을 고르면 아래 슬라이더로 바꿀 수 있어요.</p>';
     }
-    if (k === 'cam') {
-      tabs = ''; body = '<div class="row">' + [['left', '좌측 보기'], ['front', '정면 보기'], ['right', '우측 보기']].map(function (v) { return '<button class="btn" data-a="view" data-v="' + v[0] + '" aria-pressed="' + (S.view === v[0]) + '">' + v[1] + '</button>'; }).join('') + '</div>' +
-        '<div class="sl" style="margin-top:10px"><label>화각</label><input type="range" min="20" max="90" value="' + S.fov + '" data-a="fov"><output>' + S.fov + '°</output></div>' +
-        '<div class="row" style="margin-top:10px"><button class="btn" data-a="guide" aria-pressed="' + S.guide + '">바닥 격자 ' + (S.guide ? '켜짐' : '꺼짐') + '</button><button class="btn" data-a="camreset">카메라 초기화</button></div>' +
-        '<div class="row" style="margin-top:8px"><button class="btn" data-a="camsave">카메라 프리셋 저장</button><button class="btn" data-a="camload">프리셋 불러오기</button></div>';
-    }
+    if (k === 'cam') body = '<div class="row">' + [['left', '좌측 보기'], ['front', '정면 보기'], ['right', '우측 보기']].map(function (v) { return '<button class="btn" data-a="view" data-v="' + v[0] + '" aria-pressed="' + (S.view === v[0]) + '">' + v[1] + '</button>'; }).join('') + '</div><div class="sl" style="margin-top:10px"><label>화각</label><input type="range" min="20" max="90" value="' + S.fov + '" data-a="fov"><output>' + S.fov + '°</output></div><div class="row" style="margin-top:10px"><button class="btn" data-a="guide" aria-pressed="' + S.guide + '">바닥 격자 ' + (S.guide ? '켜짐' : '꺼짐') + '</button><button class="btn" data-a="camreset">카메라 초기화</button></div><div class="row" style="margin-top:8px"><button class="btn" data-a="camsave">카메라 프리셋 저장</button><button class="btn" data-a="camload">프리셋 불러오기</button></div>';
     if (k === 'light') body = [['dir', '직사광 방향', 0, 360, S.light.dir], ['pow', '조명 세기', 0, 100, S.light.pow], ['back', '역광 설정', 0, 100, S.light.back]].map(function (r) { return '<div class="sl" style="grid-template-columns:78px 1fr 40px"><label>' + r[1] + '</label><input type="range" min="' + r[2] + '" max="' + r[3] + '" value="' + r[4] + '" data-a="light" data-k="' + r[0] + '"><output>' + r[4] + '</output></div>'; }).join('');
-    if (k === 'save') {
-      var sl = slots(); body = '<div class="list">' + [0, 1, 2, 3, 4].map(function (i) { var s = sl[i]; return '<div class="li"><span>슬롯 ' + (i + 1) + '<small>' + (s ? esc(s.when) + ' · 모델 ' + s.models.length + '개' : '비어 있음') + '</small></span><span class="row"><button class="btn sm" data-a="saveslot" data-i="' + i + '">저장</button><button class="btn sm" data-a="loadslot" data-i="' + i + '" ' + (s ? '' : 'disabled') + '>불러오기</button></span></div>'; }).join('') + '</div>' + (S.saveMsg ? '<p class="sub">' + esc(S.saveMsg) + '</p>' : '<p class="sub">시안에서는 이 브라우저에 저장돼요. 앱에서는 .epp 같은 프로젝트 파일로 저장해요.</p>');
-    }
-    if (k === 'set') body = '<div class="list"><div class="li"><span>해상도</span><span class="row"><button class="btn sm" data-a="setv" data-k="res" data-v="best" aria-pressed="' + (S.set.res === 'best') + '">최대</button><button class="btn sm" data-a="setv" data-k="res" data-v="perf" aria-pressed="' + (S.set.res === 'perf') + '">최적</button></span></div>' +
-      '<div class="li"><span>안티 알리아싱</span><button class="btn sm" data-a="toggleset" data-k="aa" aria-pressed="' + S.set.aa + '">' + (S.set.aa ? '켜기' : '끄기') + '</button></div>' +
-      '<div class="li"><span>그림자</span><button class="btn sm" data-a="toggleset" data-k="shadow" aria-pressed="' + S.set.shadow + '">' + (S.set.shadow ? '켜기' : '끄기') + '</button></div>' +
-      '<div class="li"><span>UI 모드</span><span class="row"><button class="btn sm" data-a="setv" data-k="ui" data-v="phone" aria-pressed="' + (S.set.ui === 'phone') + '">스마트폰</button><button class="btn sm" data-a="setv" data-k="ui" data-v="tab" aria-pressed="' + (S.set.ui === 'tab') + '">타블렛</button></span></div>' +
-      '<div class="li"><span>슬라이더 민감도</span><input type="range" min="1" max="10" value="5" data-a="fake" style="width:120px"></div></div>';
-    if (k === 'help') body = '<div class="list">' + [['관절 고르기', '모델의 관절(노란 점)을 눌러 선택해요.'], ['회전하기', '선택한 관절을 X·Y·Z 슬라이더로 돌려요. 좌우대칭을 켜면 반대쪽도 같이 움직여요.'], ['카메라', '배경을 끌면 카메라가 돌아요. 조작모드를 바꾸면 모델을 옮길 수 있어요.'], ['완성된 포즈', '미리 만들어 둔 포즈를 고르면 선택한 모델에 적용돼요.'], ['저장·캡처', '작업을 슬롯에 저장하고, 현재 화면을 PNG로 캡처해요.']].map(function (x) { return '<div class="li"><span><b>' + x[0] + '</b><small>' + x[1] + '</small></span></div>'; }).join('') + '</div>';
+    if (k === 'save') { var sl = slots(); body = '<div class="list">' + [0, 1, 2, 3, 4].map(function (i) { var s = sl[i]; return '<div class="li"><span>슬롯 ' + (i + 1) + '<small>' + (s ? esc(s.when) + ' · 모델 ' + s.models.length + '개' : '비어 있음') + '</small></span><span class="row"><button class="btn sm" data-a="saveslot" data-i="' + i + '">저장</button><button class="btn sm" data-a="loadslot" data-i="' + i + '" ' + (s ? '' : 'disabled') + '>불러오기</button></span></div>'; }).join('') + '</div>' + (S.saveMsg ? '<p class="sub">' + esc(S.saveMsg) + '</p>' : '<p class="sub">시안에서는 이 브라우저에 저장돼요. 앱에서는 프로젝트 파일로 저장해요.</p>'); }
+    if (k === 'set') body = '<div class="list"><div class="li"><span>해상도</span><span class="row"><button class="btn sm" data-a="setv" data-k="res" data-v="best" aria-pressed="' + (S.set.res === 'best') + '">최대</button><button class="btn sm" data-a="setv" data-k="res" data-v="perf" aria-pressed="' + (S.set.res === 'perf') + '">최적</button></span></div><div class="li"><span>안티 알리아싱</span><button class="btn sm" data-a="toggleset" data-k="aa" aria-pressed="' + S.set.aa + '">' + (S.set.aa ? '켜기' : '끄기') + '</button></div><div class="li"><span>그림자</span><button class="btn sm" data-a="toggleset" data-k="shadow" aria-pressed="' + S.set.shadow + '">' + (S.set.shadow ? '켜기' : '끄기') + '</button></div><div class="li"><span>UI 모드</span><span class="row"><button class="btn sm" data-a="setv" data-k="ui" data-v="phone" aria-pressed="' + (S.set.ui === 'phone') + '">스마트폰</button><button class="btn sm" data-a="setv" data-k="ui" data-v="tab" aria-pressed="' + (S.set.ui === 'tab') + '">타블렛</button></span></div></div>';
+    if (k === 'help') body = '<div class="list">' + [['관절 고르기', '모델의 관절(노란 점)을 눌러 선택해요.'], ['회전하기', '선택한 관절을 X·Y·Z 슬라이더로 돌려요. 좌우대칭을 켜면 반대쪽도 같이 움직여요. 팔·다리를 고르면 보조 관절 슬라이더가 나와요.'], ['손가락', '손을 고르고 "손가락" 버튼을 누르면 손가락마다 마디를 구부릴 수 있어요.'], ['카메라', '배경을 끌면 카메라가 돌아요. 조작모드를 바꾸면 모델을 옮길 수 있어요.'], ['완성된 포즈', '미리 만들어 둔 포즈를 고르면 선택한 모델에 적용돼요.'], ['저장·캡처', '작업을 슬롯에 저장하고, 현재 화면을 PNG로 캡처해요.']].map(function (x) { return '<div class="li"><span><b>' + x[0] + '</b><small>' + x[1] + '</small></span></div>'; }).join('') + '</div>';
     if (k === 'shop') body = '<div class="list">' + ['판타지 팩', '현대무기 팩', '드래곤 팩', '말 팩', '자전거·오토바이 팩', '악기 팩'].map(function (n) { return '<div class="li"><span>' + n + '<small>시안 · 구매 기능 없음</small></span><button class="btn sm" data-a="locked">구입</button></div>'; }).join('') + '</div>';
     if (k === 'shot') body = (S.capture ? '<img class="cap" src="' + S.capture + '" alt="캡처">' : '') + '<p class="sub">시안에서는 미리보기만 보여요. 앱에서는 갤러리에 저장돼요.</p>';
     if (k === 'confirm') { body = '<p>' + esc(S.confirm.msg) + '</p>'; foot = '<div class="row"><button class="btn" data-a="close">취소</button><button class="btn main" data-a="confirmok">확인</button></div>'; }
     return h + (tabs ? '<div class="tabs">' + tabs + '</div>' : '<div></div>') + '<div class="body">' + body + '</div>' + (foot ? '<div>' + foot + '</div>' : '<div></div>') + '</div>';
   }
+  function handSvg(n) { var c = { '기본': 0, '쥐기': 14, '주먹': 24, '가리키기': 22, 'V': 18, '펼치기': 0 }[n] || 0; return '<svg viewBox="0 0 60 60" width="55%" fill="none" stroke="#9fb0c8" stroke-width="3" stroke-linecap="round"><path d="M18 46V' + (28 + c / 2) + 'M26 46V' + (18 + c) + 'M34 46V' + (16 + c) + 'M42 46V' + (22 + c) + 'M12 38l8 8h22"/></svg>'; }
+  function propSvg(k) { return '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + k + '</span>'; }
   function afterView() {
-    if (S.screen === 'work' && !S.hideUI) { /* 3D는 따로 */ }
     if (S.screen === 'work') initThree(); else { cancelAnimationFrame(raf); T.canvas = null; }
     if (S.hideUI) { var vp = $('#vp'); if (vp) vp.addEventListener('click', function f() { S.hideUI = false; vp.removeEventListener('click', f); setTimeout(renderAll, 0); }); }
   }
@@ -539,23 +618,23 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 
   /* ---------- 동작 ---------- */
   function addModel(typeId) {
-    var m = curModel(), ch = S.sheet === 'add' && S.swap && m;
-    pushUndo();
-    if (ch) { m.type = typeId; S.swap = false; }
-    else { var n = S.models.length; var nm = newModel(typeId, [n === 0 ? 0 : ((n % 2) ? 1 : -1) * Math.ceil(n / 2) * 0.55, 0]); S.models.push(nm); S.sel = { m: nm.id, j: null }; }
+    var m = curModel(); pushUndo();
+    if (S.sheet === 'add' && S.swap && m) { m.type = typeId; S.swap = false; }
+    else { var n = S.models.length, nm = newModel(typeId, [n === 0 ? 0 : ((n % 2) ? 1 : -1) * Math.ceil(n / 2) * 0.6, 0]); S.models.push(nm); S.sel = { m: nm.id, j: null }; }
     S.sheet = null; rebuildModels(); renderAll();
   }
+  function selFingerSide() { return S.side; }
   phone.addEventListener('click', function (e) {
     var el = e.target.closest('[data-a]'); if (!el || !phone.contains(el)) return;
     var a = el.dataset.a, m = curModel();
     if (a === 'dim') { if (e.target === el) { S.sheet = null; sheetOnly(); } return; }
-    if (a === 'rot') return;
+    if (a === 'rot' || a === 'twist' || a === 'fing') return;
     switch (a) {
       case 'start': S.screen = 'work'; renderAll(); return;
       case 'back': S.screen = 'menu'; S.sheet = null; renderAll(); return;
       case 'newproj': S.confirm = { msg: '새로운 작업을 시작합니다. 저장하지 않은 데이터는 초기화돼요.', ok: 'new' }; S.sheet = 'confirm'; renderAll(); return;
       case 'confirmok': if (S.confirm && S.confirm.ok === 'new') { S.models = [newModel('male', [0, 0])]; S.sel = { m: S.models[0].id, j: null }; S.undo = []; S.redo = []; S.sheet = null; S.screen = 'work'; renderAll(); toast('새 프로젝트를 시작했어요'); } return;
-      case 'open': S.sheet = el.dataset.s; S.tab = null; S.swap = (el.dataset.s === 'add' && !!el.textContent.match(/변경/)); if (S.screen === 'menu') { renderAll(); } else sheetOnly(); return;
+      case 'open': S.sheet = el.dataset.s; S.tab = el.dataset.tab || null; S.swap = !!el.dataset.swap; if (S.screen === 'menu') renderAll(); else sheetOnly(); return;
       case 'close': S.sheet = null; sheetOnly(); return;
       case 'tab': S.tab = el.dataset.t; sheetOnly(); return;
       case 'undo': undo(); return; case 'redo': redo(); return;
@@ -567,14 +646,19 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
       case 'deselect': S.sel.j = null; markSel(); renderCtl(); renderTop(); return;
       case 'addmodel': addModel(el.dataset.t); return;
       case 'skin': if (m) { pushUndo(); m.skin = parseInt(el.dataset.i, 10); rebuildModels(); sheetOnly(); } return;
+      case 'hairc': if (m) { pushUndo(); m.hairC = parseInt(el.dataset.i, 10); rebuildModels(); sheetOnly(); } return;
+      case 'topc': if (m) { pushUndo(); m.top = parseInt(el.dataset.i, 10); rebuildModels(); sheetOnly(); } return;
+      case 'botc': if (m) { pushUndo(); m.bot = parseInt(el.dataset.i, 10); rebuildModels(); sheetOnly(); } return;
+      case 'cloth': if (m) { pushUndo(); m.cloth = el.dataset.k; rebuildModels(); sheetOnly(); } return;
       case 'copymodel': if (m) { pushUndo(); var c = JSON.parse(JSON.stringify(m)); c.id = S.nid++; c.pos = [m.pos[0] + 0.7, m.pos[1]]; S.models.push(c); S.sel = { m: c.id, j: null }; rebuildModels(); renderAll(); toast('복사가 완료되었습니다'); } return;
       case 'delmodel': if (m) { pushUndo(); S.models = S.models.filter(function (x) { return x.id !== m.id; }); S.sel = { m: S.models.length ? S.models[0].id : -1, j: null }; rebuildModels(); renderAll(); } return;
-      case 'resetpose': if (m) { pushUndo(); applyPose(m, { p: {} }); renderAll(); } return;
-      case 'resetjoint': if (m && S.sel.j) { pushUndo(); var id = S.sel.j; var d0 = (id === 'armL') ? [0, 0, 10] : (id === 'armR') ? [0, 0, -10] : [0, 0, 0]; [0, 1, 2].forEach(function (ax) { setJoint(m, id, ax, d0[ax]); }); renderCtl(); } return;
+      case 'resetpose': if (m) { pushUndo(); applyPose(m, { q: {} }); renderAll(); } return;
+      case 'resetjoint': if (m && S.sel.j) { pushUndo(); var id = S.sel.j; [0, 1, 2].forEach(function (ax) { setJoint(m, id, ax, 0); }); renderCtl(); } return;
       case 'lock': if (m && S.sel.j) { S.lock[m.id + S.sel.j] = !S.lock[m.id + S.sel.j]; renderCtl(); } return;
       case 'applypose': if (m) { var p = POSES[el.dataset.c].filter(function (x) { return x.id === el.dataset.id; })[0]; pushUndo(); applyPose(m, p); S.sheet = null; renderAll(); toast('"' + p.name + '" 적용'); } else toast('우선 모델을 선택해 주세요.'); return;
-      case 'handpose': S.hs = parseInt(el.dataset.i, 10); sheetOnly(); toast('손포즈는 시안에서 표시만 돼요'); return;
-      case 'finger': S.handFinger = el.dataset.f; sheetOnly(); return;
+      case 'side': S.side = el.dataset.v; sheetOnly(); return;
+      case 'handpose': if (m) { pushUndo(); S.hs = el.dataset.n; setFingers(m, S.side, S.hs); var o = objOf(m); FING.forEach(function (f) { for (var i = 1; i <= 3; i++) { var n = S.side + 'Hand' + f + i; if (o) applyRot(o.nodes[n], n, m.joints[n], TBY[m.type].d); } }); sheetOnly(); } else toast('우선 모델을 선택해 주세요.'); return;
+      case 'finger': S.finger = el.dataset.f; sheetOnly(); return;
       case 'prop': if (m) { pushUndo(); m.prop = el.dataset.k || null; rebuildModels(); sheetOnly(); } return;
       case 'hair': if (m) { pushUndo(); m.hair = el.dataset.k; rebuildModels(); sheetOnly(); } return;
       case 'view': setView(el.dataset.v); sheetOnly(); return;
@@ -590,32 +674,35 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
     }
   });
   phone.addEventListener('input', function (e) {
-    var el = e.target, a = el.dataset.a, m = curModel();
-    if (a === 'rot' && m && S.sel.j) { el.nextElementSibling.textContent = el.value + '°'; if (!el._pushed) { pushUndo(); el._pushed = true; } setJoint(m, S.sel.j, parseInt(el.dataset.ax, 10), parseInt(el.value, 10)); }
-    else if (a === 'fov') { S.fov = parseInt(el.value, 10); T.camera.fov = S.fov; T.camera.updateProjectionMatrix(); el.nextElementSibling.textContent = S.fov + '°'; }
-    else if (a === 'light') { S.light[el.dataset.k] = parseInt(el.value, 10); updateLights(); el.nextElementSibling.textContent = el.value; }
-    else if (a === 'fake') { var o = el.nextElementSibling; if (o && o.tagName === 'OUTPUT') o.textContent = el.value + '°'; }
+    var el = e.target, a = el.dataset.a, m = curModel(), out = el.nextElementSibling;
+    if (a === 'rot' && m && S.sel.j) { out.textContent = el.value + '°'; if (!el._p) { pushUndo(); el._p = true; } setJoint(m, S.sel.j, parseInt(el.dataset.ax, 10), parseInt(el.value, 10)); }
+    else if (a === 'twist' && m) { out.textContent = el.value + '°'; if (!el._p) { pushUndo(); el._p = true; } var tj = el.dataset.j, v = parseInt(el.value, 10); m.joints[tj][0] = v; var mj = mirName(tj); if (S.sym && mj) m.joints[mj][0] = v; var o = objOf(m); if (o) { applyRot(o.nodes[tj], tj, m.joints[tj], TBY[m.type].d); if (S.sym && mj) applyRot(o.nodes[mj], mj, m.joints[mj], TBY[m.type].d); } }
+    else if (a === 'gaze' && m) { out.textContent = el.value; m.gaze = parseInt(el.value, 10); if (!el._p) { pushUndo(); el._p = true; } clearTimeout(S.gt); S.gt = setTimeout(rebuildModels, 60); }
+    else if (a === 'hipy' && m) { out.textContent = el.value; m.hyF = parseInt(el.value, 10) / 100; if (!el._p) { pushUndo(); el._p = true; } var oo = objOf(m); if (oo) { var th = restOf(TBY[m.type].d).P; oo.nodes.Hips.position.y = th.Hips.y + m.hyF * th.LeftUpLegTwist.distanceTo(th.LeftLeg); } }
+    else if (a === 'fing' && m) {
+      var kk = parseInt(el.dataset.k, 10), jn = S.side + 'Hand' + S.finger + (kk === 0 ? 1 : kk), v2 = parseInt(el.value, 10), sg = S.side === 'Left' ? -1 : 1; out.textContent = v2 + '°';
+      if (!el._p) { pushUndo(); el._p = true; }
+      if (kk === 0) m.joints[jn][0] = v2; else m.joints[jn][2] = v2 * sg;
+      var o2 = objOf(m); if (o2) applyRot(o2.nodes[jn], jn, m.joints[jn], TBY[m.type].d);
+    }
+    else if (a === 'fov') { S.fov = parseInt(el.value, 10); T.camera.fov = S.fov; T.camera.updateProjectionMatrix(); out.textContent = S.fov + '°'; }
+    else if (a === 'light') { S.light[el.dataset.k] = parseInt(el.value, 10); updateLights(); out.textContent = el.value; }
   });
-  phone.addEventListener('change', function (e) { if (e.target.dataset.a === 'rot') { e.target._pushed = false; renderCtl(); } });
+  phone.addEventListener('change', function (e) { var a = e.target.dataset.a; if (a === 'rot' || a === 'twist' || a === 'gaze' || a === 'hipy' || a === 'fing') { e.target._p = false; if (a === 'rot') renderCtl(); } });
 
-  /* ---------- 위 선택 줄 ---------- */
   var SHEETS = ['add', 'pose', 'hand', 'cam', 'light', 'save', 'set'];
   function go(v) {
     document.querySelectorAll('#bar .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
-    S.tab = null; S.hideUI = false; S.swap = false;
-    S.screen = v === 'menu' ? 'menu' : 'work';
-    S.sheet = SHEETS.indexOf(v) >= 0 ? v : null;
-    renderAll();
+    S.tab = null; S.hideUI = false; S.swap = false; S.screen = v === 'menu' ? 'menu' : 'work'; S.sheet = SHEETS.indexOf(v) >= 0 ? v : null; renderAll();
     try { history.replaceState(null, '', '#' + v); } catch (e) {}
   }
   $('#bar').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) go(b.dataset.v); });
-  function fit() { var s = Math.min(1, (document.documentElement.clientWidth - 32) / 390), slot = $('#slot'); slot.style.transform = 'scale(' + s + ')'; slot.style.width = '390px'; slot.style.height = '844px'; slot.parentNode.style.height = Math.round(844 * s) + 'px'; slot.parentNode.style.width = Math.round(390 * s) + 'px'; slot.parentNode.style.margin = '0 auto'; slot.parentNode.style.overflow = 'hidden'; slot.style.marginBottom = Math.round(-844 * (1 - s)) + 'px'; }
+  function fit() { var s = Math.min(1, (document.documentElement.clientWidth - 32) / 390), slot = $('#slot'); slot.style.transform = 'scale(' + s + ')'; slot.style.width = '390px'; slot.style.height = '844px'; var st = slot.parentNode; st.style.height = Math.round(844 * s) + 'px'; st.style.width = Math.round(390 * s) + 'px'; st.style.margin = '0 auto'; st.style.overflow = 'hidden'; slot.style.marginBottom = Math.round(-844 * (1 - s)) + 'px'; }
   window.addEventListener('resize', function () { fit(); resize(); });
-
   S.models = [newModel('male', [0, 0])]; S.sel = { m: S.models[0].id, j: null };
   fit(); renderAll();
-  var h = (location.hash || '').slice(1);
-  if (h && h !== 'work' && $('#bar [data-v="' + h + '"]')) go(h);
+  var h = (location.hash || '').slice(1); if (h && h !== 'work' && $('#bar [data-v="' + h + '"]')) go(h);
+  window.__poser = { S: S, T: T, build: build, restOf: restOf };
 })();
 </script>
 </body>
