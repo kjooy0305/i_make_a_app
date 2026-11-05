@@ -235,7 +235,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
 
   function newModel(type, pos) {
     var joints = {}; ALLJ.forEach(function (n) { joints[n] = [0, 0, 0]; });
-    return { id: S.nid++, type: type, skin: 0, pos: pos || [0, 0], ry: 0, hyF: 0, joints: joints, hair: 'none', hairC: 0, prop: null, cloth: 'none', top: 1, bot: 0, shoe: 5, gaze: 0, vis: true };
+    return { id: S.nid++, type: type, skin: 0, pos: pos || [0, 0], ry: 0, hyF: 0, joints: joints, hair: 'none', hairC: 0, prop: null, bm: (TBY[type] && TBY[type].bm) || null, hairMesh: null, shoeMesh: null, propMesh: null, cloth: 'none', top: 1, bot: 0, shoe: 5, gaze: 0, vis: true };
   }
 
   /* ---------- 3D 몸 만들기 ---------- */
@@ -289,6 +289,8 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
     var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
   }
   function build(m) {
+    var bmPack = PACK && PACK.meta.meshes[m.bm || DEFAULT_BM[m.type]] ? (m.bm || DEFAULT_BM[m.type]) : null;
+    if (bmPack) return buildPack(m, bmPack);
     var t = TBY[m.type], R = restOf(t.d), P = R.P, D = R.D, g = new THREE.Group(), nodes = {}, hits = [], mats = {};
     g.userData.model = m.id;
     var skin = new THREE.Color(SKINS[m.skin]), cl = CLOTH[m.cloth][1];
@@ -362,6 +364,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   // 보조 관절(Twist)은 뼈 방향 축으로, 나머지는 X·Y·Z 순서
   function axisOf(n, dk) { var R = restOf(dk).P, c = { 'ArmTwist': 'ForeArm', 'HandTwist': 'Hand', 'UpLegTwist': 'Leg' }, s = n.indexOf('Left') === 0 ? 'Left' : 'Right', key = n.slice(s.length); if (!c[key]) return null; return R[s + c[key]].clone().sub(R[n]).normalize(); }
   function applyRot(node, n, a, dk) {
+    if (node.userData && node.userData.pack) { applyRotPack(node, n, a); return; }
     var ax = /Twist$/.test(n) ? axisOf(n, dk) : null;
     if (ax) node.quaternion.setFromAxisAngle(ax, a[0] * D2R); else node.rotation.set(a[0] * D2R, a[1] * D2R, a[2] * D2R);
   }
@@ -399,6 +402,135 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
     if (kind === 'guitar') { add(new THREE.SphereGeometry(0.17, 16, 12), mat(0xb5733f), 0, -0.1, 0.1).scale.set(1, 1.2, 0.3); add(new B(0.05, 0.6, 0.03), wood, 0, -0.55, 0.1); }
     if (kind === 'umbrella') { add(new C(0.012, 0.012, 0.9, 8), wood, 0, -0.35, 0); add(new THREE.ConeGeometry(0.45, 0.22, 16, 1, true), mat(0xb23a3a, { side: THREE.DoubleSide }), 0, -0.9, 0, Math.PI, 0, 0); }
     return g;
+  }
+
+  /* ---------- 내 모델 팩 (개인용: 이 기기 브라우저에만 저장, 저장소에는 없음) ---------- */
+  var PACK = null, GEO = {}, TEXC = {}, packWait = [];
+  var DEFAULT_BM = { male: 'msh_mangabody_male01', female: 'msh_mangabody_female02', maleS: 'msh_mangabody_male_shorty01', femaleS: 'msh_mangabody_female_shorty01', tiny: 'msh_mangabody_male_tiny01', tinyf: 'msh_mangabody_female_tiny01', hero: 'msh_male_superhero01_rashguard', herof: 'msh_female_superhero01_rashguard', big: 'msh_male_Bigman01', fit: 'msh_male_Fitboy01' };
+  var PK = { db: null };
+  function pkOpen() { return new Promise(function (res) { try { var r = indexedDB.open('poser-pack', 1); r.onupgradeneeded = function () { r.result.createObjectStore('p'); }; r.onsuccess = function () { PK.db = r.result; res(true); }; r.onerror = function () { res(false); }; } catch (e) { res(false); } }); }
+  function pkGet() { return new Promise(function (res) { if (!PK.db) return res(null); var q = PK.db.transaction('p', 'readonly').objectStore('p').get('pack'); q.onsuccess = function () { res(q.result || null); }; q.onerror = function () { res(null); }; }); }
+  function pkPut(buf) { return new Promise(function (res) { if (!PK.db) return res(false); var q = PK.db.transaction('p', 'readwrite').objectStore('p').put(buf, 'pack'); q.onsuccess = function () { res(true); }; q.onerror = function () { res(false); }; }); }
+  function pkClear() { return new Promise(function (res) { if (!PK.db) return res(); var q = PK.db.transaction('p', 'readwrite').objectStore('p').delete('pack'); q.onsuccess = q.onerror = function () { res(); }; }); }
+  function parsePack(buf) {
+    var u = new Uint8Array(buf); if (String.fromCharCode(u[0], u[1], u[2], u[3]) !== 'PPK1') throw new Error('팩 파일이 아니에요');
+    var hl = new DataView(buf).getUint32(4, true), meta = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, hl)));
+    var P = { meta: meta, buf: buf, base: 8 + hl, hair: [], shoe: [], prop: [], body: [], piece: [] };
+    Object.keys(meta.meshes).forEach(function (k) { var c = meta.meshes[k].cat; if (P[c]) P[c].push(k); });
+    return P;
+  }
+  function setPack(P) { PACK = P; GEO = {}; TEXC = {}; }
+  var famOf = function (n) { var l = n.toLowerCase(); return { g: /female/.test(l) ? 'f' : (/(^|_)male/.test(l) ? 'm' : 'x'), k: /superhero/.test(l) ? 'hero' : /bigman/.test(l) ? 'big' : /shorty/.test(l) ? 'shorty' : /tiny/.test(l) ? 'tiny' : /standard|standar|fitboy/.test(l) ? 'std' : 'x' }; };
+  var TFAM = { male: { g: 'm', k: 'std' }, female: { g: 'f', k: 'std' }, maleS: { g: 'm', k: 'shorty' }, femaleS: { g: 'f', k: 'shorty' }, tiny: { g: 'm', k: 'tiny' }, tinyf: { g: 'f', k: 'tiny' }, hero: { g: 'm', k: 'hero' }, herof: { g: 'f', k: 'hero' }, big: { g: 'm', k: 'big' }, fit: { g: 'm', k: 'std' } };
+  function fits(name, type) { var a = famOf(name), b = TFAM[type]; if (!b) return true; if (a.k === 'x' && a.g === 'x') return true; if (a.k !== 'x' && a.k !== b.k) return false; if (a.g !== 'x' && a.g !== b.g && !(b.k === 'tiny')) return false; return true; }
+  function bodyVariants(type) {
+    if (!PACK) return [];
+    var base = DEFAULT_BM[type], res = [];
+    PACK.body.forEach(function (n) {
+      var M = PACK.meta.meshes[n]; if (M.bones.length < 60) return;
+      var l = n.toLowerCase(); if (l.indexOf('rival') >= 0) return;
+      var f = famOf(n); var b = TFAM[type];
+      if (/schooluniform_male/.test(l)) { if (type !== 'fit') return; res.push(n); return; }
+      if (/schooluniform01_female/.test(l)) { if (type !== 'female') return; res.push(n); return; }
+      if (/casualfit_femaletiny/.test(l)) { if (type !== 'tinyf') return; res.push(n); return; }
+      if (/survivalfit/.test(l)) { if (type !== 'hero') return; res.push(n); return; }
+      if (/female_superhero01_casualfit/.test(l)) { if (type !== 'herof') return; res.push(n); return; }
+      if (f.k !== b.k || (f.g !== b.g && !(b.k === 'tiny' && /female/.test(l) === (b.g === 'f')))) return;
+      if (b.k === 'tiny' && (/female/.test(l)) !== (b.g === 'f')) return;
+      res.push(n);
+    });
+    if (res.indexOf(base) < 0 && PACK.meta.meshes[base]) res.unshift(base);
+    return res;
+  }
+  function piecesOf(bm) { var r = []; Object.keys(PACK.meta.meshes).forEach(function (n) { var M = PACK.meta.meshes[n]; if (M.cat === 'body' && M.bones.length < 40 && (n.indexOf(bm + '_') === 0 || (bm.indexOf('SchoolUniform01_female01') >= 0 && n === 'msh_SchoolUniform01_Skirt'))) r.push(n); }); return r; }
+  var nice = function (n) { return n.replace(/^msh_/, '').replace(/_/g, ' '); };
+  function geoOf(name) {
+    if (GEO[name]) return GEO[name];
+    var M = PACK.meta.meshes[name], b = PACK.base, nv = M.nv, g = new THREE.BufferGeometry();
+    var f32 = function (off, n) { return new Float32Array(PACK.buf.slice(b + off, b + off + n * 4)); };
+    g.setAttribute('position', new THREE.BufferAttribute(f32(M.pos, nv * 3), 3)); g.setAttribute('normal', new THREE.BufferAttribute(f32(M.nrm, nv * 3), 3)); g.setAttribute('uv', new THREE.BufferAttribute(f32(M.uv, nv * 2), 2));
+    g.setIndex(new THREE.BufferAttribute(new Uint32Array(PACK.buf.slice(b + M.idx, b + M.idx + M.ni * 4)), 1));
+    if (M.si !== undefined) {
+      var si = new Uint8Array(PACK.buf.slice(b + M.si, b + M.si + nv * 4)), sw = new Uint8Array(PACK.buf.slice(b + M.sw, b + M.sw + nv * 4)), fw = new Float32Array(nv * 4);
+      for (var i = 0; i < fw.length; i++) fw[i] = sw[i] / 255;
+      g.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array(si), 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(fw, 4));
+    }
+    M.groups.forEach(function (gr) { g.addGroup(gr[0], gr[1], gr[2]); });
+    if (M.cat === 'prop') g.computeVertexNormals();
+    return (GEO[name] = g);
+  }
+  function texOf(name) {
+    if (!name || !PACK.meta.textures[name]) return null;
+    if (TEXC[name]) return TEXC[name];
+    var t = PACK.meta.textures[name], blob = new Blob([PACK.buf.slice(PACK.base + t.off, PACK.base + t.off + t.len)], { type: 'image/png' }), tex = new THREE.Texture(), img = new Image();
+    img.onload = function () { tex.image = img; tex.needsUpdate = true; }; img.src = URL.createObjectURL(blob);
+    tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4; return (TEXC[name] = tex);
+  }
+  function matsOf(name, m) {
+    var M = PACK.meta.meshes[name], isHair = M.cat === 'hair', skin = new THREE.Color(SKINS[m.skin]);
+    var list = (M.mats.length ? M.mats : [{ name: '?', tex: null, color: null }]).map(function (x) {
+      var nm = x.name || '', tex = texOf(x.tex), o = { roughness: 0.7, metalness: 0.0 };
+      if (isHair) { o.color = new THREE.Color(HAIRS_C[m.hairC]); o.roughness = 0.55; if (tex) o.map = tex; }
+      else if (/PoseModelMatSSS/.test(nm)) { o.color = skin; if (tex) o.map = tex; }
+      else if (/skin/i.test(nm)) { o.color = skin; }
+      else if (/4ch/i.test(nm)) { o.color = new THREE.Color(TOPS[m.top]); }
+      else { o.color = x.color && !tex ? new THREE.Color(x.color[0], x.color[1], x.color[2]) : new THREE.Color(0xffffff); if ((!tex && !x.color) || (!tex && x.color && x.color[0] + x.color[1] + x.color[2] < 0.45)) o.color = new THREE.Color(M.cat === 'shoe' ? 0x303642 : 0xbfc5d2); if (tex) o.map = tex; }
+      o.side = THREE.DoubleSide; o.skinning = M.cat !== 'prop'; return new THREE.MeshStandardMaterial(o);
+    });
+    return list;
+  }
+  var TPOSE = {};
+  function tposeOf(dk) { if (TPOSE[dk]) return TPOSE[dk]; var P = {}; window.BODY[dk].joints.forEach(function (j) { P[j[0]] = new THREE.Vector3(j[1], j[2], j[3]); }); return (TPOSE[dk] = P); }
+  function resolveBone(n, nodes, kind) {
+    if (nodes[n]) return n; var s = n.replace(/^Rot_/, ''); if (nodes[s]) return s;
+    var l = n.toLowerCase(); if (/skirt/.test(l)) return 'Hips'; if (/hair|head|ear|tail/.test(l)) return 'Head'; if (/cape|cloak|back/.test(l)) return 'Spine2'; if (/arm|sleeve/.test(l)) return /right/.test(l) ? 'RightForeArm' : 'LeftForeArm';
+    return kind === 'hair' ? 'Head' : 'Hips';
+  }
+  function buildPack(m, bm) {
+    var t = TBY[m.type], g = new THREE.Group(), nodes = {}, hits = [], Mb = PACK.meta.meshes[bm];
+    var P = {}, T0 = tposeOf(t.d); ALLJ.forEach(function (n) { P[n] = Mb.bind && Mb.bind[n] ? new THREE.Vector3(Mb.bind[n][0], Mb.bind[n][1], Mb.bind[n][2]) : T0[n].clone(); });
+    g.userData.model = m.id;
+    var Z = new THREE.Vector3(0, 0, 1), WN = {}, QI = new THREE.Quaternion();
+    ['Left', 'Right'].forEach(function (s) {
+      var dir = P[s + 'Hand'].clone().sub(P[s + 'Arm']), th = -Math.PI / 2 - Math.atan2(dir.y, dir.x) + (s === 'Left' ? 1 : -1) * 9 * D2R, q = new THREE.Quaternion().setFromAxisAngle(Z, th);
+      ALLJ.forEach(function (n) { if (n.indexOf(s) !== 0 || n === s + 'Shoulder') return; var a = n, ok = false; while (a) { if (a === s + 'Arm') { ok = true; break; } a = PARENT[a]; } if (ok) WN[n] = q; });
+    });
+    ALLJ.forEach(function (n) {
+      var o = new THREE.Object3D(); nodes[n] = o; var par = PARENT[n];
+      if (par) { o.position.copy(P[n]).sub(P[par]); nodes[par].add(o); } else { o.position.copy(P[n]); g.add(o); }
+      var wn = WN[n] || QI, wp = par ? (WN[par] || QI) : QI; o.userData = { pack: true, wn: wn, wpInv: wp.clone().invert(), tp: P };
+    });
+    var thighLen = P.LeftUpLegTwist.distanceTo(P.LeftLeg); nodes.Hips.position.y = P.Hips.y + m.hyF * thighLen;
+    function skin(name, kind) {
+      var M = PACK.meta.meshes[name]; if (!M) return;
+      var geo = geoOf(name), bones = [], inv = [];
+      M.bones.forEach(function (bn) { var r = resolveBone(bn, nodes, kind); bones.push(nodes[r]); inv.push(new THREE.Matrix4().makeTranslation(-P[r].x, -P[r].y, -P[r].z)); });
+      var sm = new THREE.SkinnedMesh(geo, matsOf(name, m)); sm.frustumCulled = false; sm.castShadow = true; sm.receiveShadow = false; g.add(sm);
+      g.updateMatrixWorld(true); sm.bind(new THREE.Skeleton(bones, inv), new THREE.Matrix4());
+    }
+    skin(bm, 'body'); piecesOf(bm).forEach(function (p) { skin(p, 'body'); });
+    Object.keys(PACK.meta.meshes).forEach(function (n) { var X = PACK.meta.meshes[n]; if (X.cat === 'piece' && n.indexOf(bm + '_') === 0) { var pm0 = new THREE.Mesh(geoOf(n), matsOf(n, m)); pm0.castShadow = true; nodes[X.attach || 'Head'].add(pm0); } });
+    if (m.hairMesh && PACK.meta.meshes[m.hairMesh]) skin(m.hairMesh, 'hair');
+    if (m.shoeMesh && PACK.meta.meshes[m.shoeMesh]) skin(m.shoeMesh, 'shoe');
+    if (m.propMesh && PACK.meta.meshes[m.propMesh]) {
+      var pm = new THREE.Mesh(geoOf(m.propMesh), matsOf(m.propMesh, m)); pm.castShadow = true; var grip = P.RightHandMiddle2.clone().sub(P.RightHand); pm.position.copy(grip); nodes.RightHand.add(pm);
+    }
+    SELECTABLE.forEach(function (n) {
+      var rr = n === 'Hips' ? 0.06 : (n === 'Head' ? 0.07 : 0.04) * (t.d === 'tiny' ? 0.8 : 1);
+      var dot = new THREE.Mesh(new THREE.SphereGeometry(rr, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0, depthTest: false })); dot.renderOrder = 10; dot.userData = { joint: n, model: m.id }; nodes[n].add(dot); hits.push(dot);
+    });
+    ALLJ.forEach(function (n) { applyRot(nodes[n], n, m.joints[n], t.d); });
+    g.position.set(m.pos[0], 0, m.pos[1]); g.rotation.y = m.ry * D2R;
+    return { group: g, nodes: nodes, hits: hits, id: m.id, type: t.d };
+  }
+  var QX = new THREE.Quaternion(), EU = new THREE.Euler();
+  function applyRotPack(node, n, a) {
+    var U;
+    if (/Twist$/.test(n)) {
+      var s = n.indexOf('Left') === 0 ? 'Left' : 'Right', key = n.slice(s.length), c = { ArmTwist: 'ForeArm', HandTwist: 'Hand', UpLegTwist: 'Leg' }[key], P = node.userData.tp;
+      var ax = P[s + c].clone().sub(P[n]).normalize().applyQuaternion(node.userData.wn); U = new THREE.Quaternion().setFromAxisAngle(ax, a[0] * D2R);
+    } else { EU.set(a[0] * D2R, a[1] * D2R, a[2] * D2R, 'XYZ'); U = new THREE.Quaternion().setFromEuler(EU); }
+    node.quaternion.copy(node.userData.wpInv).multiply(U).multiply(node.userData.wn);
   }
 
   /* ---------- 3D 장면 ---------- */
@@ -531,7 +663,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   function menuView() {
     return '<div class="menu"><div class="logo"><div class="fig"><svg width="70" height="86" viewBox="0 0 70 86" fill="none" stroke="#ffd23f" stroke-width="5" stroke-linecap="round"><circle cx="35" cy="12" r="8"/><path d="M35 22v28M35 30L15 42M35 30l20 8M35 50L22 76M35 50l16 26"/></svg></div><h2>포저</h2><small>3D 마네킹 포즈 모델 만들기</small></div>' +
       '<button class="btn main" data-a="start">시작하기<span>작업 화면으로</span></button><button class="btn" data-a="newproj">새 프로젝트<span>모두 비우고 시작</span></button>' +
-      '<button class="btn" data-a="open" data-s="save">작업 불러오기<span>저장 슬롯</span></button><button class="btn" data-a="open" data-s="shop">상점<span>팩 · 시안</span></button>' +
+      '<button class="btn" data-a="open" data-s="save">작업 불러오기<span>저장 슬롯</span></button><button class="btn" data-a="open" data-s="pack">내 모델 팩<span>' + (PACK ? '사용 중' : '없음') + '</span></button><button class="btn" data-a="open" data-s="shop">상점<span>팩 · 시안</span></button>' +
       '<button class="btn" data-a="open" data-s="set">환경설정</button><button class="btn" data-a="open" data-s="help">튜토리얼 · 도움말</button><div class="ver">v0.2 · 시안</div></div>';
   }
   function workView() {
@@ -568,12 +700,13 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   function manSvg(thick, head) { thick = thick || 1; head = head || 1; var hr = 7 * head; return '<svg viewBox="0 0 60 60" width="64%" fill="none" stroke="#9fb0c8" stroke-width="' + (3 * thick) + '" stroke-linecap="round"><circle cx="30" cy="' + (9 + hr / 2) + '" r="' + hr + '"/><path d="M30 ' + (17 + hr) + 'v14M30 ' + (22 + hr) + 'l-10 8M30 ' + (22 + hr) + 'l10 8M30 ' + (31 + hr) + 'l-7 14M30 ' + (31 + hr) + 'l7 14"/></svg>'; }
   function swatches(list, cur, act) { return '<div class="sw">' + list.map(function (c, i) { return '<button style="background:' + c + '" data-a="' + act + '" data-i="' + i + '" aria-pressed="' + (cur === i) + '"></button>'; }).join('') + '</div>'; }
   function sheetView() {
-    var k = S.sheet, h = '<div class="sheet' + (k === 'add' || k === 'hand' ? ' full' : '') + '"><div class="grab"></div>', title = { add: '모델 추가', pose: '완성된 포즈', hand: '손 · 소품 · 꾸미기', cam: '카메라', light: '조명', save: '작업 저장 · 불러오기', set: '환경설정', help: '튜토리얼 · 도움말', shop: '상점', shot: '캡처', confirm: '확인' }[k] || '';
+    var k = S.sheet, h = '<div class="sheet' + (k === 'add' || k === 'hand' ? ' full' : '') + '"><div class="grab"></div>', title = { pack: '내 모델 팩', add: '모델 추가', pose: '완성된 포즈', hand: '손 · 소품 · 꾸미기', cam: '카메라', light: '조명', save: '작업 저장 · 불러오기', set: '환경설정', help: '튜토리얼 · 도움말', shop: '상점', shot: '캡처', confirm: '확인' }[k] || '';
     h += '<h4>' + title + '<button class="btn sm x" data-a="close">닫기</button></h4>';
     var tabs = '', body = '', foot = '', cm = curModel();
     if (k === 'add') {
       var tab = S.tab || '사람'; tabs = ['사람', '동물', '탈것', '특수'].map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tab === t) + '">' + t + '</button>'; }).join('');
-      if (tab === '사람') body = '<div class="grid">' + TYPES.map(function (t) { return tile(t.name, manSvg(t.d === 'big' ? 1.8 : t.d === 'hero' ? 1.4 : 1, t.d === 'tiny' ? 1.7 : t.d.indexOf('S') > 0 ? 1.25 : 1), 'data-a="addmodel" data-t="' + t.id + '"'); }).join('') + '</div><p class="sub">' + (S.swap ? '선택한 모델을 이 종류로 바꿔요.' : '고르면 화면에 새 모델이 서요.') + '</p>';
+      if (tab === '사람') body = '<div class="grid">' + TYPES.filter(function (x) { return !x.bm; }).map(function (t) { return tile(t.name, manSvg(t.d === 'big' ? 1.8 : t.d === 'hero' ? 1.4 : 1, t.d === 'tiny' ? 1.7 : t.d.indexOf('S') > 0 ? 1.25 : 1), 'data-a="addmodel" data-t="' + t.id + '"'); }).join('') + '</div><p class="sub">' + (S.swap ? '선택한 모델을 이 종류로 바꿔요.' : '고르면 화면에 새 모델이 서요.') + '</p>';
+      else if (tab === '특수' && PACK) body = '<div class="grid">' + TYPES.filter(function (x) { return x.bm; }).map(function (x) { return tile(x.name, manSvg(1, 1), 'data-a="addmodel" data-t="' + x.id + '"'); }).join('') + '</div><p class="sub">팩에 들어 있는 특수 모델이에요.</p>';
       else body = '<div class="grid">' + { '동물': ['말', '드래곤', '공룡', '고양이'], '탈것': ['자전거', '오토바이', '승용차', '스쿠터'], '특수': ['중세 기사', '교복', '운동복'] }[tab].map(function (n) { return tile(n, '<svg viewBox="0 0 60 60" width="60%" fill="none" stroke="#667" stroke-width="3"><rect x="10" y="14" width="40" height="32" rx="8"/></svg>', 'data-a="locked"', { locked: 'DLC' }); }).join('') + '</div><p class="sub">추가 팩은 시안에서는 잠겨 있어요.</p>';
     }
     if (k === 'pose') {
@@ -581,7 +714,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
       body = (cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<div class="list">' + POSES[cat].map(function (p) { return '<button class="li" data-a="applypose" data-c="' + cat + '" data-id="' + p.id + '"><span>' + p.name + '<small>' + Object.keys(p.p).length + '개 관절' + (p.fing ? ' · 손 포함' : '') + '</small></span><span class="sub">적용</span></button>'; }).join('') + '</div>';
     }
     if (k === 'hand') {
-      var tb = S.tab || '핸드포즈'; tabs = ['핸드포즈', '손가락 편집', '소품', '헤어', '의상', '피부·눈'].map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tb === t) + '">' + t + '</button>'; }).join('');
+      var tb = S.tab || '핸드포즈'; tabs = (PACK ? ['핸드포즈', '손가락 편집', '소품', '헤어', '의상', '신발', '피부·눈'] : ['핸드포즈', '손가락 편집', '소품', '헤어', '의상', '피부·눈']).map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tb === t) + '">' + t + '</button>'; }).join('');
       var need = cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>';
       var sideBtn = '<div class="row" style="margin-bottom:8px"><button class="btn sm" data-a="side" data-v="Left" aria-pressed="' + (S.side === 'Left') + '">왼손</button><button class="btn sm" data-a="side" data-v="Right" aria-pressed="' + (S.side === 'Right') + '">오른손</button></div>';
       if (tb === '핸드포즈') body = need + sideBtn + '<div class="grid">' + Object.keys(HANDP).map(function (n) { return tile(n, handSvg(n), 'data-a="handpose" data-n="' + n + '"', { on: S.hs === n }); }).join('') + '</div>';
@@ -595,17 +728,26 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
       if (tb === '소품') body = need + '<p class="sub">고르면 오른손에 쥐어요. 손 모양은 "핸드포즈"에서 쥐기를 고르면 자연스러워요.</p><div class="grid">' + tile('없음', '<span class="sub">–</span>', 'data-a="prop" data-k=""', { on: !(cm && cm.prop) }) + PROPS.map(function (p) { return tile(p[0], propSvg(p[1]), 'data-a="prop" data-k="' + p[1] + '"', { on: !!cm && cm.prop === p[1] }); }).join('') + '</div>';
       if (tb === '헤어') body = need + '<div class="grid">' + HAIRS.map(function (p) { return tile(p[0], '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + p[1] + '</span>', 'data-a="hair" data-k="' + p[1] + '"', { on: !!cm && cm.hair === p[1] }); }).join('') + '</div><div class="sub" style="margin:10px 0 6px">헤어 색상</div>' + swatches(HAIRS_C, cm ? cm.hairC : -1, 'hairc');
       if (tb === '의상') body = need + '<div class="list">' + Object.keys(CLOTH).map(function (c) { return '<button class="li" data-a="cloth" data-k="' + c + '" aria-pressed="' + (cm && cm.cloth === c) + '"><span>' + CLOTH[c][0] + '</span><span class="sub">' + (cm && cm.cloth === c ? '입는 중' : '입기') + '</span></button>'; }).join('') + '</div><div class="sub" style="margin:10px 0 6px">상의 색상</div>' + swatches(TOPS, cm ? cm.top : -1, 'topc') + '<div class="sub" style="margin:10px 0 6px">하의 색상</div>' + swatches(BOTS, cm ? cm.bot : -1, 'botc') + (cm && !TBY[cm.type].f ? '<p class="sub">교복의 치마는 여성 모델에서만 보여요.</p>' : '');
+      if (PACK && cm && (tb === '소품' || tb === '헤어' || tb === '의상' || tb === '신발')) body = packList(tb, cm);
       if (tb === '피부·눈') body = need + '<div class="sub" style="margin-bottom:6px">피부 색상</div>' + swatches(SKINS, cm ? cm.skin : -1, 'skin') + '<p class="sub" style="margin-top:10px">눈동자 방향은 얼굴(머리) 관절을 고르면 아래 슬라이더로 바꿀 수 있어요.</p>';
     }
     if (k === 'cam') body = '<div class="row">' + [['left', '좌측 보기'], ['front', '정면 보기'], ['right', '우측 보기']].map(function (v) { return '<button class="btn" data-a="view" data-v="' + v[0] + '" aria-pressed="' + (S.view === v[0]) + '">' + v[1] + '</button>'; }).join('') + '</div><div class="sl" style="margin-top:10px"><label>화각</label><input type="range" min="20" max="90" value="' + S.fov + '" data-a="fov"><output>' + S.fov + '°</output></div><div class="row" style="margin-top:10px"><button class="btn" data-a="guide" aria-pressed="' + S.guide + '">바닥 격자 ' + (S.guide ? '켜짐' : '꺼짐') + '</button><button class="btn" data-a="camreset">카메라 초기화</button></div><div class="row" style="margin-top:8px"><button class="btn" data-a="camsave">카메라 프리셋 저장</button><button class="btn" data-a="camload">프리셋 불러오기</button></div>';
     if (k === 'light') body = [['dir', '직사광 방향', 0, 360, S.light.dir], ['pow', '조명 세기', 0, 100, S.light.pow], ['back', '역광 설정', 0, 100, S.light.back]].map(function (r) { return '<div class="sl" style="grid-template-columns:78px 1fr 40px"><label>' + r[1] + '</label><input type="range" min="' + r[2] + '" max="' + r[3] + '" value="' + r[4] + '" data-a="light" data-k="' + r[0] + '"><output>' + r[4] + '</output></div>'; }).join('');
     if (k === 'save') { var sl = slots(); body = '<div class="list">' + [0, 1, 2, 3, 4].map(function (i) { var s = sl[i]; return '<div class="li"><span>슬롯 ' + (i + 1) + '<small>' + (s ? esc(s.when) + ' · 모델 ' + s.models.length + '개' : '비어 있음') + '</small></span><span class="row"><button class="btn sm" data-a="saveslot" data-i="' + i + '">저장</button><button class="btn sm" data-a="loadslot" data-i="' + i + '" ' + (s ? '' : 'disabled') + '>불러오기</button></span></div>'; }).join('') + '</div>' + (S.saveMsg ? '<p class="sub">' + esc(S.saveMsg) + '</p>' : '<p class="sub">시안에서는 이 브라우저에 저장돼요. 앱에서는 프로젝트 파일로 저장해요.</p>'); }
-    if (k === 'set') body = '<div class="list"><div class="li"><span>해상도</span><span class="row"><button class="btn sm" data-a="setv" data-k="res" data-v="best" aria-pressed="' + (S.set.res === 'best') + '">최대</button><button class="btn sm" data-a="setv" data-k="res" data-v="perf" aria-pressed="' + (S.set.res === 'perf') + '">최적</button></span></div><div class="li"><span>안티 알리아싱</span><button class="btn sm" data-a="toggleset" data-k="aa" aria-pressed="' + S.set.aa + '">' + (S.set.aa ? '켜기' : '끄기') + '</button></div><div class="li"><span>그림자</span><button class="btn sm" data-a="toggleset" data-k="shadow" aria-pressed="' + S.set.shadow + '">' + (S.set.shadow ? '켜기' : '끄기') + '</button></div><div class="li"><span>UI 모드</span><span class="row"><button class="btn sm" data-a="setv" data-k="ui" data-v="phone" aria-pressed="' + (S.set.ui === 'phone') + '">스마트폰</button><button class="btn sm" data-a="setv" data-k="ui" data-v="tab" aria-pressed="' + (S.set.ui === 'tab') + '">타블렛</button></span></div></div>';
+    if (k === 'set') body = '<div class="list"><div class="li"><span>내 모델 팩</span><button class="btn sm" data-a="open" data-s="pack">' + (PACK ? '사용 중' : '불러오기') + '</button></div><div class="li"><span>해상도</span><span class="row"><button class="btn sm" data-a="setv" data-k="res" data-v="best" aria-pressed="' + (S.set.res === 'best') + '">최대</button><button class="btn sm" data-a="setv" data-k="res" data-v="perf" aria-pressed="' + (S.set.res === 'perf') + '">최적</button></span></div><div class="li"><span>안티 알리아싱</span><button class="btn sm" data-a="toggleset" data-k="aa" aria-pressed="' + S.set.aa + '">' + (S.set.aa ? '켜기' : '끄기') + '</button></div><div class="li"><span>그림자</span><button class="btn sm" data-a="toggleset" data-k="shadow" aria-pressed="' + S.set.shadow + '">' + (S.set.shadow ? '켜기' : '끄기') + '</button></div><div class="li"><span>UI 모드</span><span class="row"><button class="btn sm" data-a="setv" data-k="ui" data-v="phone" aria-pressed="' + (S.set.ui === 'phone') + '">스마트폰</button><button class="btn sm" data-a="setv" data-k="ui" data-v="tab" aria-pressed="' + (S.set.ui === 'tab') + '">타블렛</button></span></div></div>';
     if (k === 'help') body = '<div class="list">' + [['관절 고르기', '모델의 관절(노란 점)을 눌러 선택해요.'], ['회전하기', '선택한 관절을 X·Y·Z 슬라이더로 돌려요. 좌우대칭을 켜면 반대쪽도 같이 움직여요. 팔·다리를 고르면 보조 관절 슬라이더가 나와요.'], ['손가락', '손을 고르고 "손가락" 버튼을 누르면 손가락마다 마디를 구부릴 수 있어요.'], ['카메라', '배경을 끌면 카메라가 돌아요. 조작모드를 바꾸면 모델을 옮길 수 있어요.'], ['완성된 포즈', '미리 만들어 둔 포즈를 고르면 선택한 모델에 적용돼요.'], ['저장·캡처', '작업을 슬롯에 저장하고, 현재 화면을 PNG로 캡처해요.']].map(function (x) { return '<div class="li"><span><b>' + x[0] + '</b><small>' + x[1] + '</small></span></div>'; }).join('') + '</div>';
+    if (k === 'pack') body = '<div class="list"><div class="li"><span>내 모델 팩<small>' + (PACK ? '불러옴 · 몸 ' + PACK.body.length + ' · 헤어 ' + PACK.hair.length + ' · 신발 ' + PACK.shoe.length + ' · 소품 ' + PACK.prop.length : '아직 없어요') + '</small></span><span class="sub">' + (PACK ? '사용 중' : '') + '</span></div></div><div class="row" style="margin-top:10px"><button class="btn main" data-a="pickpack">팩 파일 선택</button><button class="btn" data-a="clearpack" ' + (PACK ? '' : 'disabled') + '>팩 지우기</button></div><input type="file" id="packfile" style="display:none"><p class="sub" style="margin-top:10px">개인용 모델 팩(poser-models.pack)을 고르면 이 기기의 브라우저에만 저장돼요. 공개 저장소에는 올라가지 않아요. 팩이 없으면 기본 마네킹이 나와요.</p>';
     if (k === 'shop') body = '<div class="list">' + ['판타지 팩', '현대무기 팩', '드래곤 팩', '말 팩', '자전거·오토바이 팩', '악기 팩'].map(function (n) { return '<div class="li"><span>' + n + '<small>시안 · 구매 기능 없음</small></span><button class="btn sm" data-a="locked">구입</button></div>'; }).join('') + '</div>';
     if (k === 'shot') body = (S.capture ? '<img class="cap" src="' + S.capture + '" alt="캡처">' : '') + '<p class="sub">시안에서는 미리보기만 보여요. 앱에서는 갤러리에 저장돼요.</p>';
     if (k === 'confirm') { body = '<p>' + esc(S.confirm.msg) + '</p>'; foot = '<div class="row"><button class="btn" data-a="close">취소</button><button class="btn main" data-a="confirmok">확인</button></div>'; }
     return h + (tabs ? '<div class="tabs">' + tabs + '</div>' : '<div></div>') + '<div class="body">' + body + '</div>' + (foot ? '<div>' + foot + '</div>' : '<div></div>') + '</div>';
+  }
+  function packList(tb, cm) {
+    var f = tb === '소품' ? ['prop', 'propMesh', PACK.prop] : tb === '헤어' ? ['hair', 'hairMesh', PACK.hair.filter(function (n) { return fits(n, cm.type); })] : tb === '신발' ? ['shoe', 'shoeMesh', PACK.shoe.filter(function (n) { return fits(n, cm.type); })] : ['body', 'bm', bodyVariants(cm.type)];
+    var cur = cm[f[1]] || (f[0] === 'body' ? DEFAULT_BM[cm.type] : null), list = f[2];
+    var h = (f[0] !== 'body' ? '<button class="li" data-a="pk" data-f="' + f[1] + '" data-k="" aria-pressed="' + !cm[f[1]] + '"><span>없음</span><span class="sub">' + (!cm[f[1]] ? '선택됨' : '') + '</span></button>' : '') + list.map(function (n) { return '<button class="li" data-a="pk" data-f="' + f[1] + '" data-k="' + n + '" aria-pressed="' + (cur === n) + '"><span>' + esc(nice(n)) + '</span><span class="sub">' + (cur === n ? '선택됨' : '') + '</span></button>'; }).join('');
+    if (f[0] === 'hair') h += '</div><div class="sub" style="margin:10px 0 6px">헤어 색상</div>' + swatches(HAIRS_C, cm.hairC, 'hairc') + '<div>';
+    return '<div class="list">' + h + '</div>';
   }
   function handSvg(n) { var c = { '기본': 0, '쥐기': 14, '주먹': 24, '가리키기': 22, 'V': 18, '펼치기': 0 }[n] || 0; return '<svg viewBox="0 0 60 60" width="55%" fill="none" stroke="#9fb0c8" stroke-width="3" stroke-linecap="round"><path d="M18 46V' + (28 + c / 2) + 'M26 46V' + (18 + c) + 'M34 46V' + (16 + c) + 'M42 46V' + (22 + c) + 'M12 38l8 8h22"/></svg>'; }
   function propSvg(k) { return '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + k + '</span>'; }
@@ -619,7 +761,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   /* ---------- 동작 ---------- */
   function addModel(typeId) {
     var m = curModel(); pushUndo();
-    if (S.sheet === 'add' && S.swap && m) { m.type = typeId; S.swap = false; }
+    if (S.sheet === 'add' && S.swap && m) { m.type = typeId; m.bm = (TBY[typeId] && TBY[typeId].bm) || null; m.hairMesh = m.shoeMesh = m.propMesh = null; S.swap = false; }
     else { var n = S.models.length, nm = newModel(typeId, [n === 0 ? 0 : ((n % 2) ? 1 : -1) * Math.ceil(n / 2) * 0.6, 0]); S.models.push(nm); S.sel = { m: nm.id, j: null }; }
     S.sheet = null; rebuildModels(); renderAll();
   }
@@ -670,6 +812,9 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
       case 'loadslot': { var sl2 = slots(), s = sl2[parseInt(el.dataset.i, 10)]; if (s) { pushUndo(); S.models = s.models; S.nid = s.nid; S.sel = { m: S.models.length ? S.models[0].id : -1, j: null }; S.sheet = null; rebuildModels(); renderAll(); toast('저장된 데이터를 성공적으로 불러왔습니다'); } return; }
       case 'setv': S.set[el.dataset.k] = el.dataset.v; sheetOnly(); return;
       case 'toggleset': S.set[el.dataset.k] = !S.set[el.dataset.k]; if (el.dataset.k === 'shadow') updateLights(); sheetOnly(); toast('다시 시작하면 완전히 적용돼요 (시안)'); return;
+      case 'pickpack': { var pf = $('#packfile'); if (pf) pf.click(); return; }
+      case 'clearpack': pkClear().then(function () { setPack(null); PACK = null; rebuildModels(); sheetOnly(); toast('모델 팩을 지웠어요'); }); return;
+      case 'pk': if (m) { pushUndo(); var kk = el.dataset.f; m[kk] = el.dataset.k || null; rebuildModels(); sheetOnly(); } return;
       case 'locked': toast('추가 팩은 시안에서 잠겨 있어요'); return;
     }
   });
@@ -688,7 +833,8 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
     else if (a === 'fov') { S.fov = parseInt(el.value, 10); T.camera.fov = S.fov; T.camera.updateProjectionMatrix(); out.textContent = S.fov + '°'; }
     else if (a === 'light') { S.light[el.dataset.k] = parseInt(el.value, 10); updateLights(); out.textContent = el.value; }
   });
-  phone.addEventListener('change', function (e) { var a = e.target.dataset.a; if (a === 'rot' || a === 'twist' || a === 'gaze' || a === 'hipy' || a === 'fing') { e.target._p = false; if (a === 'rot') renderCtl(); } });
+  phone.addEventListener('change', function (e) {
+    if (e.target.id === 'packfile' && e.target.files[0]) { toast('팩을 읽는 중이에요…'); e.target.files[0].arrayBuffer().then(function (buf) { var P = parsePack(buf); setPack(P); addRivals(); pkPut(buf); rebuildModels(); renderAll(); toast('모델 팩을 불러왔어요'); }).catch(function (er) { toast('팩을 읽지 못했어요: ' + er.message); }); return; } var a = e.target.dataset.a; if (a === 'rot' || a === 'twist' || a === 'gaze' || a === 'hipy' || a === 'fing') { e.target._p = false; if (a === 'rot') renderCtl(); } });
 
   var SHEETS = ['add', 'pose', 'hand', 'cam', 'light', 'save', 'set'];
   function go(v) {
@@ -701,6 +847,8 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
   window.addEventListener('resize', function () { fit(); resize(); });
   S.models = [newModel('male', [0, 0])]; S.sel = { m: S.models[0].id, j: null };
   fit(); renderAll();
+  pkOpen().then(pkGet).then(function (buf) { if (!buf) return; try { setPack(parsePack(buf)); addRivals(); rebuildModels(); renderAll(); } catch (e) { /* 손상된 팩은 무시 */ } });
+  function addRivals() { if (!PACK) return; [['rv_vampire', '뱀파이어', 'msh_Rival_Vampire01', 'male'], ['rv_mage', '메이지', 'msh_Rival_Mage01', 'male'], ['rv_wind', '윈드위버', 'msh_Rival_WindMage01', 'female'], ['rv_pirate', '해적(여)', 'msh_Rival_PirateFemale01', 'herof']].forEach(function (r) { if (!TBY[r[0]] && PACK.meta.meshes[r[2]]) { var o = { id: r[0], name: r[1], d: r[3], f: /female|herof/.test(r[3]), bm: r[2] }; TYPES.push(o); TBY[o.id] = o; } }); }
   var h = (location.hash || '').slice(1); if (h && h !== 'work' && $('#bar [data-v="' + h + '"]')) go(h);
   window.__poser = { S: S, T: T, build: build, restOf: restOf };
 })();
