@@ -471,7 +471,7 @@ input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 
     var list = (M.mats.length ? M.mats : [{ name: '?', tex: null, color: null }]).map(function (x) {
       var nm = x.name || '', tex = texOf(x.tex), o = { roughness: 0.7, metalness: 0.0 };
       if (isHair) { o.color = new THREE.Color(HAIRS_C[m.hairC]); o.roughness = 0.55; if (tex) o.map = tex; }
-      else if (/PoseModelMatSSS/.test(nm)) { o.color = skin; if (tex) o.map = tex; }
+      else if (/PoseModelMatSSS/.test(nm)) { o.color = skin; if (tex && !/female/i.test(name) && !(TBY[m.type] && TBY[m.type].f)) o.map = tex; }
       else if (/skin/i.test(nm)) { o.color = skin; }
       else if (/4ch/i.test(nm)) { o.color = new THREE.Color(TOPS[m.top]); }
       else { o.color = x.color && !tex ? new THREE.Color(x.color[0], x.color[1], x.color[2]) : new THREE.Color(0xffffff); if ((!tex && !x.color) || (!tex && x.color && x.color[0] + x.color[1] + x.color[2] < 0.45)) o.color = new THREE.Color(M.cat === 'shoe' ? 0x303642 : 0xbfc5d2); if (tex) o.map = tex; }
