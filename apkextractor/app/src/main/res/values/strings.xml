@@ -14,7 +14,13 @@
     <string name="extracting">추출하는 중… (%1$d/%2$d)</string>
     <string name="done_title">추출 완료</string>
     <string name="done_body">%1$d개 저장했습니다.\n위치: 다운로드/APK추출기\n\n여러 파일로 나뉜 앱은 .apks 파일 하나로 묶었습니다.</string>
-    <string name="done_failed">\n\n실패한 앱 %1$d개: %2$s</string>
+    <string name="done_failed">\n\n실패한 앱 %1$d개:\n%2$s\n(불완전한 파일은 남기지 않고 지웠습니다)</string>
     <string name="ok">확인</string>
+    <string name="guard_text">앱을 저장하는 중입니다. 끝날 때까지 앱을 닫지 마세요.</string>
+    <string name="guard_channel">저장 중</string>
+    <string name="extracting_bytes">추출하는 중… (%1$d/%2$d) %3$s %4$d%%</string>
+    <string name="cancel_extract">취소</string>
+    <string name="done_verified">\n\n저장한 파일은 크기와 압축 구조를 다시 읽어 확인했습니다.</string>
+    <string name="done_cancelled">추출을 취소했습니다. 만들던 파일은 지웠습니다.</string>
     <string name="permission_denied">저장 권한이 없어 추출할 수 없습니다. 설정에서 저장소 권한을 허용하세요.</string>
 </resources>

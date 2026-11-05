@@ -2,7 +2,11 @@ package com.kjooy0305.apkextractor
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Build
+import android.os.PowerManager
+import android.view.WindowManager
+import androidx.core.app.ActivityCompat
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -23,6 +27,8 @@ class MainActivity : AppCompatActivity() {
     private var all: List<AppItem> = emptyList()
     private var visible: List<AppItem> = emptyList()
     private var busy = false
+    @Volatile private var cancelRequested = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     private val storagePermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -45,7 +51,7 @@ class MainActivity : AppCompatActivity() {
         b.systemToggle.setOnCheckedChangeListener { _, _ -> applyFilter() }
         b.selectAllButton.setOnClickListener { adapter.selectAllVisible() }
         b.clearButton.setOnClickListener { adapter.clearSelection() }
-        b.extractButton.setOnClickListener { onExtractClicked() }
+        b.extractButton.setOnClickListener { if (busy) { cancelRequested = true; b.extractButton.isEnabled = false } else onExtractClicked() }
 
         io.execute {
             val list = AppRepository.load(this)
@@ -58,6 +64,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // 화면이 닫히면 진행 중인 저장을 멈추고 만들던 파일을 지운다
+        if (busy) cancelRequested = true
         io.shutdown()
     }
 
@@ -78,7 +86,8 @@ class MainActivity : AppCompatActivity() {
     private fun updateSummary() {
         val n = adapter.selected.size
         b.countText.text = getString(R.string.app_count, visible.size, n)
-        b.extractButton.isEnabled = n > 0 && !busy
+        if (busy) return
+        b.extractButton.isEnabled = n > 0
         b.extractButton.text =
             if (n > 0) getString(R.string.extract_n, n) else getString(R.string.extract_none)
     }
@@ -96,21 +105,81 @@ class MainActivity : AppCompatActivity() {
         val targets = all.filter { it.packageName in adapter.selected }
         if (targets.isEmpty()) return
         busy = true
-        b.extractButton.isEnabled = false
+        cancelRequested = false
+        b.extractButton.isEnabled = true
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        acquireWakeLock()
+        startGuard(getString(R.string.guard_text))
         io.execute {
             val failed = mutableListOf<String>()
-            targets.forEachIndexed { i, item ->
-                runOnUiThread { b.extractButton.text = getString(R.string.extracting, i + 1, targets.size) }
-                runCatching { ApkExtractor.extract(this, item) }.onFailure { failed.add(item.label) }
+            var saved = 0
+            var cancelled = false
+            for ((i, item) in targets.withIndex()) {
+                if (cancelRequested) { cancelled = true; break }
+                try {
+                    ApkExtractor.extract(
+                        this, item,
+                        isCancelled = { cancelRequested },
+                        onProgress = { done, total ->
+                            val pct = if (total > 0) (done * 100 / total).toInt() else 0
+                            runOnUiThread {
+                                if (!isDestroyed) b.extractButton.text =
+                                    getString(R.string.extracting_bytes, i + 1, targets.size, item.label, pct)
+                            }
+                        },
+                    )
+                    saved++
+                } catch (e: ExtractCancelled) {
+                    cancelled = true
+                    break
+                } catch (e: Throwable) {
+                    failed.add("${item.label}: ${e.message ?: e.javaClass.simpleName}")
+                }
             }
             runOnUiThread {
                 busy = false
+                releaseWakeLock()
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                stopService(Intent(this, ExtractGuardService::class.java))
+                if (isDestroyed) return@runOnUiThread
                 adapter.clearSelection()
-                var msg = getString(R.string.done_body, targets.size - failed.size)
-                if (failed.isNotEmpty()) msg += getString(R.string.done_failed, failed.size, failed.joinToString(", "))
+                updateSummary()
+                var msg = if (cancelled) getString(R.string.done_cancelled) + "\n\n" else ""
+                msg += getString(R.string.done_body, saved)
+                if (saved > 0) msg += getString(R.string.done_verified)
+                if (failed.isNotEmpty()) msg += getString(R.string.done_failed, failed.size, failed.joinToString("\n"))
                 showMessage(msg)
             }
         }
+    }
+
+    private fun startGuard(text: String) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            // 알림이 보이지 않아도 저장은 계속된다. 허용하면 진행 중 알림이 보인다.
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
+        try {
+            ContextCompat.startForegroundService(
+                this, Intent(this, ExtractGuardService::class.java).putExtra(ExtractGuardService.EXTRA_TEXT, text)
+            )
+        } catch (_: Exception) {
+            // 서비스를 못 띄워도 저장은 진행한다
+        }
+    }
+
+    private fun acquireWakeLock() {
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "apkextractor:extract").apply {
+            setReferenceCounted(false)
+            acquire(60 * 60 * 1000L) // 최대 1시간
+        }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
     }
 
     private fun showMessage(message: String) {
