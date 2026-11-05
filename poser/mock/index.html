@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>포저 시안</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* Layout: 위에 화면 고르는 줄, 가운데에 폰 비율(390×844) 한 대. 폰 안에서 3D 마네킹을 직접 돌려 볼 수 있다. */
+:root {
+  --bg: #17191e;        /* 작업실 바닥: 푸른 기가 도는 먹색 */
+  --panel: #23262d;
+  --panel2: #2c3039;
+  --line: #3a3f4a;
+  --text: #eceff4;
+  --sub: #9aa3b2;
+  --accent: #ffd23f;    /* 선택된 관절·강조 */
+  --accent-ink: #1c1600;
+  --sel: #ff7a45;
+  --font-body: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-num: "Space Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; }
+.page { max-width: 900px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { margin: 0; font-size: 24px; font-weight: 900; letter-spacing: -.02em; }
+.head p { margin: 4px 0 0; color: var(--sub); max-width: 64ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; min-height: 36px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+.stage { display: flex; justify-content: center; }
+.slot { transform-origin: top center; }
+
+/* ===== 폰 ===== */
+.phone { width: 390px; height: 844px; background: var(--bg); border: 2px solid var(--line); border-radius: 38px; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.status { height: 30px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 8px 24px 0; font-family: var(--font-num); font-size: 12px; color: var(--sub); }
+.gesture { height: 18px; flex: none; display: flex; justify-content: center; align-items: center; background: var(--panel); }
+.gesture i { width: 110px; border-top: 3px solid var(--line); border-radius: 3px; }
+.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+.btn { font: inherit; font-weight: 700; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); padding: 10px 14px; min-height: 42px; cursor: pointer; }
+.btn.main { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.sm { min-height: 34px; padding: 5px 10px; font-size: 12px; border-radius: 10px; white-space: nowrap; }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn:disabled { opacity: .4; }
+
+/* 메인 메뉴 */
+.menu { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 24px; background: radial-gradient(120% 70% at 50% 8%, #2b3140 0%, var(--bg) 62%); }
+.logo { text-align: center; margin-bottom: 14px; }
+.logo .fig { width: 120px; height: 120px; margin: 0 auto 10px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); display: grid; place-items: center; }
+.logo h2 { margin: 0; font-size: 34px; font-weight: 900; letter-spacing: -.03em; }
+.logo small { color: var(--sub); }
+.menu .btn { min-height: 52px; font-size: 16px; text-align: left; display: flex; justify-content: space-between; }
+.menu .btn span { color: var(--sub); font-weight: 400; font-size: 12px; align-self: center; }
+.menu .btn.main span { color: var(--accent-ink); }
+.ver { text-align: center; color: var(--sub); font-family: var(--font-num); font-size: 11px; }
+
+/* 작업 화면 */
+.tb { display: flex; align-items: center; gap: 6px; padding: 6px 10px; flex: none; background: var(--panel); border-bottom: 1px solid var(--line); }
+.tb .grow { flex: 1; }
+.ib { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.ib[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ib:disabled { opacity: .35; }
+.vp { position: relative; flex: 1; min-height: 0; background: linear-gradient(#262b36, #1b1e26); touch-action: none; }
+.vp canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hint { position: absolute; left: 10px; top: 8px; font-size: 11px; color: var(--sub); pointer-events: none; font-family: var(--font-num); }
+.sel-tag { position: absolute; right: 10px; top: 8px; background: rgba(0,0,0,.45); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; pointer-events: none; }
+.models { position: absolute; left: 8px; bottom: 8px; right: 8px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.models::-webkit-scrollbar { display: none; }
+.mchip { flex: none; font: inherit; font-size: 12px; border-radius: 999px; padding: 4px 11px; border: 1px solid var(--line); background: rgba(35,38,45,.9); color: var(--text); cursor: pointer; }
+.mchip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.ctl { flex: none; background: var(--panel); border-top: 1px solid var(--line); padding: 8px 12px 6px; display: grid; gap: 6px; }
+.ctl .ttl { display: flex; align-items: center; gap: 8px; }
+.ctl .ttl b { flex: 1; font-size: 14px; }
+.ctl .ttl small { color: var(--sub); }
+.sl { display: grid; grid-template-columns: 46px 1fr 44px; align-items: center; gap: 8px; }
+.sl label { font-size: 12px; color: var(--sub); font-weight: 700; }
+.sl output { font-family: var(--font-num); font-size: 12px; text-align: right; }
+.sl.dis { opacity: .4; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 26px; background: transparent; margin: 0; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--line); }
+input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); margin-top: -8px; border: 0; }
+input[type=range]::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); border: 0; }
+.row { display: flex; gap: 6px; }
+.row .btn { flex: 1; }
+.nav { flex: none; display: grid; grid-template-columns: repeat(6, 1fr); background: var(--panel); border-top: 1px solid var(--line); }
+.nav button { font: inherit; font-size: 11px; background: none; border: 0; color: var(--sub); padding: 8px 0 7px; display: grid; gap: 2px; justify-items: center; cursor: pointer; }
+.nav button i { font-style: normal; font-size: 18px; line-height: 1; color: var(--text); }
+.nav button[aria-pressed="true"] { color: var(--accent); font-weight: 700; }
+
+/* 시트 */
+.dim { position: absolute; inset: 0; background: rgba(8,9,12,.6); display: flex; align-items: flex-end; z-index: 5; }
+.sheet { width: 100%; background: var(--panel); border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); padding: 10px 16px 16px; display: grid; gap: 10px; max-height: 80%; grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.sheet.full { max-height: 92%; }
+.grab { width: 44px; height: 4px; border-radius: 3px; background: var(--line); margin: 0 auto; }
+.sheet h4 { margin: 0; font-size: 17px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+.sheet h4 .x { margin-left: auto; }
+.tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs .chip { min-height: 32px; padding: 3px 12px; font-size: 12px; flex: none; }
+.body { overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: #6a7283 transparent; padding-right: 4px; }
+.body::-webkit-scrollbar { width: 6px; }
+.body::-webkit-scrollbar-thumb { background: #6a7283; border-radius: 4px; }
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tile { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 10px 6px 8px; display: grid; gap: 6px; justify-items: center; cursor: pointer; position: relative; min-width: 0; }
+.tile .pic { width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; background: var(--bg); display: grid; place-items: center; overflow: hidden; }
+.tile b { font-size: 12px; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+.tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tile .lock { position: absolute; top: 6px; right: 6px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: #000a; color: var(--accent); border: 1px solid var(--accent); }
+.tile.locked .pic { opacity: .45; }
+.sub { color: var(--sub); font-size: 12px; }
+.sw { display: flex; gap: 8px; flex-wrap: wrap; }
+.sw button { width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.sw button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--bg) inset; }
+.list { display: grid; gap: 6px; }
+.li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel2); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.li small { color: var(--sub); display: block; }
+.fing { display: grid; gap: 4px; }
+.fing .row .btn { padding: 4px 0; min-height: 32px; font-size: 12px; }
+.cap { width: 100%; border-radius: 12px; border: 1px solid var(--line); display: block; background: #fff2; }
+.toast { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); background: var(--text); color: var(--bg); font-weight: 700; padding: 8px 16px; border-radius: 999px; z-index: 9; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="head">
+    <h1>포저 시안</h1>
+    <p>3D 마네킹으로 포즈를 잡는 앱의 시안이에요. 폰 안에서 직접 해 보세요: 관절(노란 점)을 눌러 고르고 아래 슬라이더로 돌리고, 배경을 끌면 카메라가 돌아요. 모델 추가, 완성된 포즈, 카메라·조명, 저장·불러오기가 움직여요. 손가락, 소품, 상점은 화면만 있어요.</p>
+  </header>
+  <div class="bar" id="bar">
+    <button class="chip" data-v="menu" aria-pressed="false">메인 메뉴</button>
+    <button class="chip" data-v="work" aria-pressed="true">작업 화면</button>
+    <button class="chip" data-v="add" aria-pressed="false">모델 추가</button>
+    <button class="chip" data-v="pose" aria-pressed="false">완성된 포즈</button>
+    <button class="chip" data-v="hand" aria-pressed="false">손·소품</button>
+    <button class="chip" data-v="cam" aria-pressed="false">카메라</button>
+    <button class="chip" data-v="light" aria-pressed="false">조명</button>
+    <button class="chip" data-v="save" aria-pressed="false">저장·불러오기</button>
+    <button class="chip" data-v="set" aria-pressed="false">설정</button>
+  </div>
+  <div class="stage"><div class="slot" id="slot"><div class="phone" id="phone"></div></div></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var D2R = Math.PI / 180;
+
+  /* ---------- 관절 정의 (EasyPose 분석: 몸중심·허리·가슴·목·얼굴·쇄골과 어깨·팔·팔꿈치·손목과 손·고관절·무릎·발목) ---------- */
+  // [id, 한글 이름, 부모, 위치[x,y,z], 뼈대 {len, r, dir}, 좌우 짝]
+  var J = [
+    ['hip', '몸중심', null, [0, 0.98, 0], { len: 0.0, r: 0.12 }, null],
+    ['waist', '허리', 'hip', [0, 0.02, 0], { len: 0.2, r: 0.13, dir: 1 }, null],
+    ['chest', '가슴', 'waist', [0, 0.2, 0], { len: 0.22, r: 0.16, dir: 1 }, null],
+    ['neck', '목', 'chest', [0, 0.24, 0], { len: 0.08, r: 0.05, dir: 1 }, null],
+    ['head', '얼굴', 'neck', [0, 0.08, 0], { len: 0.0, r: 0.11, head: true }, null],
+    ['shL', '왼쪽 쇄골과 어깨', 'chest', [0.17, 0.2, 0], { len: 0.0, r: 0.06 }, 'shR'],
+    ['shR', '오른쪽 쇄골과 어깨', 'chest', [-0.17, 0.2, 0], { len: 0.0, r: 0.06 }, 'shL'],
+    ['armL', '왼쪽 팔', 'shL', [0.04, 0, 0], { len: 0.3, r: 0.045, dir: -1 }, 'armR'],
+    ['armR', '오른쪽 팔', 'shR', [-0.04, 0, 0], { len: 0.3, r: 0.045, dir: -1 }, 'armL'],
+    ['elbL', '왼쪽 팔꿈치', 'armL', [0, -0.3, 0], { len: 0.27, r: 0.04, dir: -1 }, 'elbR'],
+    ['elbR', '오른쪽 팔꿈치', 'armR', [0, -0.3, 0], { len: 0.27, r: 0.04, dir: -1 }, 'elbL'],
+    ['handL', '왼쪽 손목과 손', 'elbL', [0, -0.27, 0], { len: 0.09, r: 0.035, dir: -1, hand: true }, 'handR'],
+    ['handR', '오른쪽 손목과 손', 'elbR', [0, -0.27, 0], { len: 0.09, r: 0.035, dir: -1, hand: true }, 'handL'],
+    ['legL', '왼쪽 고관절', 'hip', [0.09, -0.04, 0], { len: 0.45, r: 0.065, dir: -1 }, 'legR'],
+    ['legR', '오른쪽 고관절', 'hip', [-0.09, -0.04, 0], { len: 0.45, r: 0.065, dir: -1 }, 'legL'],
+    ['kneeL', '왼쪽 무릎', 'legL', [0, -0.45, 0], { len: 0.43, r: 0.05, dir: -1 }, 'kneeR'],
+    ['kneeR', '오른쪽 무릎', 'legR', [0, -0.45, 0], { len: 0.43, r: 0.05, dir: -1 }, 'kneeL'],
+    ['footL', '왼쪽 발목', 'kneeL', [0, -0.43, 0], { len: 0.0, r: 0.045, foot: true }, 'footR'],
+    ['footR', '오른쪽 발목', 'kneeR', [0, -0.43, 0], { len: 0.0, r: 0.045, foot: true }, 'footL']
+  ];
+  var JID = J.map(function (j) { return j[0]; });
+  var JBY = {}; J.forEach(function (j) { JBY[j[0]] = j; });
+
+  /* ---------- 모델 종류 (EasyPose 분석: 일반 / 소형(4등신) / 히어로 / 빅맨 …) ---------- */
+  var TYPES = [
+    { id: 'male', name: '남자 일반', sex: '남', s: 1, limb: 1, head: 1, thick: 1 },
+    { id: 'female', name: '여자 일반', sex: '여', s: 0.94, limb: 1, head: 0.95, thick: 0.85 },
+    { id: 'male4', name: '남자 4등신', sex: '남', s: 0.6, limb: 0.62, head: 1.9, thick: 1.35 },
+    { id: 'female4', name: '여자 4등신', sex: '여', s: 0.58, limb: 0.6, head: 1.9, thick: 1.3 },
+    { id: 'hero', name: '히어로(남)', sex: '남', s: 1.06, limb: 1, head: 1, thick: 1.4 },
+    { id: 'herof', name: '히어로(여)', sex: '여', s: 1, limb: 1.02, head: 0.95, thick: 1.05 },
+    { id: 'big', name: '빅맨', sex: '남', s: 1.12, limb: 1, head: 1, thick: 1.9 }
+  ];
+  var TBY = {}; TYPES.forEach(function (t) { TBY[t.id] = t; });
+  var SKINS = ['#e9e4dc', '#f0c7a8', '#c98f62', '#8a5a3b', '#9fb3c8', '#c8d6a0', '#e8a0a8'];
+  var POSES = {
+    '일반': [
+      { id: 'a', name: '기본 서기', p: {} },
+      { id: 't', name: 'T 자세', p: { armL: [0, 0, 90], armR: [0, 0, -90] } },
+      { id: 'hi', name: '손 흔들기', p: { armL: [0, 0, 135], elbL: [0, 0, 25], head: [0, 0, -6] } },
+      { id: 'think', name: '생각하기', p: { armR: [-105, 0, -8], elbR: [-125, 0, 0], head: [12, 0, 0], waist: [4, 0, 0] } },
+      { id: 'point', name: '앞 가리키기', p: { armR: [-90, 0, -4], elbR: [-4, 0, 0], waist: [0, -12, 0], head: [0, -12, 0] } }
+    ],
+    '앉기': [
+      { id: 'sit', name: '의자에 앉기', p: { legL: [-90, 0, 4], legR: [-90, 0, -4], kneeL: [90, 0, 0], kneeR: [90, 0, 0], armL: [-35, 0, 8], armR: [-35, 0, -8], elbL: [-60, 0, 0], elbR: [-60, 0, 0], waist: [-4, 0, 0] }, hy: -0.45 },
+      { id: 'sit2', name: '다리 꼬기', p: { legL: [-90, 0, 0], legR: [-90, 25, -16], kneeL: [90, 0, 0], kneeR: [100, 0, 0], waist: [-6, 0, 0], armL: [-30, 0, 10], elbL: [-70, 0, 0], armR: [-50, 0, -6], elbR: [-80, 0, 0] }, hy: -0.45 }
+    ],
+    '다이나믹': [
+      { id: 'run', name: '달리기', p: { legL: [-62, 0, 3], kneeL: [75, 0, 0], legR: [30, 0, -3], kneeR: [22, 0, 0], armL: [38, 0, 10], elbL: [-70, 0, 0], armR: [-52, 0, -10], elbR: [-85, 0, 0], waist: [-10, 14, 0], chest: [-6, -14, 0] }, hy: -0.04 },
+      { id: 'win', name: '승리 포즈', p: { armL: [0, 0, 150], armR: [0, 0, -150], head: [-12, 0, 0], waist: [-6, 0, 0], legL: [0, 0, 8], legR: [0, 0, -8] } },
+      { id: 'punch', name: '펀치', p: { armR: [-92, 0, -8], elbR: [-4, 0, 0], armL: [-60, 0, 14], elbL: [-110, 0, 0], waist: [4, 22, 0], chest: [0, 18, 0], legL: [-14, 0, 8], legR: [18, 0, -10], kneeL: [14, 0, 0], kneeR: [20, 0, 0] }, hy: -0.04 }
+    ],
+    '특수': [
+      { id: 'bow', name: '인사하기', p: { waist: [38, 0, 0], chest: [14, 0, 0], head: [10, 0, 0], armL: [8, 0, 6], armR: [8, 0, -6] } },
+      { id: 'kneel', name: '무릎 꿇기', p: { legL: [-90, 0, 2], legR: [8, 0, -2], kneeL: [90, 0, 0], kneeR: [100, 0, 0], waist: [-4, 0, 0] }, hy: -0.45 }
+    ]
+  };
+  var PROPS = [['검', 'sword'], ['방패', 'shield'], ['지팡이', 'staff'], ['도끼', 'axe'], ['활', 'bow'], ['단검', 'dagger']];
+  var HAIRS = [['없음', 'none'], ['짧은 머리', 'short'], ['긴 머리', 'long'], ['묶음 머리', 'bun']];
+  var HANDS = ['기본', '쥐기', '가리키기', 'V', '펼치기', '주먹'];
+
+  /* ---------- 상태 ---------- */
+  var S = { screen: 'work', sheet: null, tab: null, models: [], sel: { m: -1, j: null }, sym: true, mode: 'camera', lock: {}, guide: true,
+    fov: 38, light: { dir: 40, back: 30, pow: 70 }, hair: 'none', prop: null, handFinger: 'thumb', hs: null, undo: [], redo: [], toast: '', capture: null,
+    set: { aa: true, shadow: true, res: 'best', ui: 'phone' }, view: 'front', saveMsg: null, confirm: null, hideUI: false, nid: 1 };
+  var T = {}; // three 객체
+
+  function newModel(type, pos) {
+    var joints = {}; JID.forEach(function (id) { joints[id] = [0, 0, 0]; });
+    joints.armL = [0, 0, 10]; joints.armR = [0, 0, -10];
+    return { id: S.nid++, type: type, skin: 0, pos: pos || [0, 0], ry: 0, hy: 0, joints: joints, hair: 'none', prop: null, vis: true };
+  }
+
+  /* ---------- 3D ---------- */
+  function mat(color, extra) { return new THREE.MeshStandardMaterial(Object.assign({ color: color, roughness: 0.65, metalness: 0.05 }, extra || {})); }
+  function build(m) {
+    var t = TBY[m.type], g = new THREE.Group(), nodes = {}, hits = [];
+    var skin = new THREE.Color(SKINS[m.skin]);
+    var scale = t.s;
+    g.userData.model = m.id;
+    J.forEach(function (j) {
+      var o = new THREE.Object3D(), pos = j[3].slice();
+      var isLimbPos = j[0] !== 'hip';
+      o.position.set(pos[0] * scale * (j[0].indexOf('sh') === 0 || j[0].indexOf('leg') === 0 ? t.thick > 1.5 ? 1.15 : 1 : 1), pos[1] * scale * (j[2] && (j[0].indexOf('arm') === 0 || j[0].indexOf('elb') === 0 || j[0].indexOf('hand') === 0 || j[0].indexOf('leg') === 0 || j[0].indexOf('knee') === 0 || j[0].indexOf('foot') === 0) ? t.limb : 1), pos[2] * scale);
+      if (j[0] === 'hip') o.position.y = pos[1] * scale * (0.5 + 0.5 * t.limb) + m.hy * scale;
+      nodes[j[0]] = o;
+      (j[2] ? nodes[j[2]] : g).add(o);
+      var sp = j[4], r = sp.r * t.thick * scale * (sp.head ? t.head / t.thick : 1);
+      if (sp.head) r = 0.11 * t.head * scale;
+      if (sp.len > 0) {
+        var len = sp.len * scale * (sp.dir === -1 ? t.limb : 1);
+        var cy = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.9, len, 14), mat(skin));
+        cy.position.y = sp.dir * len / 2; o.add(cy);
+      }
+      if (sp.head) { var hd = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 16), mat(skin)); hd.position.y = r * 0.85; o.add(hd); o.userData.headR = r; }
+      if (sp.hand) { var ha = new THREE.Mesh(new THREE.BoxGeometry(r * 2.1, len0(sp, scale, t) * 1.0, r * 1.1), mat(skin)); ha.position.y = -len0(sp, scale, t) / 2; o.add(ha); }
+      if (sp.foot) { var ft = new THREE.Mesh(new THREE.BoxGeometry(r * 2.2, 0.06 * scale, 0.2 * scale * (t.limb > 0.8 ? 1 : 0.8)), mat(skin)); ft.position.set(0, -0.035 * scale, 0.05 * scale); o.add(ft); }
+      // 선택용 관절 점
+      var jr = Math.max(0.035, r * 0.95) * (sp.head ? 0.5 : 1);
+      var dot = new THREE.Mesh(new THREE.SphereGeometry(jr, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.0 }));
+      dot.userData = { joint: j[0], model: m.id, base: jr }; o.add(dot); hits.push(dot);
+      if (sp.head) dot.position.y = r * 0.85;
+    });
+    // 적용
+    JID.forEach(function (id) { var a = m.joints[id]; nodes[id].rotation.set(a[0] * D2R, a[1] * D2R, a[2] * D2R); });
+    // 머리카락·소품
+    applyHair(m, nodes.head, skin);
+    if (m.prop) { var p = makeProp(m.prop); if (p) { p.scale.setScalar(scale); nodes.handR.add(p); } }
+    g.position.set(m.pos[0], 0, m.pos[1]); g.rotation.y = m.ry * D2R;
+    return { group: g, nodes: nodes, hits: hits, id: m.id };
+  }
+  function len0(sp, scale, t) { return sp.len * scale * t.limb; }
+  function applyHair(m, headNode, skin) {
+    if (!m.hair || m.hair === 'none') return;
+    var r = headNode.userData.headR, hc = 0x3a2a22, h = new THREE.Group();
+    var cap = new THREE.Mesh(new THREE.SphereGeometry(r * 1.07, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.62), mat(hc)); cap.position.y = r * 0.9; h.add(cap);
+    if (m.hair === 'long') { var back = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.95, r * 0.7, r * 2.6, 14, 1, true), mat(hc, { side: THREE.DoubleSide })); back.position.set(0, r * 0.1, -r * 0.25); h.add(back); }
+    if (m.hair === 'bun') { var bun = new THREE.Mesh(new THREE.SphereGeometry(r * 0.42, 12, 10), mat(hc)); bun.position.set(0, r * 2.05, -r * 0.3); h.add(bun); }
+    headNode.add(h);
+  }
+  function makeProp(kind) {
+    var g = new THREE.Group(), steel = mat(0xc0c8d6, { metalness: 0.5, roughness: 0.35 }), wood = mat(0x7a5638);
+    function add(geo, mt, x, y, z, rx, ry, rz) { var o = new THREE.Mesh(geo, mt); o.position.set(x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); g.add(o); return o; }
+    var C = THREE.CylinderGeometry, B = THREE.BoxGeometry;
+    if (kind === 'sword') { add(new C(0.015, 0.015, 0.14, 8), wood, 0, -0.1, 0); add(new B(0.14, 0.02, 0.03), steel, 0, -0.17, 0); add(new B(0.035, 0.7, 0.012), steel, 0, -0.55, 0); }
+    if (kind === 'shield') { add(new C(0.22, 0.22, 0.03, 20), mat(0x8a3b3b), 0, -0.1, 0.08, Math.PI / 2, 0, 0); }
+    if (kind === 'staff') { add(new C(0.02, 0.02, 1.5, 8), wood, 0, -0.3, 0); add(new THREE.SphereGeometry(0.06, 12, 10), mat(0x66aaff, { emissive: 0x2244aa }), 0, -1.08, 0); }
+    if (kind === 'axe') { add(new C(0.02, 0.02, 0.8, 8), wood, 0, -0.35, 0); add(new B(0.22, 0.2, 0.025), steel, 0.1, -0.7, 0); }
+    if (kind === 'bow') { add(new THREE.TorusGeometry(0.4, 0.015, 6, 20, Math.PI), wood, 0, -0.3, 0, 0, 0, Math.PI / 2); }
+    if (kind === 'dagger') { add(new B(0.025, 0.28, 0.01), steel, 0, -0.22, 0); add(new C(0.012, 0.012, 0.1, 8), wood, 0, -0.07, 0); }
+    return g;
+  }
+
+  function initThree() {
+    var vp = $('#vp'); if (!vp || !window.THREE) return;
+    if (T.renderer) { T.renderer.dispose(); }
+    var canvas = document.createElement('canvas'); vp.insertBefore(canvas, vp.firstChild);
+    T.canvas = canvas;
+    T.renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: S.set.aa, alpha: false, preserveDrawingBuffer: true });
+    T.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    T.renderer.shadowMap.enabled = true;
+    T.scene = new THREE.Scene(); T.scene.background = new THREE.Color(0x232833);
+    T.camera = new THREE.PerspectiveCamera(S.fov, 1, 0.1, 50);
+    T.az = 0; T.el = 0.12; T.dist = 4.6; T.target = new THREE.Vector3(0, 0.9, 0);
+    T.amb = new THREE.HemisphereLight(0xffffff, 0x334455, 0.7); T.scene.add(T.amb);
+    T.dl = new THREE.DirectionalLight(0xffffff, 0.9); T.dl.castShadow = true; T.dl.shadow.mapSize.set(1024, 1024); T.scene.add(T.dl);
+    T.bl = new THREE.DirectionalLight(0x9db8ff, 0.4); T.scene.add(T.bl);
+    var floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), mat(0x2d3340, { roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; T.scene.add(floor);
+    T.grid = new THREE.GridHelper(14, 28, 0x56607a, 0x3a4152); T.grid.position.y = 0.002; T.scene.add(T.grid);
+    T.grid.visible = S.guide;
+    T.root = new THREE.Group(); T.scene.add(T.root);
+    T.ray = new THREE.Raycaster();
+    updateLights(); rebuildModels(); resize(); loop();
+    bindPointer(vp);
+  }
+  function updateLights() {
+    if (!T.dl) return;
+    var a = S.light.dir * D2R;
+    T.dl.position.set(Math.sin(a) * 4, 5, Math.cos(a) * 4); T.dl.intensity = 0.2 + S.light.pow / 100 * 1.2;
+    var b = (S.light.dir + 180) * D2R; T.bl.position.set(Math.sin(b) * 4, 3, Math.cos(b) * 4); T.bl.intensity = S.light.back / 100 * 0.9;
+    T.dl.castShadow = S.set.shadow;
+  }
+  function rebuildModels() {
+    if (!T.root) return;
+    while (T.root.children.length) { var c = T.root.children.pop(); T.root.remove(c); }
+    T.objs = [];
+    S.models.forEach(function (m) { var o = build(m); o.group.visible = m.vis; T.root.add(o.group); T.objs.push(o); o.group.traverse(function (n) { if (n.isMesh && !n.userData.joint) n.castShadow = true; }); });
+    markSel();
+  }
+  function markSel() {
+    if (!T.objs) return;
+    T.objs.forEach(function (o) {
+      o.hits.forEach(function (d) {
+        var on = S.sel.m === o.id && S.sel.j === d.userData.joint, mine = S.sel.m === o.id;
+        d.material.opacity = on ? 0.95 : (mine ? 0.45 : 0.0); d.material.color.set(on ? 0xff7a45 : 0xffd23f);
+        d.scale.setScalar(on ? 1.35 : 1);
+      });
+    });
+  }
+  function resize() {
+    var vp = $('#vp'); if (!vp || !T.renderer) return;
+    var w = vp.clientWidth, h = vp.clientHeight; if (!w || !h) return;
+    T.renderer.setSize(w, h, false); T.camera.aspect = w / h; T.camera.updateProjectionMatrix();
+  }
+  var raf = 0;
+  function loop() {
+    cancelAnimationFrame(raf);
+    var step = function () {
+      if (!T.renderer || !document.body.contains(T.canvas)) return;
+      var cp = T.target.clone().add(new THREE.Vector3(Math.sin(T.az) * Math.cos(T.el), Math.sin(T.el), Math.cos(T.az) * Math.cos(T.el)).multiplyScalar(T.dist));
+      T.camera.position.copy(cp); T.camera.lookAt(T.target);
+      T.renderer.render(T.scene, T.camera); raf = requestAnimationFrame(step);
+    };
+    step();
+  }
+  function setView(v) { S.view = v; T.az = v === 'left' ? Math.PI / 2 : v === 'right' ? -Math.PI / 2 : 0; T.el = 0.12; }
+
+  function pick(ev) {
+    var vp = $('#vp'), r = vp.getBoundingClientRect(), sc = r.width / vp.offsetWidth || 1;
+    var x = (ev.clientX - r.left) / r.width * 2 - 1, y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+    T.ray.setFromCamera({ x: x, y: y }, T.camera);
+    var all = []; T.objs.forEach(function (o) { if (o.group.visible) all = all.concat(o.hits); });
+    all.forEach(function (d) { d.material.opacity = Math.max(d.material.opacity, 0.001); });
+    var hit = T.ray.intersectObjects(all, false)[0];
+    return hit ? hit.object.userData : null;
+  }
+  function bindPointer(vp) {
+    var drag = null;
+    vp.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.models,.hint,.sel-tag')) return;
+      vp.setPointerCapture(e.pointerId);
+      drag = { x: e.clientX, y: e.clientY, moved: 0, hit: pick(e), t: Date.now() };
+    });
+    vp.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+      if (drag.moved < 6) return;
+      var m = curModel();
+      if (S.mode === 'model' && m) { var k = 0.006 * T.dist / 4; m.pos[0] += (Math.cos(T.az) * dx + Math.sin(T.az) * dy) * k; m.pos[1] += (-Math.sin(T.az) * dx + Math.cos(T.az) * dy) * k; syncPos(m); drag.posChanged = true; }
+      else { T.az -= dx * 0.008; T.el = Math.max(-0.2, Math.min(1.3, T.el + dy * 0.006)); }
+    });
+    vp.addEventListener('pointerup', function () {
+      if (!drag) return;
+      if (drag.moved < 6) { if (drag.hit) { S.sel = { m: drag.hit.model, j: drag.hit.joint }; markSel(); renderCtl(); renderTop(); } else if (S.sel.j) { S.sel.j = null; markSel(); renderCtl(); renderTop(); } }
+      else if (drag.posChanged) pushUndo();
+      drag = null;
+    });
+    vp.addEventListener('wheel', function (e) { e.preventDefault(); T.dist = Math.max(1.8, Math.min(9, T.dist + e.deltaY * 0.004)); }, { passive: false });
+  }
+  function syncPos(m) { var o = T.objs.filter(function (x) { return x.id === m.id; })[0]; if (o) o.group.position.set(m.pos[0], 0, m.pos[1]); }
+  var curModel = function () { return S.models.filter(function (m) { return m.id === S.sel.m; })[0] || null; };
+
+  /* ---------- 실행 취소 ---------- */
+  function snap() { return JSON.stringify({ models: S.models, nid: S.nid, sel: S.sel }); }
+  function pushUndo() { S.undo.push(snap()); if (S.undo.length > 60) S.undo.shift(); S.redo = []; renderTop(); }
+  function restore(str) { var o = JSON.parse(str); S.models = o.models; S.nid = o.nid; S.sel = o.sel; rebuildModels(); renderAll(); }
+  function undo() { if (!S.undo.length) return; S.redo.push(snap()); restore(S.undo.pop()); }
+  function redo() { if (!S.redo.length) return; S.undo.push(snap()); restore(S.redo.pop()); }
+
+  /* ---------- 관절 회전 ---------- */
+  function setJoint(m, id, axis, val, fromSym) {
+    if (S.lock[m.id + id] && !fromSym) return;
+    m.joints[id][axis] = val;
+    var o = T.objs.filter(function (x) { return x.id === m.id; })[0];
+    if (o) o.nodes[id].rotation[['x', 'y', 'z'][axis]] = val * D2R;
+    var mir = JBY[id][5];
+    if (S.sym && mir && !fromSym && !S.lock[m.id + mir]) setJoint(m, mir, axis, axis === 0 ? val : -val, true);
+  }
+  function applyPose(m, pose) {
+    JID.forEach(function (id) { m.joints[id] = [0, 0, 0]; });
+    m.joints.armL = [0, 0, 10]; m.joints.armR = [0, 0, -10];
+    Object.keys(pose.p).forEach(function (k) { m.joints[k] = pose.p[k].slice(); });
+    m.hy = pose.hy || 0; rebuildModels();
+  }
+
+  /* ---------- 저장 슬롯 ---------- */
+  var KEY = 'poser-mock-slots';
+  function slots() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
+  function putSlots(a) { try { localStorage.setItem(KEY, JSON.stringify(a)); return true; } catch (e) { return false; } }
+
+  /* ---------- 화면 조각 ---------- */
+  var phone = $('#phone');
+  function icon(name) { return { undo: '↶', redo: '↷', sym: '⇋', cam: '◎', model: '✥', shot: '◉', hide: '▣', menu: '☰', lock: '⚿' }[name] || name; }
+  function renderAll() { phone.innerHTML = view(); afterView(); }
+  function view() {
+    var h = '<div class="status"><span>9:41</span><span>●●● 100%</span></div><div class="screen">';
+    h += S.screen === 'menu' ? menuView() : workView();
+    if (S.sheet) h += '<div class="dim" data-a="dim">' + sheetView() + '</div>';
+    if (S.toast) h += '<div class="toast">' + esc(S.toast) + '</div>';
+    return h + '</div><div class="gesture"><i></i></div>';
+  }
+  function menuView() {
+    return '<div class="menu"><div class="logo"><div class="fig"><svg width="70" height="86" viewBox="0 0 70 86" fill="none" stroke="#ffd23f" stroke-width="5" stroke-linecap="round"><circle cx="35" cy="12" r="8"/><path d="M35 22v28M35 30L15 42M35 30l20 8M35 50L22 76M35 50l16 26"/></svg></div><h2>포저</h2><small>3D 마네킹 포즈 모델 만들기</small></div>' +
+      '<button class="btn main" data-a="start">시작하기<span>작업 화면으로</span></button>' +
+      '<button class="btn" data-a="newproj">새 프로젝트<span>모두 비우고 시작</span></button>' +
+      '<button class="btn" data-a="open" data-s="save">작업 불러오기<span>저장 슬롯</span></button>' +
+      '<button class="btn" data-a="open" data-s="shop">상점<span>팩 · 시안</span></button>' +
+      '<button class="btn" data-a="open" data-s="set">환경설정</button>' +
+      '<button class="btn" data-a="open" data-s="help">튜토리얼 · 도움말</button><div class="ver">v0.1 · 시안</div></div>';
+  }
+  function workView() {
+    return '<div class="tb" id="tb">' + topHTML() + '</div>' +
+      '<div class="vp" id="vp"><div class="hint">끌기: ' + (S.mode === 'camera' ? '카메라 돌리기' : '모델 옮기기') + ' · 휠: 확대</div><div class="sel-tag" id="seltag">' + selTag() + '</div><div class="models" id="models">' + modelsHTML() + '</div></div>' +
+      (S.hideUI ? '' : '<div class="ctl" id="ctl">' + ctlHTML() + '</div><div class="nav" id="nav">' + navHTML() + '</div>');
+  }
+  function topHTML() {
+    var m = curModel();
+    return '<button class="ib" data-a="back" title="메뉴">' + icon('menu') + '</button>' +
+      '<button class="ib" data-a="undo" ' + (S.undo.length ? '' : 'disabled') + ' title="되돌리기">' + icon('undo') + '</button>' +
+      '<button class="ib" data-a="redo" ' + (S.redo.length ? '' : 'disabled') + ' title="되돌리기 취소">' + icon('redo') + '</button>' +
+      '<span class="grow"></span>' +
+      '<button class="ib" data-a="sym" aria-pressed="' + S.sym + '" title="좌우 대칭">' + icon('sym') + '</button>' +
+      '<button class="ib" data-a="mode" aria-pressed="' + (S.mode === 'model') + '" title="조작 모드 (모델 이동/카메라)">' + (S.mode === 'camera' ? icon('cam') : icon('model')) + '</button>' +
+      '<button class="ib" data-a="hideui" title="UI 감추기">' + icon('hide') + '</button>' +
+      '<button class="ib" data-a="shot" title="캡처">' + icon('shot') + '</button>';
+  }
+  function selTag() { var m = curModel(); return m ? esc(TBY[m.type].name) + (S.sel.j ? ' · ' + esc(JBY[S.sel.j][1]) : '') : '모델 없음'; }
+  function modelsHTML() {
+    return S.models.map(function (m, i) { return '<button class="mchip" data-a="selmodel" data-id="' + m.id + '" aria-pressed="' + (S.sel.m === m.id) + '">' + (i + 1) + ' ' + esc(TBY[m.type].name) + '</button>'; }).join('') + '<button class="mchip" data-a="open" data-s="add">＋ 모델</button>';
+  }
+  function ctlHTML() {
+    var m = curModel();
+    if (!m) return '<div class="ttl"><b>모델이 없어요</b></div><div class="sub">우선 "모델 추가"로 모델을 추가해 주세요.</div><div class="row"><button class="btn main" data-a="open" data-s="add">모델 추가</button></div>';
+    var id = S.sel.j;
+    if (!id) return '<div class="ttl"><b>' + esc(TBY[m.type].name) + '</b><small>관절(노란 점)을 눌러 고르세요</small></div>' +
+      '<div class="row"><button class="btn sm" data-a="copymodel">모델 복사</button><button class="btn sm" data-a="open" data-s="add">모델 변경</button><button class="btn sm" data-a="resetpose">포즈 리셋</button><button class="btn sm" data-a="delmodel">모델 삭제</button></div>' +
+      '<div class="sub">몸중심 선택 후 "위치 조정"으로 높이를 바꿀 수 있어요.</div>';
+    var a = m.joints[id], lk = !!S.lock[m.id + id];
+    var s = '<div class="ttl"><b>' + esc(JBY[id][1]) + '</b><small>' + (JBY[id][5] ? '대칭 ' + (S.sym ? '켜짐' : '꺼짐') : '') + '</small></div>';
+    ['X축 회전', 'Y축 회전', 'Z축 회전'].forEach(function (lab, ax) {
+      s += '<div class="sl' + (lk ? ' dis' : '') + '"><label>' + lab.replace('축 회전', ' ROT') + '</label><input type="range" min="-180" max="180" step="1" value="' + a[ax] + '" data-a="rot" data-ax="' + ax + '" ' + (lk ? 'disabled' : '') + '><output>' + a[ax] + '°</output></div>';
+    });
+    s += '<div class="row"><button class="btn sm" data-a="resetjoint">초기값</button><button class="btn sm" data-a="lock" aria-pressed="' + lk + '">관절 잠금</button><button class="btn sm" data-a="open" data-s="hand">손·소품</button><button class="btn sm" data-a="deselect">선택 해제</button></div>';
+    return s;
+  }
+  function navHTML() {
+    var it = [['add', '＋', '모델'], ['pose', '☺', '완성포즈'], ['hand', '✋', '손·소품'], ['cam', '◎', '카메라'], ['light', '☀', '조명'], ['save', '▤', '저장']];
+    return it.map(function (x) { return '<button data-a="open" data-s="' + x[0] + '" aria-pressed="' + (S.sheet === x[0]) + '"><i>' + x[1] + '</i>' + x[2] + '</button>'; }).join('');
+  }
+  function renderTop() { var e = $('#tb'); if (e) e.innerHTML = topHTML(); var t = $('#seltag'); if (t) t.innerHTML = selTag(); var md = $('#models'); if (md) md.innerHTML = modelsHTML(); }
+  function renderCtl() { var e = $('#ctl'); if (e) e.innerHTML = ctlHTML(); }
+
+  function tile(label, pic, attrs, opt) {
+    opt = opt || {};
+    return '<button class="tile' + (opt.locked ? ' locked' : '') + '" ' + attrs + (opt.on ? ' aria-pressed="true"' : '') + '><span class="pic">' + pic + '</span><b>' + esc(label) + '</b>' + (opt.locked ? '<span class="lock">' + esc(opt.locked) + '</span>' : '') + '</button>';
+  }
+  function manSvg(thick, head) { thick = thick || 1; head = head || 1; var hr = 7 * head;
+    return '<svg viewBox="0 0 60 60" width="64%" fill="none" stroke="#9fb0c8" stroke-width="' + (3 * thick) + '" stroke-linecap="round"><circle cx="30" cy="' + (9 + hr / 2) + '" r="' + hr + '"/><path d="M30 ' + (17 + hr) + 'v14M30 ' + (22 + hr) + 'l-10 8M30 ' + (22 + hr) + 'l10 8M30 ' + (31 + hr) + 'l-7 14M30 ' + (31 + hr) + 'l7 14"/></svg>'; }
+  function sheetView() {
+    var k = S.sheet, h = '<div class="sheet' + (k === 'add' || k === 'hand' ? ' full' : '') + '"><div class="grab"></div>', title = { add: '모델 추가', pose: '완성된 포즈', hand: '손포즈 · 소품 · 헤어', cam: '카메라', light: '조명', save: '작업 저장 · 불러오기', set: '환경설정', help: '튜토리얼 · 도움말', shop: '상점', shot: '캡처', confirm: '확인' }[k] || '';
+    h += '<h4>' + title + '<button class="btn sm x" data-a="close">닫기</button></h4>';
+    var tabs = '', body = '', foot = '';
+    if (k === 'add') {
+      var tab = S.tab || '사람'; tabs = ['사람', '동물', '탈것', '특수'].map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tab === t) + '">' + t + '</button>'; }).join('');
+      if (tab === '사람') body = '<div class="grid">' + TYPES.map(function (t) { return tile(t.name, manSvg(t.thick > 1.3 ? 1.5 : 1, t.head > 1.5 ? 1.6 : 1), 'data-a="addmodel" data-t="' + t.id + '"'); }).join('') + '</div><p class="sub">고르면 화면에 새 모델이 서요. 선택된 모델이 있고 "모델 변경"으로 열었다면 같은 자리에서 바뀌어요.</p>';
+      else body = '<div class="grid">' + { '동물': ['말', '드래곤', '공룡', '고양이'], '탈것': ['자전거', '오토바이', '승용차', '스쿠터'], '특수': ['중세 기사', '교복', '운동복'] }[tab].map(function (n) { return tile(n, '<svg viewBox="0 0 60 60" width="60%" fill="none" stroke="#667" stroke-width="3"><rect x="10" y="14" width="40" height="32" rx="8"/></svg>', 'data-a="locked"', { locked: 'DLC' }); }).join('') + '</div><p class="sub">추가 팩은 시안에서는 잠겨 있어요.</p>';
+      var ch = curModel(); if (ch) foot = '<div><div class="sub" style="margin-bottom:6px">피부 색상</div><div class="sw">' + SKINS.map(function (c, i) { return '<button style="background:' + c + '" data-a="skin" data-i="' + i + '" aria-pressed="' + (ch.skin === i) + '"></button>'; }).join('') + '</div></div>';
+    }
+    if (k === 'pose') {
+      var cat = S.tab && POSES[S.tab] ? S.tab : '일반'; tabs = Object.keys(POSES).map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (cat === t) + '">' + t + '</button>'; }).join('');
+      body = (curModel() ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<div class="list">' + POSES[cat].map(function (p) { return '<button class="li" data-a="applypose" data-c="' + cat + '" data-id="' + p.id + '"><span>' + p.name + '<small>' + Object.keys(p.p).length + '개 관절</small></span><span class="sub">적용</span></button>'; }).join('') + '</div>';
+    }
+    if (k === 'hand') {
+      var tb = S.tab || '핸드포즈'; tabs = ['핸드포즈', '소품', '헤어스타일', '손가락 편집'].map(function (t) { return '<button class="chip" data-a="tab" data-t="' + t + '" aria-pressed="' + (tb === t) + '">' + t + '</button>'; }).join('');
+      var cm = curModel();
+      if (tb === '핸드포즈') body = '<p class="sub">왼손이나 오른손을 터치해 선택해 주세요. (시안: 선택만 표시돼요)</p><div class="grid">' + HANDS.map(function (n, i) { return tile(n, '<svg viewBox="0 0 60 60" width="55%" fill="none" stroke="#9fb0c8" stroke-width="3" stroke-linecap="round"><path d="M18 44V26M26 44V16M34 44V14M42 44V20M12 36l8 8h22"/></svg>', 'data-a="handpose" data-i="' + i + '"', { on: S.hs === i }); }).join('') + '</div>';
+      if (tb === '소품') body = (cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<p class="sub">고르면 오른손에 쥐어요.</p><div class="grid">' + tile('없음', '<span class="sub">–</span>', 'data-a="prop" data-k=""', { on: !(cm && cm.prop) }) + PROPS.map(function (p) { return tile(p[0], '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + p[1] + '</span>', 'data-a="prop" data-k="' + p[1] + '"', { on: !!cm && cm.prop === p[1] }); }).join('') + '</div>';
+      if (tb === '헤어스타일') body = (cm ? '' : '<p class="sub">우선 모델을 선택해 주세요.</p>') + '<div class="grid">' + HAIRS.map(function (p) { return tile(p[0], '<span style="font-size:11px;color:#9fb0c8;font-family:var(--font-num)">' + p[1] + '</span>', 'data-a="hair" data-k="' + p[1] + '"', { on: !!cm && (cm.hair || 'none') === p[1] }); }).join('') + '</div>';
+      if (tb === '손가락 편집') { var fs = ['thumb', '엄지', 'index', '검지', 'middle', '중지', 'ring', '약지', 'pinky', '새끼']; body = '<div class="fing"><div class="row">' + [0, 2, 4, 6, 8].map(function (i) { return '<button class="btn" data-a="finger" data-f="' + fs[i] + '" aria-pressed="' + (S.handFinger === fs[i]) + '">' + fs[i + 1] + '</button>'; }).join('') + '</div>' + ['좌우 회전', '관절 1', '관절 2', '관절 3'].map(function (l, i) { return '<div class="sl"><label>' + l + '</label><input type="range" min="-90" max="90" value="0" data-a="fake"><output>0°</output></div>'; }).join('') + '<p class="sub">손가락 편집은 시안에서 화면만 있어요.</p></div>'; }
+    }
+    if (k === 'cam') {
+      tabs = ''; body = '<div class="row">' + [['left', '좌측 보기'], ['front', '정면 보기'], ['right', '우측 보기']].map(function (v) { return '<button class="btn" data-a="view" data-v="' + v[0] + '" aria-pressed="' + (S.view === v[0]) + '">' + v[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="sl" style="margin-top:10px"><label>화각</label><input type="range" min="20" max="90" value="' + S.fov + '" data-a="fov"><output>' + S.fov + '°</output></div>' +
+        '<div class="row" style="margin-top:10px"><button class="btn" data-a="guide" aria-pressed="' + S.guide + '">바닥 격자 ' + (S.guide ? '켜짐' : '꺼짐') + '</button><button class="btn" data-a="camreset">카메라 초기화</button></div>' +
+        '<div class="row" style="margin-top:8px"><button class="btn" data-a="camsave">카메라 프리셋 저장</button><button class="btn" data-a="camload">프리셋 불러오기</button></div>';
+    }
+    if (k === 'light') body = [['dir', '직사광 방향', 0, 360, S.light.dir], ['pow', '조명 세기', 0, 100, S.light.pow], ['back', '역광 설정', 0, 100, S.light.back]].map(function (r) { return '<div class="sl" style="grid-template-columns:78px 1fr 40px"><label>' + r[1] + '</label><input type="range" min="' + r[2] + '" max="' + r[3] + '" value="' + r[4] + '" data-a="light" data-k="' + r[0] + '"><output>' + r[4] + '</output></div>'; }).join('');
+    if (k === 'save') {
+      var sl = slots(); body = '<div class="list">' + [0, 1, 2, 3, 4].map(function (i) { var s = sl[i]; return '<div class="li"><span>슬롯 ' + (i + 1) + '<small>' + (s ? esc(s.when) + ' · 모델 ' + s.models.length + '개' : '비어 있음') + '</small></span><span class="row"><button class="btn sm" data-a="saveslot" data-i="' + i + '">저장</button><button class="btn sm" data-a="loadslot" data-i="' + i + '" ' + (s ? '' : 'disabled') + '>불러오기</button></span></div>'; }).join('') + '</div>' + (S.saveMsg ? '<p class="sub">' + esc(S.saveMsg) + '</p>' : '<p class="sub">시안에서는 이 브라우저에 저장돼요. 앱에서는 .epp 같은 프로젝트 파일로 저장해요.</p>');
+    }
+    if (k === 'set') body = '<div class="list"><div class="li"><span>해상도</span><span class="row"><button class="btn sm" data-a="setv" data-k="res" data-v="best" aria-pressed="' + (S.set.res === 'best') + '">최대</button><button class="btn sm" data-a="setv" data-k="res" data-v="perf" aria-pressed="' + (S.set.res === 'perf') + '">최적</button></span></div>' +
+      '<div class="li"><span>안티 알리아싱</span><button class="btn sm" data-a="toggleset" data-k="aa" aria-pressed="' + S.set.aa + '">' + (S.set.aa ? '켜기' : '끄기') + '</button></div>' +
+      '<div class="li"><span>그림자</span><button class="btn sm" data-a="toggleset" data-k="shadow" aria-pressed="' + S.set.shadow + '">' + (S.set.shadow ? '켜기' : '끄기') + '</button></div>' +
+      '<div class="li"><span>UI 모드</span><span class="row"><button class="btn sm" data-a="setv" data-k="ui" data-v="phone" aria-pressed="' + (S.set.ui === 'phone') + '">스마트폰</button><button class="btn sm" data-a="setv" data-k="ui" data-v="tab" aria-pressed="' + (S.set.ui === 'tab') + '">타블렛</button></span></div>' +
+      '<div class="li"><span>슬라이더 민감도</span><input type="range" min="1" max="10" value="5" data-a="fake" style="width:120px"></div></div>';
+    if (k === 'help') body = '<div class="list">' + [['관절 고르기', '모델의 관절(노란 점)을 눌러 선택해요.'], ['회전하기', '선택한 관절을 X·Y·Z 슬라이더로 돌려요. 좌우대칭을 켜면 반대쪽도 같이 움직여요.'], ['카메라', '배경을 끌면 카메라가 돌아요. 조작모드를 바꾸면 모델을 옮길 수 있어요.'], ['완성된 포즈', '미리 만들어 둔 포즈를 고르면 선택한 모델에 적용돼요.'], ['저장·캡처', '작업을 슬롯에 저장하고, 현재 화면을 PNG로 캡처해요.']].map(function (x) { return '<div class="li"><span><b>' + x[0] + '</b><small>' + x[1] + '</small></span></div>'; }).join('') + '</div>';
+    if (k === 'shop') body = '<div class="list">' + ['판타지 팩', '현대무기 팩', '드래곤 팩', '말 팩', '자전거·오토바이 팩', '악기 팩'].map(function (n) { return '<div class="li"><span>' + n + '<small>시안 · 구매 기능 없음</small></span><button class="btn sm" data-a="locked">구입</button></div>'; }).join('') + '</div>';
+    if (k === 'shot') body = (S.capture ? '<img class="cap" src="' + S.capture + '" alt="캡처">' : '') + '<p class="sub">시안에서는 미리보기만 보여요. 앱에서는 갤러리에 저장돼요.</p>';
+    if (k === 'confirm') { body = '<p>' + esc(S.confirm.msg) + '</p>'; foot = '<div class="row"><button class="btn" data-a="close">취소</button><button class="btn main" data-a="confirmok">확인</button></div>'; }
+    return h + (tabs ? '<div class="tabs">' + tabs + '</div>' : '<div></div>') + '<div class="body">' + body + '</div>' + (foot ? '<div>' + foot + '</div>' : '<div></div>') + '</div>';
+  }
+  function afterView() {
+    if (S.screen === 'work' && !S.hideUI) { /* 3D는 따로 */ }
+    if (S.screen === 'work') initThree(); else { cancelAnimationFrame(raf); T.canvas = null; }
+    if (S.hideUI) { var vp = $('#vp'); if (vp) vp.addEventListener('click', function f() { S.hideUI = false; vp.removeEventListener('click', f); setTimeout(renderAll, 0); }); }
+  }
+  function toast(msg) { S.toast = msg; var e = $('.toast'); if (e) e.textContent = msg; else { var d = document.createElement('div'); d.className = 'toast'; d.textContent = msg; $('.screen').appendChild(d); } clearTimeout(toast.t); toast.t = setTimeout(function () { S.toast = ''; var x = $('.toast'); if (x) x.remove(); }, 1800); }
+  function sheetOnly() { var d = $('.dim'); if (d) d.remove(); if (S.sheet) { var w = document.createElement('div'); w.innerHTML = '<div class="dim" data-a="dim">' + sheetView() + '</div>'; $('.screen').appendChild(w.firstChild); } var n = $('#nav'); if (n) n.innerHTML = navHTML(); }
+
+  /* ---------- 동작 ---------- */
+  function addModel(typeId) {
+    var m = curModel(), ch = S.sheet === 'add' && S.swap && m;
+    pushUndo();
+    if (ch) { m.type = typeId; S.swap = false; }
+    else { var n = S.models.length; var nm = newModel(typeId, [n === 0 ? 0 : ((n % 2) ? 1 : -1) * Math.ceil(n / 2) * 0.55, 0]); S.models.push(nm); S.sel = { m: nm.id, j: null }; }
+    S.sheet = null; rebuildModels(); renderAll();
+  }
+  phone.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-a]'); if (!el || !phone.contains(el)) return;
+    var a = el.dataset.a, m = curModel();
+    if (a === 'dim') { if (e.target === el) { S.sheet = null; sheetOnly(); } return; }
+    if (a === 'rot') return;
+    switch (a) {
+      case 'start': S.screen = 'work'; renderAll(); return;
+      case 'back': S.screen = 'menu'; S.sheet = null; renderAll(); return;
+      case 'newproj': S.confirm = { msg: '새로운 작업을 시작합니다. 저장하지 않은 데이터는 초기화돼요.', ok: 'new' }; S.sheet = 'confirm'; renderAll(); return;
+      case 'confirmok': if (S.confirm && S.confirm.ok === 'new') { S.models = [newModel('male', [0, 0])]; S.sel = { m: S.models[0].id, j: null }; S.undo = []; S.redo = []; S.sheet = null; S.screen = 'work'; renderAll(); toast('새 프로젝트를 시작했어요'); } return;
+      case 'open': S.sheet = el.dataset.s; S.tab = null; S.swap = (el.dataset.s === 'add' && !!el.textContent.match(/변경/)); if (S.screen === 'menu') { renderAll(); } else sheetOnly(); return;
+      case 'close': S.sheet = null; sheetOnly(); return;
+      case 'tab': S.tab = el.dataset.t; sheetOnly(); return;
+      case 'undo': undo(); return; case 'redo': redo(); return;
+      case 'sym': S.sym = !S.sym; renderTop(); renderCtl(); return;
+      case 'mode': S.mode = S.mode === 'camera' ? 'model' : 'camera'; var hn = $('.hint'); if (hn) hn.textContent = '끌기: ' + (S.mode === 'camera' ? '카메라 돌리기' : '모델 옮기기') + ' · 휠: 확대'; renderTop(); toast(S.mode === 'camera' ? '조작모드: 카메라' : '조작모드: 모델 이동'); return;
+      case 'hideui': S.hideUI = true; S.sheet = null; renderAll(); toast('화면을 누르면 UI가 돌아와요'); return;
+      case 'shot': try { S.capture = T.canvas.toDataURL('image/png'); } catch (err) { S.capture = null; } S.sheet = 'shot'; sheetOnly(); return;
+      case 'selmodel': S.sel = { m: parseInt(el.dataset.id, 10), j: null }; markSel(); renderTop(); renderCtl(); return;
+      case 'deselect': S.sel.j = null; markSel(); renderCtl(); renderTop(); return;
+      case 'addmodel': addModel(el.dataset.t); return;
+      case 'skin': if (m) { pushUndo(); m.skin = parseInt(el.dataset.i, 10); rebuildModels(); sheetOnly(); } return;
+      case 'copymodel': if (m) { pushUndo(); var c = JSON.parse(JSON.stringify(m)); c.id = S.nid++; c.pos = [m.pos[0] + 0.7, m.pos[1]]; S.models.push(c); S.sel = { m: c.id, j: null }; rebuildModels(); renderAll(); toast('복사가 완료되었습니다'); } return;
+      case 'delmodel': if (m) { pushUndo(); S.models = S.models.filter(function (x) { return x.id !== m.id; }); S.sel = { m: S.models.length ? S.models[0].id : -1, j: null }; rebuildModels(); renderAll(); } return;
+      case 'resetpose': if (m) { pushUndo(); applyPose(m, { p: {} }); renderAll(); } return;
+      case 'resetjoint': if (m && S.sel.j) { pushUndo(); var id = S.sel.j; var d0 = (id === 'armL') ? [0, 0, 10] : (id === 'armR') ? [0, 0, -10] : [0, 0, 0]; [0, 1, 2].forEach(function (ax) { setJoint(m, id, ax, d0[ax]); }); renderCtl(); } return;
+      case 'lock': if (m && S.sel.j) { S.lock[m.id + S.sel.j] = !S.lock[m.id + S.sel.j]; renderCtl(); } return;
+      case 'applypose': if (m) { var p = POSES[el.dataset.c].filter(function (x) { return x.id === el.dataset.id; })[0]; pushUndo(); applyPose(m, p); S.sheet = null; renderAll(); toast('"' + p.name + '" 적용'); } else toast('우선 모델을 선택해 주세요.'); return;
+      case 'handpose': S.hs = parseInt(el.dataset.i, 10); sheetOnly(); toast('손포즈는 시안에서 표시만 돼요'); return;
+      case 'finger': S.handFinger = el.dataset.f; sheetOnly(); return;
+      case 'prop': if (m) { pushUndo(); m.prop = el.dataset.k || null; rebuildModels(); sheetOnly(); } return;
+      case 'hair': if (m) { pushUndo(); m.hair = el.dataset.k; rebuildModels(); sheetOnly(); } return;
+      case 'view': setView(el.dataset.v); sheetOnly(); return;
+      case 'guide': S.guide = !S.guide; T.grid.visible = S.guide; sheetOnly(); return;
+      case 'camreset': setView('front'); T.dist = 4.6; S.fov = 38; T.camera.fov = 38; T.camera.updateProjectionMatrix(); sheetOnly(); return;
+      case 'camsave': S.camPreset = { az: T.az, el: T.el, dist: T.dist, fov: S.fov }; toast('현재 카메라 설정값을 저장했습니다'); return;
+      case 'camload': if (S.camPreset) { T.az = S.camPreset.az; T.el = S.camPreset.el; T.dist = S.camPreset.dist; S.fov = S.camPreset.fov; T.camera.fov = S.fov; T.camera.updateProjectionMatrix(); sheetOnly(); } else toast('저장된 카메라가 없어요'); return;
+      case 'saveslot': { var sl = slots(), i = parseInt(el.dataset.i, 10); sl[i] = { when: new Date().toLocaleString('ko-KR'), models: JSON.parse(JSON.stringify(S.models)), nid: S.nid }; S.saveMsg = putSlots(sl) ? '슬롯 ' + (i + 1) + '에 저장했어요.' : '저장하지 못했어요. 브라우저 저장소를 확인해 주세요.'; sheetOnly(); return; }
+      case 'loadslot': { var sl2 = slots(), s = sl2[parseInt(el.dataset.i, 10)]; if (s) { pushUndo(); S.models = s.models; S.nid = s.nid; S.sel = { m: S.models.length ? S.models[0].id : -1, j: null }; S.sheet = null; rebuildModels(); renderAll(); toast('저장된 데이터를 성공적으로 불러왔습니다'); } return; }
+      case 'setv': S.set[el.dataset.k] = el.dataset.v; sheetOnly(); return;
+      case 'toggleset': S.set[el.dataset.k] = !S.set[el.dataset.k]; if (el.dataset.k === 'shadow') updateLights(); sheetOnly(); toast('다시 시작하면 완전히 적용돼요 (시안)'); return;
+      case 'locked': toast('추가 팩은 시안에서 잠겨 있어요'); return;
+    }
+  });
+  phone.addEventListener('input', function (e) {
+    var el = e.target, a = el.dataset.a, m = curModel();
+    if (a === 'rot' && m && S.sel.j) { el.nextElementSibling.textContent = el.value + '°'; if (!el._pushed) { pushUndo(); el._pushed = true; } setJoint(m, S.sel.j, parseInt(el.dataset.ax, 10), parseInt(el.value, 10)); }
+    else if (a === 'fov') { S.fov = parseInt(el.value, 10); T.camera.fov = S.fov; T.camera.updateProjectionMatrix(); el.nextElementSibling.textContent = S.fov + '°'; }
+    else if (a === 'light') { S.light[el.dataset.k] = parseInt(el.value, 10); updateLights(); el.nextElementSibling.textContent = el.value; }
+    else if (a === 'fake') { var o = el.nextElementSibling; if (o && o.tagName === 'OUTPUT') o.textContent = el.value + '°'; }
+  });
+  phone.addEventListener('change', function (e) { if (e.target.dataset.a === 'rot') { e.target._pushed = false; renderCtl(); } });
+
+  /* ---------- 위 선택 줄 ---------- */
+  var SHEETS = ['add', 'pose', 'hand', 'cam', 'light', 'save', 'set'];
+  function go(v) {
+    document.querySelectorAll('#bar .chip').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
+    S.tab = null; S.hideUI = false; S.swap = false;
+    S.screen = v === 'menu' ? 'menu' : 'work';
+    S.sheet = SHEETS.indexOf(v) >= 0 ? v : null;
+    renderAll();
+    try { history.replaceState(null, '', '#' + v); } catch (e) {}
+  }
+  $('#bar').addEventListener('click', function (e) { var b = e.target.closest('.chip'); if (b) go(b.dataset.v); });
+  function fit() { var s = Math.min(1, (document.documentElement.clientWidth - 32) / 390), slot = $('#slot'); slot.style.transform = 'scale(' + s + ')'; slot.style.width = '390px'; slot.style.height = '844px'; slot.parentNode.style.height = Math.round(844 * s) + 'px'; slot.parentNode.style.width = Math.round(390 * s) + 'px'; slot.parentNode.style.margin = '0 auto'; slot.parentNode.style.overflow = 'hidden'; slot.style.marginBottom = Math.round(-844 * (1 - s)) + 'px'; }
+  window.addEventListener('resize', function () { fit(); resize(); });
+
+  S.models = [newModel('male', [0, 0])]; S.sel = { m: S.models[0].id, j: null };
+  fit(); renderAll();
+  var h = (location.hash || '').slice(1);
+  if (h && h !== 'work' && $('#bar [data-v="' + h + '"]')) go(h);
+})();
+</script>
+</body>
+</html>
