@@ -11,6 +11,7 @@ on:
       - 'musiclist/**'
       - 'poser/**'
       - 'uswsync/**'
+      - 'vibelink/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
