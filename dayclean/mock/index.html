@@ -405,22 +405,40 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       memo: [{ t: '17:25', x: '독서 모임 책: 다음 주까지 3장' }],
       done: [{ w: '06:40', r: '07:10', p: '지금 우선', x: '보고서 초안 보내기' }, { w: '09:00', r: '09:20', p: '지금 우선', x: '세탁소에 전화하기' }] }
   ];
-  // 장기 목표 기록: 기록장에 자동 추가된 날(D-10)부터 해결한 날까지, 하루도 빠짐없이 그날의 D-n 으로 남긴다.
-  // (해결한 날 하나만 남기면 그날 쓰고 끝낸 것처럼 보이므로, 지나온 날수를 모두 기록)
+  // 장기 목표 기록: ① 목표일까지 한 달씩 줄어들 때마다(…3달, 2달, 1달 남음) 그 날짜에 한 줄 기록하고,
+  // ② 해결하면 작성 날짜·시간, 해결 날짜·시간, 그때의 D-n(남은/지난 시간)을 남긴다.
   var GLOG = [
-    { x: '이력서 초안 끝내기', due: '2026-10-27', added: '2026-10-17', done: '2026-10-24', r: '08:05' },
-    { x: '자격증 접수', due: '2026-10-20', added: '2026-10-10', done: '2026-10-22', r: '10:30' },
-    { x: '책상 서랍 전부 비우기', due: '2026-10-30', added: '2026-10-20', done: null }
+    { x: '이력서 초안 끝내기', due: '2026-11-20', wr: '2026-10-05 09:12', done: '2026-10-24 08:05' },
+    { x: '자격증 접수', due: '2026-10-20', wr: '2026-09-18 21:30', done: '2026-10-22 10:30' },
+    { x: '영어 점수 올리기', due: '2027-01-19', wr: '2026-08-03 22:10', done: null },
+    { x: '여행 계획 확정', due: '2026-11-17', wr: '2026-10-02 07:45', done: null }
   ];
-  function dayNum(d) { var p = d.split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000; }
+  function dayNum(d) { var p = d.slice(0, 10).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000; }
+  function numDay(n) { var t = new Date(n * 86400000); return t.getUTCFullYear() + '-' + z(t.getUTCMonth() + 1) + '-' + z(t.getUTCDate()); }
+  function minusMonths(d, k) {   // 같은 날짜의 k달 전 (그 달에 없는 날짜면 말일)
+    var p = d.split('-'), y = +p[0], m = +p[1] - 1 - k, day = +p[2];
+    y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+    var last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    return y + '-' + z(m + 1) + '-' + z(Math.min(day, last));
+  }
   function dText2(n) { return n === 0 ? 'D-DAY' : (n > 0 ? 'D-' + n : 'D+' + (-n)); }
+  function span(a, b) {   // 작성~해결 사이 시간 (일/시간)
+    var m = Math.round((new Date(b.replace(' ', 'T')) - new Date(a.replace(' ', 'T'))) / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+    return (d ? d + '일 ' : '') + h + '시간';
+  }
   function goalRows(day) {
-    var out = [];
+    var out = [], n = dayNum(day.d);
     GLOG.forEach(function (g) {
-      var n = dayNum(day.d), a = dayNum(g.added), e = g.done ? dayNum(g.done) : Infinity;
-      if (n < a || n > e) return;
-      var off = dayNum(g.due) - n, first = n === a, fin = g.done && n === e;
-      out.push({ t: dText2(off), x: g.x, off: off, fin: !!fin, first: first, state: fin ? '해결' : (off < 0 ? '기한 지남 · 진행 중' : '진행 중'), r: g.r, span: g.done ? (e - a + 1) : null, addedOff: dayNum(g.due) - a, dueD: g.due });
+      var due = dayNum(g.due), wr = dayNum(g.wr), end = g.done ? dayNum(g.done) : Infinity;
+      if (g.done && g.done.slice(0, 10) === day.d) {
+        var off = due - n;
+        out.push({ kind: 'done', x: g.x, off: off, wr: g.wr, dn: g.done, due: g.due, span: span(g.wr, g.done) });
+      }
+      for (var k = 1; k <= 24; k++) {
+        var md = minusMonths(g.due, k), mn = dayNum(md);
+        if (mn < wr) break;
+        if (md === day.d && mn < end) out.push({ kind: 'mark', x: g.x, off: due - mn, k: k, wr: g.wr, due: g.due });
+      }
     });
     return out;
   }
@@ -445,7 +463,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       var memo = day.memo.filter(function (i) { return ok('메모', i.x); });
       var key = S.mdone === 'written' ? 'w' : 'r';
       var done = day.done.filter(function (i) { return ok('해결한 내용 ' + i.p, i.x); }).sort(function (a, b) { return a[key] < b[key] ? -1 : (a[key] > b[key] ? 1 : 0); });
-      var goal = goalRows(day).filter(function (i) { return ok('장기 목표 ' + i.t + ' ' + i.state, i.x); });
+      var goal = goalRows(day).filter(function (i) { return ok('장기 목표 ' + (i.kind === 'mark' ? i.k + '달 남음 ' : '해결 ') + dText2(i.off) + ' ' + i.wr + ' ' + (i.dn || ''), i.x); });
       var n = late.length + memo.length + done.length + goal.length;
       if (n) { days.push({ day: day, late: late, memo: memo, done: done, goal: goal }); count += n; }
     });
@@ -465,9 +483,15 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
       if (g.late.length) h += '<div class="l1"><b>미룬 것</b>' + g.late.map(function (i) { return row(i.t, i.x); }).join('') + '</div>';
       if (g.memo.length) h += '<div class="l1"><b>메모</b>' + g.memo.map(function (i) { return row(i.t, i.x); }).join('') + '</div>';
       if (g.goal.length) h += '<div class="l1"><b>장기 목표</b>' + g.goal.map(function (i) {
-        var lab = '<b>' + hl(i.t, r.toks) + '</b> · ' + (i.fin ? '<b>✔ 해결 ' + i.r + '</b>' : i.state) + (i.first ? ' · 자동 추가' : '');
-        var sub = i.fin ? '<div class="l3" style="font-size:12px;opacity:.85">D-' + i.addedOff + '에 기록장에 올라와 ' + i.span + '일간 기록한 뒤 해결 (목표일 ' + i.dueD.slice(5).replace('-', '.') + ')</div>' : '';
-        return '<div class="l2">ㄴ <span class="t">' + lab + '</span><div class="l3">ㄴ ' + hl(i.x, r.toks) + '</div>' + sub + '</div>';
+        var head, sub;
+        if (i.kind === 'mark') {
+          head = '<b>' + i.k + '달 남음 · ' + dText2(i.off) + '</b>';
+          sub = '<div class="l3" style="font-size:12px;opacity:.85">작성 ' + i.wr + ' · 목표일 ' + i.due + '</div>';
+        } else {
+          head = '<b>✔ 해결 · ' + dText2(i.off) + '</b>';
+          sub = '<div class="l3" style="font-size:12px;opacity:.85">작성 ' + i.wr + '<br>해결 ' + i.dn + '<br>' + (i.off >= 0 ? '목표일(' + i.due + ')보다 ' + i.off + '일 남기고 해결' : '목표일(' + i.due + ')보다 ' + (-i.off) + '일 지나서 해결') + ' · 작성 후 ' + i.span + ' 걸림</div>';
+        }
+        return '<div class="l2">ㄴ <span class="t">' + hl(i.kind === 'mark' ? i.k + '달 남음 ' + dText2(i.off) : '해결 ' + dText2(i.off), r.toks) + '</span><div class="l3">ㄴ ' + hl(i.x, r.toks) + '</div>' + sub + '</div>';
       }).join('') + '</div>';
       if (g.done.length) h += '<div class="l1"><b>해결한 내용</b>' + g.done.map(function (i) { return row('작성 ' + i.w + ' · 해결 ' + i.r + ' · ' + i.p, i.x); }).join('') + '</div>';
       return h;
@@ -579,7 +603,7 @@ mark { background: var(--paper); color: var(--ink); text-decoration: underline; 
     { id: 'memory', label: '메모리', html: function () { return '<div class="screen">' + topbar('home', '메모리') +
       '<div class="scroll">' +
         '<div class="grid4 one"><button class="btn">오늘<br>불러오기</button><button class="btn">전체<br>불러오기</button><button class="btn">오늘<br>내보내기</button><button class="btn">전체<br>내보내기</button></div>' +
-        '<div class="lockline" style="text-align:left;font-size:12px;margin-bottom:8px">오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.<br>장기 목표는 기록장에 올라온 날(D-10)부터 해결한 날까지 매일 그날의 D-n으로 남아요.</div>' +
+        '<div class="lockline" style="text-align:left;font-size:12px;margin-bottom:8px">오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.<br>장기 목표는 목표일까지 한 달씩 줄어들 때마다 기록되고, 해결하면 작성·해결 날짜와 시간, D-n이 함께 남아요.</div>' +
         '<div class="stick">' +
           '<div class="field"><input class="msearch" type="search" placeholder="날짜나 내용으로 검색 (예: 10.24, 빨래)" aria-label="기록 검색" autocomplete="off"><button class="btn" data-clear="1" aria-label="검색 지우기">✕</button></div>' +
           '<div class="sorts" style="flex-wrap:wrap" role="group" aria-label="순서">' +
