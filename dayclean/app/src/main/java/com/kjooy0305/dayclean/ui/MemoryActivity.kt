@@ -68,7 +68,7 @@ class MemoryActivity : BaseActivity() {
         b("오늘\n내보내기", { export(true) })
         b("전체\n내보내기", { export(false) }, last = true)
         sticky.head.add(buttons, MATCH, WRAP, 0f, 0, 0, 0, 10)
-        sticky.head.add(label("오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.", 12f).apply {
+        sticky.head.add(label("오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.\n장기 목표는 한 달 넘게 남았을 땐 한 달마다, 한 달 이내엔 1주일마다, 목표일이 지나면 매일 D-n으로 기록돼요. 해결하면 작성·해결 날짜와 시간이 3줄로 남아요.", 12f).apply {
             background = shape(strokeDp = 1.5f, radiusDp = 10f)
             setPadding(dp(12), dp(8), dp(12), dp(8))
         }, MATCH, WRAP, 0f, 0, 0, 0, 10)
@@ -150,23 +150,28 @@ class MemoryActivity : BaseActivity() {
             val day = hit.archive.date
             body.add(highlight("%04d-%02d-%02d (%s)".format(day.year, day.monthValue, day.dayOfMonth, Dates.dow(day.dayOfWeek)), r.tokens, 15f, bold = true), MATCH, WRAP, 0f, 0, 14, 0, 2)
             body.add(hline(2f))
-            fun section(title: String, rows: List<Pair<String, String>>) {
+            fun section(title: String, rows: List<Triple<String, String, List<String>>>) {
                 if (rows.isEmpty()) return
                 val l1 = Indent(this)
                 l1.inner.add(label("ㄴ $title", 14f, bold = true), t = 6)
-                rows.forEach { (meta, text) ->
+                rows.forEach { (meta, text, extra) ->
                     val l2 = Indent(this)
                     l2.inner.add(label("ㄴ $meta", 12f, mono = true), t = 4)
                     val l3 = Indent(this)
-                    l3.inner.add(highlight("ㄴ $text", r.tokens, 14f), t = 2, b = 2)
+                    l3.inner.add(highlight("ㄴ $text", r.tokens, 14f), t = 2, b = if (extra.isEmpty()) 2 else 0)
+                    extra.forEachIndexed { i, line -> l3.inner.add(label(line, 12f), t = 0, b = if (i == extra.size - 1) 4 else 0) }
                     l2.inner.add(l3, MATCH, WRAP, 0f, 8, 0, 0, 0)
                     l1.inner.add(l2, MATCH, WRAP, 0f, 8, 0, 0, 0)
                 }
                 body.add(l1, MATCH, WRAP, 0f, 8, 0, 0, 0)
             }
-            section("미룬 것", hit.late.map { it.time to it.text })
-            section("메모", hit.memos.map { it.time to it.text })
-            section("해결한 내용", hit.done.map { "작성 ${it.written} · 해결 ${it.resolved} · ${it.priority}" to it.text })
+            section("미룬 것", hit.late.map { Triple(it.time, it.text, emptyList()) })
+            section("메모", hit.memos.map { Triple(it.time, it.text, emptyList()) })
+            // 장기 목표: 해결한 날은 3줄(작성 · 해결 · 걸린 시간), 그 밖의 날은 D-n 한 줄
+            section("장기 목표",
+                hit.goalDone.map { Triple("✔ 해결 ${Dates.dText(it.off.toLong())}", it.text, listOf("작성 ${it.written}", "해결 ${it.resolved}", "작성 후 ${it.span} 걸림")) } +
+                    hit.goals.map { Triple(Dates.dText(it.off.toLong()), it.text, emptyList()) })
+            section("해결한 내용", hit.done.map { Triple("작성 ${it.written} · 해결 ${it.resolved} · ${it.priority}", it.text, emptyList()) })
         }
     }
 

@@ -87,8 +87,13 @@ data class Goal(
     val target: LocalDate,
     /** 작성 순서. 클수록 나중에 쓴 것 */
     val seq: Long,
-    val createdOn: LocalDate
+    val createdOn: LocalDate,
+    /** 작성한 때(밀리초). 옛 데이터는 0 이라서 createdOn 의 0시로 본다 */
+    val createdAt: Long = 0L
 )
+
+/** 달성(해결)한 목표. 다음 자정에 메모리의 그날 기록으로 옮겨진다. */
+data class ResolvedGoal(val goal: Goal, val at: Long)
 
 data class Settings(
     val fontScale: Float = 1f,
@@ -118,13 +123,21 @@ data class DoneRec(val written: String, val resolved: String, val kind: Kind, va
     val priority: String get() = if (kind == Kind.NOW) "지금 우선" else "나중 일"
 }
 
+/** 장기 목표 기록: 그날의 D-n(남은 날, 지나면 음수)과 목표 이름 */
+data class GoalRec(val off: Int, val text: String)
+
+/** 장기 목표를 해결한 날의 기록. written/resolved 는 "2026-10-05 09:12", span 은 "18일 22시간" */
+data class GoalDoneRec(val off: Int, val text: String, val written: String, val resolved: String, val span: String)
+
 data class DayArchive(
     val date: LocalDate,
     val late: List<LateRec> = emptyList(),
     val memos: List<MemoRec> = emptyList(),
-    val done: List<DoneRec> = emptyList()
+    val done: List<DoneRec> = emptyList(),
+    val goals: List<GoalRec> = emptyList(),
+    val goalDone: List<GoalDoneRec> = emptyList()
 ) {
-    val isEmpty: Boolean get() = late.isEmpty() && memos.isEmpty() && done.isEmpty()
+    val isEmpty: Boolean get() = late.isEmpty() && memos.isEmpty() && done.isEmpty() && goals.isEmpty() && goalDone.isEmpty()
 }
 
 /** 오늘의 정리 진행 상황. 날짜가 바뀌면 새로 시작한다. */
@@ -145,6 +158,7 @@ data class GoalReviewState(
 data class AppState(
     val items: List<Item> = emptyList(),
     val goals: List<Goal> = emptyList(),
+    val resolvedGoals: List<ResolvedGoal> = emptyList(),
     val settings: Settings = Settings(),
     val archive: List<DayArchive> = emptyList(),
     val mode: ModeState = ModeState(LocalDate.of(2000, 1, 1)),

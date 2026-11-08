@@ -68,7 +68,9 @@ class ScreenshotTest {
             x.copy(archive = listOf(
                 DayArchive(LocalDate.of(2026, 10, 24), late = listOf(LateRec("21:40", "병원 예약 전화하기"), LateRec("21:40", "서랍 정리")),
                     memos = listOf(MemoRec("15:12", "새 아이디어: 주간 목표는 월요일 아침에 쓰기")),
-                    done = listOf(DoneRec("06:30", "08:05", Kind.NOW, "보고서 초안 보내기"), DoneRec("09:10", "18:44", Kind.LATER, "빨래 널기"))),
+                    done = listOf(DoneRec("06:30", "08:05", Kind.NOW, "보고서 초안 보내기"), DoneRec("09:10", "18:44", Kind.LATER, "빨래 널기")),
+                    goals = listOf(GoalRec(28, "여행 계획 확정")),
+                    goalDone = listOf(GoalDoneRec(27, "이력서 초안 끝내기", "2026-10-05 09:12", "2026-10-24 08:05", "18일 22시간"))),
                 DayArchive(LocalDate.of(2026, 10, 23), late = listOf(LateRec("21:35", "택배 상자 정리")),
                     done = listOf(DoneRec("07:05", "07:50", Kind.NOW, "약 먹기")))
             ))

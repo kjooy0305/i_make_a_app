@@ -255,7 +255,7 @@ class GoalEditActivity : BaseActivity() {
                 val text = content!!.text.toString().trim()
                 if (text.isEmpty()) { content.error = "내용을 적어 주세요"; return }
                 if (mode == EDIT) mutate { Ops.updateGoal(it, goal!!.id, text, period, d) }
-                else mutate { Ops.addGoal(it, text, period, d, today()) }
+                else mutate { Ops.addGoal(it, text, period, d, today(), store.now()) }
             }
         }
         finish()

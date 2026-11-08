@@ -7,6 +7,9 @@ import com.kjooy0305.dayclean.model.DayArchive
 import com.kjooy0305.dayclean.model.Disposition
 import com.kjooy0305.dayclean.model.DoneRec
 import com.kjooy0305.dayclean.model.Goal
+import com.kjooy0305.dayclean.model.GoalDoneRec
+import com.kjooy0305.dayclean.model.GoalRec
+import com.kjooy0305.dayclean.model.ResolvedGoal
 import com.kjooy0305.dayclean.model.GoalReviewState
 import com.kjooy0305.dayclean.model.Item
 import com.kjooy0305.dayclean.model.Kind
@@ -35,6 +38,7 @@ object StateJson {
         put("onboarded", s.onboarded)
         put("items", JSONArray().apply { s.items.forEach { put(item(it)) } })
         put("goals", JSONArray().apply { s.goals.forEach { put(goal(it)) } })
+        put("resolved", JSONArray().apply { s.resolvedGoals.forEach { put(JSONObject().put("g", goal(it.goal)).put("at", it.at)) } })
         put("archive", JSONArray().apply { s.archive.forEach { put(day(it)) } })
         put("settings", settings(s.settings))
         put("mode", JSONObject().apply {
@@ -55,6 +59,7 @@ object StateJson {
         return AppState(
             items = o.getJSONArray("items").map { item(it) },
             goals = o.getJSONArray("goals").map { goal(it) },
+            resolvedGoals = o.optJSONArray("resolved")?.map { ResolvedGoal(goal(it.getJSONObject("g")), it.getLong("at")) } ?: emptyList(),
             settings = settings(o.getJSONObject("settings")),
             archive = o.getJSONArray("archive").map { day(it) },
             mode = ModeState(
@@ -92,12 +97,12 @@ object StateJson {
 
     private fun goal(g: Goal) = JSONObject().apply {
         put("id", g.id); put("t", g.text); put("p", g.period.key); put("target", g.target.toString())
-        put("seq", g.seq); put("on", g.createdOn.toString())
+        put("seq", g.seq); put("on", g.createdOn.toString()); put("at", g.createdAt)
     }
 
     private fun goal(o: JSONObject) = Goal(
         o.getLong("id"), o.getString("t"), Period.of(o.getString("p")), LocalDate.parse(o.getString("target")),
-        o.getLong("seq"), LocalDate.parse(o.getString("on"))
+        o.getLong("seq"), LocalDate.parse(o.getString("on")), o.optLong("at", 0L)
     )
 
     private fun day(d: DayArchive) = JSONObject().apply {
@@ -107,13 +112,19 @@ object StateJson {
         put("done", JSONArray().apply {
             d.done.forEach { put(JSONObject().put("w", it.written).put("r", it.resolved).put("k", it.kind.name).put("x", it.text)) }
         })
+        put("goals", JSONArray().apply { d.goals.forEach { put(JSONObject().put("o", it.off).put("x", it.text)) } })
+        put("gdone", JSONArray().apply {
+            d.goalDone.forEach { put(JSONObject().put("o", it.off).put("x", it.text).put("w", it.written).put("r", it.resolved).put("s", it.span)) }
+        })
     }
 
     private fun day(o: JSONObject) = DayArchive(
         LocalDate.parse(o.getString("date")),
         o.getJSONArray("late").map { LateRec(it.getString("t"), it.getString("x")) },
         o.getJSONArray("memo").map { MemoRec(it.getString("t"), it.getString("x")) },
-        o.getJSONArray("done").map { DoneRec(it.getString("w"), it.getString("r"), Kind.valueOf(it.getString("k")), it.getString("x")) }
+        o.getJSONArray("done").map { DoneRec(it.getString("w"), it.getString("r"), Kind.valueOf(it.getString("k")), it.getString("x")) },
+        o.optJSONArray("goals")?.map { GoalRec(it.getInt("o"), it.getString("x")) } ?: emptyList(),
+        o.optJSONArray("gdone")?.map { GoalDoneRec(it.getInt("o"), it.getString("x"), it.getString("w"), it.getString("r"), it.getString("s")) } ?: emptyList()
     )
 
     private fun settings(s: Settings) = JSONObject().apply {

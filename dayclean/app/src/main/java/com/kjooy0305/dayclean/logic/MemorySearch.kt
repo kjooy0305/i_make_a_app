@@ -2,6 +2,8 @@ package com.kjooy0305.dayclean.logic
 
 import com.kjooy0305.dayclean.model.DayArchive
 import com.kjooy0305.dayclean.model.DoneRec
+import com.kjooy0305.dayclean.model.GoalDoneRec
+import com.kjooy0305.dayclean.model.GoalRec
 import com.kjooy0305.dayclean.model.LateRec
 import com.kjooy0305.dayclean.model.MemoRec
 
@@ -9,8 +11,9 @@ enum class DoneOrder { WRITTEN, RESOLVED }
 
 /** 메모리 검색: 날짜(10.24, 10-24, 2026-10-24)나 내용의 일부. 띄어 쓴 말은 모두 맞아야 한다. */
 object MemorySearch {
-    class DayHits(val archive: DayArchive, val late: List<LateRec>, val memos: List<MemoRec>, val done: List<DoneRec>) {
-        val count: Int get() = late.size + memos.size + done.size
+    class DayHits(val archive: DayArchive, val late: List<LateRec>, val memos: List<MemoRec>, val done: List<DoneRec>,
+        val goals: List<GoalRec> = emptyList(), val goalDone: List<GoalDoneRec> = emptyList()) {
+        val count: Int get() = late.size + memos.size + done.size + goals.size + goalDone.size
     }
 
     class Result(val days: List<DayHits>, val tokens: List<String>) {
@@ -43,7 +46,9 @@ object MemorySearch {
             val memos = day.memos.filter { ok("메모", it.text) }
             val done = day.done.filter { ok("해결한 내용 ${it.priority}", it.text) }
                 .sortedBy { if (order == DoneOrder.WRITTEN) it.written else it.resolved }
-            val hits = DayHits(day, late, memos, done)
+            val goals = day.goals.filter { ok("장기 목표 ${Dates.dText(it.off.toLong())}", it.text) }
+            val goalDone = day.goalDone.filter { ok("장기 목표 해결 ${Dates.dText(it.off.toLong())} ${it.written} ${it.resolved}", it.text) }
+            val hits = DayHits(day, late, memos, done, goals, goalDone)
             if (hits.count > 0) out.add(hits)
         }
         out.sortBy { it.archive.date }

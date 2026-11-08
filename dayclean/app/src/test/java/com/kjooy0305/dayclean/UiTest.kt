@@ -342,6 +342,17 @@ class UiTest {
         assertTrue(buttons.contains("오늘\n불러오기") && buttons.contains("전체\n내보내기"))
     }
 
+    @Test fun memoryShowsGoalRecordsInThreeLines() {
+        store.update { it.copy(archive = listOf(DayArchive(LocalDate.of(2026, 10, 24),
+            goals = listOf(GoalRec(28, "여행 계획")),
+            goalDone = listOf(GoalDoneRec(27, "이력서", "2026-10-05 09:12", "2026-10-24 08:05", "18일 22시간"))))) }
+        val a = start(MemoryActivity::class.java).get()
+        val t = texts(root(a))
+        assertTrue(t.contains("ㄴ ✔ 해결 D-27") && t.contains("ㄴ D-28"))
+        assertTrue(t.contains("작성 2026-10-05 09:12") && t.contains("해결 2026-10-24 08:05") && t.contains("작성 후 18일 22시간 걸림"))
+        assertFalse(t.any { it.contains("보다") && it.contains("남기고") })
+    }
+
     // ---- 알림과 알람 ----
 
     @Test fun dueItemPostsOneNotificationPerItemAndSchedulesNextAlarm() {

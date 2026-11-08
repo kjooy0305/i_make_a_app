@@ -9,6 +9,7 @@ import com.kjooy0305.dayclean.model.Goal
 import com.kjooy0305.dayclean.model.Item
 import com.kjooy0305.dayclean.model.Kind
 import com.kjooy0305.dayclean.model.Period
+import com.kjooy0305.dayclean.model.ResolvedGoal
 import com.kjooy0305.dayclean.model.RestInterval
 import com.kjooy0305.dayclean.model.Settings
 import java.time.LocalDate
@@ -35,12 +36,18 @@ object Ops {
     private fun mapItem(s: AppState, id: Long, f: (Item) -> Item): AppState =
         s.copy(items = s.items.map { if (it.id == id) f(it) else it })
 
-    fun toggleDone(s: AppState, id: Long, nowMs: Long): AppState = mapItem(s, id) { i ->
-        if (!i.done) i.copy(done = true, doneAt = nowMs, nextAlertAt = null)
-        else {
-            val back = i.copy(done = false, doneAt = null)
-            back.copy(nextAlertAt = Reminders.initialAlert(back, s.settings, nowMs))
+    /** 장기 목표 항목을 체크하면 그 목표를 해결한 것으로 기록하고, 체크를 풀면 되돌린다. */
+    fun toggleDone(s: AppState, id: Long, nowMs: Long): AppState {
+        val cur = s.items.firstOrNull { it.id == id }
+        val out = mapItem(s, id) { i ->
+            if (!i.done) i.copy(done = true, doneAt = nowMs, nextAlertAt = null)
+            else {
+                val back = i.copy(done = false, doneAt = null)
+                back.copy(nextAlertAt = Reminders.initialAlert(back, s.settings, nowMs))
+            }
         }
+        val gid = cur?.goalId ?: return out
+        return if (!cur.done) resolveGoal(out, gid, nowMs) else unresolveGoal(out, gid)
     }
 
     fun setDone(s: AppState, id: Long, done: Boolean, nowMs: Long): AppState {
@@ -75,10 +82,10 @@ object Ops {
 
     // ---- 장기 목표 ----
 
-    fun addGoal(s: AppState, text: String, period: Period, target: LocalDate, today: LocalDate): AppState {
+    fun addGoal(s: AppState, text: String, period: Period, target: LocalDate, today: LocalDate, nowMs: Long = Dates.startOfDay(today)): AppState {
         val (id, next) = s.alloc()
         val seq = (s.goals.maxOfOrNull { it.seq } ?: 0L) + 1
-        return next.copy(goals = next.goals + Goal(id, text.trim(), period, target, seq, today))
+        return next.copy(goals = next.goals + Goal(id, text.trim(), period, target, seq, today, nowMs))
     }
 
     fun updateGoal(s: AppState, id: Long, text: String, period: Period, target: LocalDate): AppState =
@@ -93,6 +100,22 @@ object Ops {
     /** 달성하거나 지운 목표. 오늘 자동으로 들어온 항목도 함께 정리한다. */
     fun removeGoal(s: AppState, id: Long): AppState =
         s.copy(goals = s.goals.filterNot { it.id == id }, items = s.items.filterNot { it.goalId == id && !it.done })
+
+    /** 목표를 달성한 것으로 기록한다. 목표는 목록에서 빠지고, 작성·해결 시간이 다음 자정에 메모리로 옮겨진다. */
+    fun resolveGoal(s: AppState, id: Long, nowMs: Long): AppState {
+        val g = s.goals.firstOrNull { it.id == id } ?: return s
+        return s.copy(
+            goals = s.goals.filterNot { it.id == id },
+            items = s.items.filterNot { it.goalId == id && !it.done },
+            resolvedGoals = s.resolvedGoals + ResolvedGoal(g, nowMs)
+        )
+    }
+
+    /** 같은 날 해결한 목표를 되살린다(체크를 푼 경우). */
+    fun unresolveGoal(s: AppState, id: Long): AppState {
+        val r = s.resolvedGoals.firstOrNull { it.goal.id == id } ?: return s
+        return s.copy(goals = s.goals + r.goal, resolvedGoals = s.resolvedGoals - r)
+    }
 
     // ---- 설정 ----
 

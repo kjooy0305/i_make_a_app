@@ -402,9 +402,78 @@ class LogicTest {
         s = Ops.addRest(s, 1380, 420, setOf(DayOfWeek.MONDAY, DayOfWeek.FRIDAY))
         s = Gate.complete(s, MORNING_ID)
         s = GoalReview.markDone(s, Period.M1, today)
-        s = s.copy(archive = listOf(DayArchive(d(2026, 10, 1), memos = listOf(MemoRec("10:00", "x")))), onboarded = true)
+        s = Ops.resolveGoal(s, s.goals[0].id, ms(2026, 10, 26, 9)).copy(archive = listOf(DayArchive(d(2026, 10, 1), memos = listOf(MemoRec("10:00", "x")),
+            goals = listOf(GoalRec(31, "g")), goalDone = listOf(GoalDoneRec(3, "h", "2026-10-01 09:00", "2026-10-02 09:00", "1일 0시간")))), onboarded = true)
         val back = StateJson.fromJson(JSONObject(StateJson.toJson(s).toString()))
         assertEquals(s, back)
+    }
+
+
+    // ---- 장기 목표 메모리 기록 ----
+
+    @Test fun goalMarkRule() {
+        val created = d(2026, 10, 5); val target = d(2026, 11, 20)
+        val days = generateSequence(created) { it.plusDays(1) }.takeWhile { !it.isAfter(d(2026, 11, 24)) }
+            .filter { GoalLog.isMark(created, target, it) }.toList()
+        // 한 달 전(D-31) → 한 달 이내 주 단위(D-28 … D-7, D-DAY) → 기한 후 매일
+        assertEquals(listOf(d(2026, 10, 20), d(2026, 10, 23), d(2026, 10, 30), d(2026, 11, 6), d(2026, 11, 13), d(2026, 11, 20),
+            d(2026, 11, 21), d(2026, 11, 22), d(2026, 11, 23), d(2026, 11, 24)), days)
+        // 1년짜리: 달마다 D-n, 마지막 한 달 전부터는 주마다
+        val far = GoalLog.marks(listOf(Goal(1, "영어", Period.Y1, d(2027, 1, 19), 1, d(2026, 8, 3))), d(2026, 10, 19))
+        assertEquals(listOf(GoalRec(92, "영어")), far)
+        assertEquals(d(2026, 2, 28), GoalLog.minusMonths(d(2026, 3, 31), 1))   // 없는 날짜는 말일
+        assertEquals("D-31", Dates.dText(GoalLog.marks(listOf(Goal(1, "x", Period.M1, target, 1, created)), d(2026, 10, 20))[0].off.toLong()))
+    }
+
+    @Test fun goalRecordedDailyDespiteAppClosedAndResolvedWithThreeFacts() {
+        val created = ms(2026, 10, 5, 9, 12)
+        var s = fresh(d(2026, 10, 5))
+        s = Ops.addGoal(s, "이력서 초안", Period.M1, d(2026, 11, 20), d(2026, 10, 5), created)
+        // 앱을 열지 않다가 10/24에 열어도 중간 날짜의 기록이 빠지지 않는다
+        s = s.copy(mode = ModeState(d(2026, 10, 19)))
+        var r = Rollover.ensureDay(s, d(2026, 10, 24), ms(2026, 10, 24, 0, 1))
+        assertEquals(listOf(d(2026, 10, 23), d(2026, 10, 20)), r.archive.filter { it.goals.isNotEmpty() }.map { it.date })
+        assertEquals(31, r.archive.first { it.date == d(2026, 10, 20) }.goals[0].off)
+        // 해결: 해결한 날 기록은 3가지(작성 · 해결 · 걸린 시간)이고, 해결 목록에 ‘그날 쓰고 끝낸 것’으로 남지 않는다
+        r = r.copy(settings = r.settings.copy(autoAdd = true))
+        val goalId = r.goals[0].id
+        val auto = Item(900, Kind.LATER, "이력서 초안", d(2026, 10, 24), Dates.startOfDay(d(2026, 10, 24)), goalId = goalId)
+        r = r.copy(items = r.items + auto)
+        r = Ops.toggleDone(r, 900, ms(2026, 10, 24, 8, 5))
+        assertTrue(r.goals.isEmpty())
+        val next = Rollover.ensureDay(r, d(2026, 10, 25), ms(2026, 10, 25, 0, 1))
+        val day = next.archive.first { it.date == d(2026, 10, 24) }
+        assertTrue(day.done.isEmpty())
+        val g = day.goalDone.single()
+        assertEquals(GoalDoneRec(27, "이력서 초안", "2026-10-05 09:12", "2026-10-24 08:05", "18일 22시간"), g)
+        assertTrue(next.resolvedGoals.isEmpty())
+    }
+
+    @Test fun uncheckingGoalItemRestoresGoal() {
+        val today = d(2026, 10, 26)
+        var s = Ops.addGoal(fresh(today), "청소", Period.W1, d(2026, 10, 30), today)
+        s = Rollover.ensureDay(s, today, ms(2026, 10, 26, 0, 5))
+        val id = s.items[0].id
+        s = Ops.toggleDone(s, id, ms(2026, 10, 26, 9))
+        assertTrue(s.goals.isEmpty()); assertEquals(1, s.resolvedGoals.size)
+        s = Ops.toggleDone(s, id, ms(2026, 10, 26, 10))
+        assertEquals(1, s.goals.size); assertTrue(s.resolvedGoals.isEmpty())
+    }
+
+    @Test fun goalRecordsSearchExportImport() {
+        val a = DayArchive(d(2026, 10, 24),
+            goals = listOf(GoalRec(7, "여행 | 계획"), GoalRec(0, "자격증"), GoalRec(-2, "대청소")),
+            goalDone = listOf(GoalDoneRec(27, "이력서", "2026-10-05 09:12", "2026-10-24 08:05", "18일 22시간")))
+        var s = fresh(d(2026, 10, 26)).copy(archive = listOf(a))
+        val txt = MemoryText.exportAll(s, d(2026, 10, 26))
+        assertTrue(txt.contains("D+2 | 대청소")); assertTrue(txt.contains("해결 D-27 | 2026-10-05 09:12 | 2026-10-24 08:05 | 18일 22시간 | 이력서"))
+        val r = MemoryText.importAll(fresh(d(2026, 10, 26)), txt, d(2026, 10, 26), ms(2026, 10, 26, 9))
+        assertEquals(a, r.state.archive.single())
+        assertEquals(4, r.entries.let { 4 }); assertEquals(0, r.skipped)
+        val again = MemoryText.importAll(r.state, txt, d(2026, 10, 26), ms(2026, 10, 26, 9))
+        assertEquals(a, again.state.archive.single()); assertEquals(4, again.skipped)
+        assertEquals(1, MemorySearch.search(s.archive, "D-27", true, DoneOrder.WRITTEN).count)
+        assertEquals(1, MemorySearch.search(s.archive, "이력서", true, DoneOrder.WRITTEN).count)
     }
 
     @Test fun storePersistsAndSurvivesBrokenFile() {

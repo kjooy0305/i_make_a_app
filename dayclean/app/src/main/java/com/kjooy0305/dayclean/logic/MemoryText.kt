@@ -4,6 +4,8 @@ import com.kjooy0305.dayclean.model.AppState
 import com.kjooy0305.dayclean.model.DayArchive
 import com.kjooy0305.dayclean.model.Disposition
 import com.kjooy0305.dayclean.model.DoneRec
+import com.kjooy0305.dayclean.model.GoalDoneRec
+import com.kjooy0305.dayclean.model.GoalRec
 import com.kjooy0305.dayclean.model.Item
 import com.kjooy0305.dayclean.model.Kind
 import com.kjooy0305.dayclean.model.LateRec
@@ -17,6 +19,7 @@ object MemoryText {
     private const val MEMO = "메모"
     private const val DONE = "해결한 내용"
     private const val LEFT = "남은 것"
+    private const val GOAL = "장기 목표"
 
     private class Remaining(val kind: Kind, val time: String, val text: String)
     private class Block(
@@ -24,7 +27,9 @@ object MemoryText {
         val late: MutableList<LateRec> = ArrayList(),
         val memos: MutableList<MemoRec> = ArrayList(),
         val done: MutableList<DoneRec> = ArrayList(),
-        val left: MutableList<Remaining> = ArrayList()
+        val left: MutableList<Remaining> = ArrayList(),
+        val goals: MutableList<GoalRec> = ArrayList(),
+        val goalDone: MutableList<GoalDoneRec> = ArrayList()
     )
 
     class ImportResult(val state: AppState, val days: Int, val entries: Int, val skipped: Int)
@@ -44,7 +49,8 @@ object MemoryText {
         liveBlock(state, today)?.let { writeBlock(sb, it) }
         for (d in state.archive.sortedByDescending { it.date }) {
             if (d.date == today) continue
-            writeBlock(sb, Block(d.date, d.late.toMutableList(), d.memos.toMutableList(), d.done.toMutableList()))
+            writeBlock(sb, Block(d.date, d.late.toMutableList(), d.memos.toMutableList(), d.done.toMutableList(),
+                goals = d.goals.toMutableList(), goalDone = d.goalDone.toMutableList()))
         }
         return sb.toString()
     }
@@ -72,6 +78,14 @@ object MemoryText {
         if (b.memos.isNotEmpty()) {
             sb.append(MEMO).append('\n')
             b.memos.forEach { sb.append("  ").append(it.time).append(" | ").append(esc(it.text)).append('\n') }
+        }
+        if (b.goals.isNotEmpty() || b.goalDone.isNotEmpty()) {
+            sb.append(GOAL).append('\n')
+            b.goals.forEach { sb.append("  ").append(Dates.dText(it.off.toLong())).append(" | ").append(esc(it.text)).append('\n') }
+            b.goalDone.forEach {
+                sb.append("  해결 ").append(Dates.dText(it.off.toLong())).append(" | ").append(it.written).append(" | ").append(it.resolved)
+                    .append(" | ").append(it.span).append(" | ").append(esc(it.text)).append('\n')
+            }
         }
         if (b.done.isNotEmpty()) {
             sb.append(DONE).append('\n')
@@ -110,17 +124,18 @@ object MemoryText {
         for (b in blocks) {
             when {
                 b.date == today -> { val r = addLive(s, b, today, nowMs); s = r.first; added += r.second; skipped += r.third }
-                b.date.isAfter(today) -> skipped += b.late.size + b.memos.size + b.done.size + b.left.size
+                b.date.isAfter(today) -> skipped += b.late.size + b.memos.size + b.done.size + b.left.size + b.goals.size + b.goalDone.size
                 else -> {
                     val old = s.archive.firstOrNull { it.date == b.date }
                     val late = b.late + b.left.map { LateRec(it.time, it.text) }
                     val merged = Rollover.mergeArchive(
-                        s.archive, DayArchive(b.date, late, b.memos, b.done))
+                        s.archive, DayArchive(b.date, late, b.memos, b.done, b.goals, b.goalDone))
                     val after = merged.firstOrNull { it.date == b.date }
-                    val before = (old?.late?.size ?: 0) + (old?.memos?.size ?: 0) + (old?.done?.size ?: 0)
-                    val now = (after?.late?.size ?: 0) + (after?.memos?.size ?: 0) + (after?.done?.size ?: 0)
+                    fun size(a: DayArchive?) = if (a == null) 0 else a.late.size + a.memos.size + a.done.size + a.goals.size + a.goalDone.size
+                    val before = size(old)
+                    val now = size(after)
                     added += now - before
-                    skipped += (late.size + b.memos.size + b.done.size) - (now - before)
+                    skipped += (late.size + b.memos.size + b.done.size + b.goals.size + b.goalDone.size) - (now - before)
                     s = s.copy(archive = merged.sortedByDescending { it.date })
                 }
             }
@@ -147,7 +162,7 @@ object MemoryText {
         b.memos.forEach { put(Kind.MEMO, it.text, it.time, null) }
         b.done.forEach { put(it.kind, it.text, it.written, it.resolved) }
         b.left.forEach { put(it.kind, it.text, it.time, null) }
-        skipped += b.late.size   // 미룬 것은 지난 일의 기록이라 오늘 기록장에는 넣지 않는다
+        skipped += b.late.size + b.goals.size + b.goalDone.size   // 미룬 것은 지난 일의 기록이라 오늘 기록장에는 넣지 않는다
         return Triple(s, added, skipped)
     }
 
@@ -169,6 +184,7 @@ object MemoryText {
             val b = cur ?: continue
             val parts = splitFields(line.trim())
             when (section) {
+                GOAL -> goalLine(parts)?.let { if (it is GoalRec) b.goals.add(it) else b.goalDone.add(it as GoalDoneRec) }
                 LATE -> if (parts.size >= 2 && validTime(parts[0])) b.late.add(LateRec(parts[0], parts[1]))
                 MEMO -> if (parts.size >= 2 && validTime(parts[0])) b.memos.add(MemoRec(parts[0], parts[1]))
                 DONE -> if (parts.size >= 4 && validTime(parts[0]) && validTime(parts[1])) {
@@ -185,6 +201,24 @@ object MemoryText {
             }
         }
         return blocks
+    }
+
+    private fun offOf(t: String): Int? {
+        if (t == "D-DAY") return 0
+        Regex("^D-(\\d+)$").matchEntire(t)?.let { return it.groupValues[1].toInt() }
+        Regex("^D\\+(\\d+)$").matchEntire(t)?.let { return -it.groupValues[1].toInt() }
+        return null
+    }
+
+    /** "D-31 | 이름" 또는 "해결 D-27 | 작성 | 해결 | 걸린 시간 | 이름" */
+    private fun goalLine(p: List<String>): Any? {
+        val head = p.firstOrNull() ?: return null
+        if (head.startsWith("해결 ")) {
+            val off = offOf(head.removePrefix("해결 ").trim()) ?: return null
+            return if (p.size >= 5) GoalDoneRec(off, p[4], p[1], p[2], p[3]) else null
+        }
+        val off = offOf(head) ?: return null
+        return if (p.size >= 2) GoalRec(off, p[1]) else null
     }
 
     private fun validTime(t: String) = Dates.parseHhmm(t) != null
