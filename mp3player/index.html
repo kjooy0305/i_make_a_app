@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MP3 플레이어</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: 한 화면 안에 위는 지금 재생 중, 아래는 곡 목록. 곡은 이 브라우저(IndexedDB)에 저장돼서 다시 열어도 남는다. */
+:root { --bg:#101114; --panel:#1a1c21; --line:#2c3038; --text:#eef0f4; --sub:#9aa1ae; --acc:#7cf0b5; --acc-ink:#04170e;
+  --font:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; --mono:ui-monospace,Menlo,Consolas,monospace; color-scheme:dark; }
+* { box-sizing:border-box; }
+html,body { height:100%; }
+body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 var(--font); padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px)); }
+.app { max-width:560px; height:100%; margin:0 auto; display:flex; flex-direction:column; padding-block:max(14px,env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-bottom,0px)); gap:12px; }
+h1 { margin:0; font-size:20px; font-weight:900; letter-spacing:-.02em; display:flex; align-items:center; gap:10px; }
+h1 small { font:400 12px var(--mono); color:var(--sub); }
+.now { background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:16px; display:grid; gap:12px; flex:none; }
+.disc { width:min(46vw,170px); aspect-ratio:1; border-radius:50%; margin:0 auto; background:conic-gradient(from 20deg,#2a2d35,#12141a,#2a2d35,#12141a,#2a2d35); border:1px solid var(--line); position:relative; }
+.disc::after { content:""; position:absolute; inset:36%; border-radius:50%; background:var(--acc); box-shadow:0 0 0 8px var(--bg) inset; }
+.disc.spin { animation:spin 5s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .disc.spin { animation:none; } }
+.title { text-align:center; font-weight:700; font-size:17px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.artist { text-align:center; color:var(--sub); font-size:13px; min-height:1.3em; }
+.bar { display:grid; grid-template-columns:44px 1fr 44px; gap:8px; align-items:center; font:12px var(--mono); color:var(--sub); }
+.bar span:last-child { text-align:right; }
+input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:28px; background:transparent; margin:0; }
+input[type=range]::-webkit-slider-runnable-track { height:6px; border-radius:3px; background:var(--line); }
+input[type=range]::-moz-range-track { height:6px; border-radius:3px; background:var(--line); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--acc); margin-top:-7px; border:0; }
+input[type=range]::-moz-range-thumb { width:20px; height:20px; border-radius:50%; background:var(--acc); border:0; }
+.ctl { display:flex; justify-content:center; align-items:center; gap:10px; }
+.ib { width:46px; height:46px; border-radius:50%; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; font-size:18px; cursor:pointer; display:grid; place-items:center; padding:0; }
+.ib.big { width:62px; height:62px; background:var(--acc); color:var(--acc-ink); border-color:var(--acc); font-size:24px; }
+.ib[aria-pressed="true"] { border-color:var(--acc); color:var(--acc); }
+button:focus-visible,input:focus-visible { outline:3px solid var(--text); outline-offset:2px; }
+.vol svg { width:18px; height:18px; }
+.vol { display:grid; grid-template-columns:22px 1fr; gap:8px; align-items:center; color:var(--sub); font-size:14px; }
+.listhead { display:flex; align-items:center; gap:8px; flex:none; }
+.listhead b { flex:1; }
+.btn { font:inherit; font-weight:700; font-size:13px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); padding:7px 12px; cursor:pointer; min-height:36px; }
+.btn.main { background:var(--acc); color:var(--acc-ink); border-color:var(--acc); }
+.list { flex:1; min-height:0; overflow-y:auto; border:1px solid var(--line); border-radius:16px; background:var(--panel); scrollbar-width:thin; scrollbar-color:#566 transparent; }
+.row { display:grid; grid-template-columns:28px minmax(0,1fr) auto auto; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line); cursor:pointer; }
+.row:last-child { border-bottom:0; }
+.row.on { background:#15261d; }
+.row.on .n { color:var(--acc); }
+.n { font:12px var(--mono); color:var(--sub); text-align:center; }
+.t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.t small { display:block; color:var(--sub); font-size:12px; overflow:hidden; text-overflow:ellipsis; }
+.d { font:12px var(--mono); color:var(--sub); }
+.x { background:none; border:0; color:var(--sub); font-size:16px; cursor:pointer; padding:4px 8px; }
+.empty { padding:36px 16px; text-align:center; color:var(--sub); }
+.drop { outline:3px dashed var(--acc); outline-offset:-8px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <h1>MP3 플레이어 <small id="stat"></small></h1>
+  <section class="now">
+    <div class="disc" id="disc"></div>
+    <div><div class="title" id="title">곡을 추가하세요</div><div class="artist" id="artist"></div></div>
+    <div class="bar"><span id="cur">0:00</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="재생 위치"><span id="dur">0:00</span></div>
+    <div class="ctl">
+      <button class="ib" id="shuf" aria-pressed="false" title="셔플"></button>
+      <button class="ib" id="prev" title="이전"></button>
+      <button class="ib big" id="play" title="재생/일시정지"></button>
+      <button class="ib" id="next" title="다음"></button>
+      <button class="ib" id="rep" aria-pressed="false" title="반복"></button>
+    </div>
+    <div class="vol"><span id="ivol"></span><input type="range" id="vol" min="0" max="100" value="80" aria-label="볼륨"></div>
+  </section>
+  <div class="listhead"><b>곡 목록</b><button class="btn" id="clear">모두 지우기</button><label class="btn main" style="display:inline-flex;align-items:center;cursor:pointer">곡 추가<input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac" multiple hidden></label></div>
+  <div class="list" id="list"></div>
+</div>
+<audio id="au" preload="metadata"></audio>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+var SV=function(d){return '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">'+d+'</svg>'};var I_PLAY=SV('<path d="M8 5v14l11-7z"/>'),I_PAUSE=SV('<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>'),I_PREV=SV('<path d="M6 5h2v14H6zM20 5v14L9 12z"/>'),I_NEXT=SV('<path d="M16 5h2v14h-2zM4 5v14l11-7z"/>'),I_SHUF=SV('<path d="M17 3l4 4-4 4V8h-3.6l-3.4 4.5L13.4 17H17v-3l4 4-4 4v-3h-4.6L8 12.5 4.6 17H3v-2h1.6L8 10.5 4.6 6H3V4h2.6L9 8.5 12.4 6H17z"/>'),I_REP=SV('<path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/>'),I_VOL=SV('<path d="M3 9v6h4l5 4V5L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/>');
+  var au = $('#au'), tracks = [], idx = -1, shuffle = false, repeat = 0, urlCur = null, db = null, mem = false;
+  var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var fmt = function (s) { if (!isFinite(s)) return '0:00'; s = Math.floor(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  /* ----- 저장소 (IndexedDB, 안 되면 이번 실행 동안만) ----- */
+  function openDB() {
+    return new Promise(function (res) {
+      try { var r = indexedDB.open('mp3player', 1); r.onupgradeneeded = function () { r.result.createObjectStore('t', { keyPath: 'id', autoIncrement: true }); }; r.onsuccess = function () { db = r.result; res(); }; r.onerror = function () { mem = true; res(); }; } catch (e) { mem = true; res(); }
+    });
+  }
+  function all() { return new Promise(function (res) { if (!db) return res([]); var q = db.transaction('t', 'readonly').objectStore('t').getAll(); q.onsuccess = function () { res(q.result || []); }; q.onerror = function () { res([]); }; }); }
+  function put(rec) { return new Promise(function (res) { if (!db) { rec.id = rec.id || Date.now() + Math.random(); return res(rec); } var q = db.transaction('t', 'readwrite').objectStore('t').add(rec); q.onsuccess = function () { rec.id = q.result; res(rec); }; q.onerror = function () { res(rec); }; }); }
+  function del(id) { return new Promise(function (res) { if (!db) return res(); var q = db.transaction('t', 'readwrite').objectStore('t').delete(id); q.onsuccess = q.onerror = function () { res(); }; }); }
+  function clearAll() { return new Promise(function (res) { if (!db) return res(); var q = db.transaction('t', 'readwrite').objectStore('t').clear(); q.onsuccess = q.onerror = function () { res(); }; }); }
+
+  /* ----- 태그(ID3v2 제목·가수) 읽기 ----- */
+  function decode(b, enc) {
+    try { if (enc === 1 || enc === 2) { var be = enc === 2, st = 0; if (b[0] === 0xFF && b[1] === 0xFE) { be = false; st = 2; } else if (b[0] === 0xFE && b[1] === 0xFF) { be = true; st = 2; } return new TextDecoder(be ? 'utf-16be' : 'utf-16le').decode(b.subarray(st)).replace(/\0+$/g, '').trim(); }
+      if (enc === 3) return new TextDecoder('utf-8').decode(b).replace(/\0+$/g, '').trim();
+      var hi = false; for (var i = 0; i < b.length; i++) if (b[i] > 127) { hi = true; break; } return new TextDecoder(hi ? 'euc-kr' : 'latin1').decode(b).replace(/\0+$/g, '').trim(); } catch (e) { return ''; }
+  }
+  async function readTags(file) {
+    var out = { title: '', artist: '' };
+    try {
+      var h = new Uint8Array(await file.slice(0, 10).arrayBuffer()); if (h[0] !== 0x49 || h[1] !== 0x44 || h[2] !== 0x33) return out;
+      var ver = h[3], size = ((h[6] & 127) << 21) | ((h[7] & 127) << 14) | ((h[8] & 127) << 7) | (h[9] & 127), buf = new Uint8Array(await file.slice(10, 10 + Math.min(size, 262144)).arrayBuffer()), p = 0, il = ver === 2 ? 3 : 4, hl = ver === 2 ? 6 : 10;
+      while (p + hl <= buf.length) {
+        var id = String.fromCharCode.apply(null, buf.subarray(p, p + il)); if (!/^[A-Z0-9]+$/.test(id)) break;
+        var fs = ver === 2 ? (buf[p + 3] << 16) | (buf[p + 4] << 8) | buf[p + 5] : ver === 4 ? ((buf[p + 4] & 127) << 21) | ((buf[p + 5] & 127) << 14) | ((buf[p + 6] & 127) << 7) | (buf[p + 7] & 127) : buf[p + 4] * 16777216 + (buf[p + 5] << 16) + (buf[p + 6] << 8) + buf[p + 7];
+        if (id === 'TIT2' || id === 'TT2') out.title = decode(buf.subarray(p + hl + 1, p + hl + fs), buf[p + hl]);
+        if (id === 'TPE1' || id === 'TP1') out.artist = decode(buf.subarray(p + hl + 1, p + hl + fs), buf[p + hl]);
+        if (fs <= 0) break; p += hl + fs;
+      }
+    } catch (e) { /* 태그 없음 */ }
+    return out;
+  }
+  function duration(file) { return new Promise(function (res) { var a = new Audio(), u = URL.createObjectURL(file); a.preload = 'metadata'; a.onloadedmetadata = function () { var d = a.duration; URL.revokeObjectURL(u); res(isFinite(d) ? d : 0); }; a.onerror = function () { URL.revokeObjectURL(u); res(0); }; a.src = u; }); }
+
+  /* ----- 화면 ----- */
+  function render() {
+    $('#stat').textContent = tracks.length + '곡' + (mem ? ' · 저장 안 됨' : '');
+    $('#list').innerHTML = tracks.length ? tracks.map(function (t, i) {
+      return '<div class="row' + (i === idx ? ' on' : '') + '" data-i="' + i + '"><span class="n">' + (i === idx && !au.paused ? '♪' : i + 1) + '</span><span class="t">' + esc(t.title) + '<small>' + esc(t.artist || '가수 미상') + '</small></span><span class="d">' + fmt(t.dur) + '</span><button class="x" data-del="' + i + '" aria-label="지우기">✕</button></div>';
+    }).join('') : '<div class="empty">곡 추가를 눌러 mp3 파일을 고르세요.<br>이 화면에 파일을 끌어놓아도 돼요.<br>곡은 이 브라우저에 저장돼서 다시 열어도 남아요.</div>';
+    var t = tracks[idx]; $('#title').textContent = t ? t.title : '곡을 추가하세요'; $('#artist').textContent = t ? (t.artist || '') : '';
+    $('#play').innerHTML = au.paused ? I_PLAY : I_PAUSE; $('#disc').classList.toggle('spin', !au.paused && idx >= 0);
+  }
+  function load(i, auto) {
+    if (i < 0 || i >= tracks.length) return; idx = i; if (urlCur) URL.revokeObjectURL(urlCur);
+    urlCur = URL.createObjectURL(tracks[i].blob); au.src = urlCur; if (auto) au.play().catch(function () { }); render();
+    if ('mediaSession' in navigator) { try { navigator.mediaSession.metadata = new MediaMetadata({ title: tracks[i].title, artist: tracks[i].artist || '' }); } catch (e) { } }
+  }
+  function next(dir) {
+    if (!tracks.length) return; var n;
+    if (shuffle && tracks.length > 1) { do { n = Math.floor(Math.random() * tracks.length); } while (n === idx); } else n = idx + dir;
+    if (n >= tracks.length) { if (repeat === 1) n = 0; else { au.pause(); render(); return; } } if (n < 0) n = tracks.length - 1; load(n, true);
+  }
+  async function addFiles(list) {
+    var arr = Array.prototype.slice.call(list).filter(function (f) { return /^audio\//.test(f.type) || /\.(mp3|m4a|wav|ogg|flac|aac)$/i.test(f.name); });
+    if (!arr.length) return;
+    for (var i = 0; i < arr.length; i++) {
+      var f = arr[i], tg = await readTags(f), d = await duration(f);
+      var rec = await put({ title: tg.title || f.name.replace(/\.[^.]+$/, ''), artist: tg.artist, dur: d, blob: f, at: Date.now() });
+      tracks.push(rec); render();
+    }
+    if (idx < 0) load(0, false);
+  }
+
+  /* ----- 이벤트 ----- */
+  $('#file').addEventListener('change', function (e) { addFiles(e.target.files).then(function () { e.target.value = ''; }); });
+  $('#list').addEventListener('click', function (e) {
+    var d = e.target.closest('[data-del]'); if (d) { var i = parseInt(d.dataset.del, 10), t = tracks[i]; del(t.id); tracks.splice(i, 1); if (i === idx) { au.pause(); au.removeAttribute('src'); idx = -1; if (tracks.length) load(Math.min(i, tracks.length - 1), false); } else if (i < idx) idx--; render(); return; }
+    var r = e.target.closest('[data-i]'); if (r) load(parseInt(r.dataset.i, 10), true);
+  });
+  $('#clear').onclick = function () { if (!tracks.length) return; if (!this.dataset.sure) { this.dataset.sure = 1; this.textContent = '정말 지울까요?'; var b = this; setTimeout(function () { delete b.dataset.sure; b.textContent = '모두 지우기'; }, 2500); return; } clearAll(); tracks = []; au.pause(); au.removeAttribute('src'); idx = -1; this.textContent = '모두 지우기'; delete this.dataset.sure; render(); };
+  $('#play').onclick = function () { if (idx < 0 && tracks.length) load(0, true); else if (au.paused) au.play().catch(function () { }); else au.pause(); };
+  $('#next').onclick = function () { next(1); }; $('#prev').onclick = function () { if (au.currentTime > 3) au.currentTime = 0; else next(-1); };
+  $('#shuf').onclick = function () { shuffle = !shuffle; this.setAttribute('aria-pressed', shuffle); };
+  $('#rep').onclick = function () { repeat = repeat ? 0 : 1; this.setAttribute('aria-pressed', !!repeat); };
+  $('#vol').oninput = function () { au.volume = this.value / 100; };
+  $('#seek').oninput = function () { if (isFinite(au.duration)) au.currentTime = au.duration * this.value / 1000; };
+  au.addEventListener('timeupdate', function () { $('#cur').textContent = fmt(au.currentTime); if (isFinite(au.duration)) { $('#seek').value = au.duration ? au.currentTime / au.duration * 1000 : 0; } });
+  au.addEventListener('loadedmetadata', function () { $('#dur').textContent = fmt(au.duration); });
+  au.addEventListener('play', render); au.addEventListener('pause', render);
+  au.addEventListener('ended', function () { if (repeat === 2) { au.currentTime = 0; au.play(); } else next(1); });
+  au.addEventListener('error', function () { if (idx >= 0) $('#artist').textContent = '이 파일은 재생할 수 없어요'; });
+  ['dragover', 'dragenter'].forEach(function (ev) { window.addEventListener(ev, function (e) { e.preventDefault(); $('#app').classList.add('drop'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { window.addEventListener(ev, function (e) { e.preventDefault(); if (ev === 'dragleave' && e.relatedTarget) return; $('#app').classList.remove('drop'); }); });
+  window.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+  if ('mediaSession' in navigator) { try { navigator.mediaSession.setActionHandler('previoustrack', function () { next(-1); }); navigator.mediaSession.setActionHandler('nexttrack', function () { next(1); }); } catch (e) { } }
+  window.addEventListener('keydown', function (e) { if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return; if (e.code === 'Space') { e.preventDefault(); $('#play').click(); } if (e.code === 'ArrowRight' && e.altKey) next(1); if (e.code === 'ArrowLeft' && e.altKey) next(-1); });
+
+  $('#shuf').innerHTML = I_SHUF; $('#prev').innerHTML = I_PREV; $('#next').innerHTML = I_NEXT; $('#rep').innerHTML = I_REP; $('#ivol').innerHTML = I_VOL; $('#play').innerHTML = I_PLAY;
+  au.volume = 0.8;
+  openDB().then(all).then(function (rows) { tracks = rows.sort(function (a, b) { return (a.at || 0) - (b.at || 0); }); if (tracks.length) { idx = 0; load(0, false); } render(); });
+})();
+</script>
+</body>
+</html>

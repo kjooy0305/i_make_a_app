@@ -10,6 +10,7 @@ on:
       - 'keywordscan/**'
       - 'musiclist/**'
       - 'poser/**'
+      - 'mp3player/**'
       - 'uswsync/**'
       - 'vibelink/**'
       - '.github/workflows/pages.yml'
