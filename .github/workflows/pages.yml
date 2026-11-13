@@ -12,6 +12,7 @@ on:
       - 'poser/**'
       - 'uswsync/**'
       - 'vibelink/**'
+      - 'voicenote/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
