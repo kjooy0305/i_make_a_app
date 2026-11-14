@@ -195,9 +195,12 @@ class GoalEditActivity : BaseActivity() {
             box.add(content, MATCH, WRAP, 0f, 0, 8, 0, 0)
         }
         if (mode == EDIT) {
+            box.add(button("이 목표 해결", primary = true) {
+                Dialogs.confirmGoalResolved(this, goal!!.text) { mutate { Ops.resolveGoal(it, goal!!.id, store.now()) }; finish() }
+            }, MATCH, WRAP, 0f, 0, 16, 0, 0)
             box.add(button("이 목표 삭제") {
                 Dialogs.confirm(this, "이 목표를 지울까요?", "삭제") { mutate { Ops.removeGoal(it, goal!!.id) }; finish() }
-            }, MATCH, WRAP, 0f, 0, 16, 0, 0)
+            }, MATCH, WRAP, 0f, 0, 8, 0, 0)
         }
 
         val bottom = hbox()

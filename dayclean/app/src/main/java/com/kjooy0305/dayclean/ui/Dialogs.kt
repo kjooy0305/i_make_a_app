@@ -97,6 +97,11 @@ object Dialogs {
         modal(context, "확인", context.label(text, 15f), action, "취소") { onYes(); true }.show()
     }
 
+    /** 장기 목표를 해결 처리하기 전에 한 번 더 묻는다: 해결했어요(확인) / 취소. */
+    fun confirmGoalResolved(context: Context, goalText: String, onYes: () -> Unit) {
+        confirm(context, "‘$goalText’\n정말 해결했나요?\n해결하면 목록에서 빠지고 메모리에 기록돼요.", "해결했어요", onYes)
+    }
+
     /** 목록에서 하나 고르기. */
     fun pick(context: Context, title: String, options: List<String>, selected: Int, onPick: (Int) -> Unit) {
         val list = context.vbox()
@@ -216,7 +221,8 @@ object Dialogs {
     }
 
     /** 날짜를 달력에서 고른다. 오늘 이전은 고를 수 없다. */
-    fun calendar(context: Context, initial: LocalDate, today: LocalDate, onPick: (LocalDate) -> Unit) {
+    /** [allowPast] 가 true 면 지난 날짜도 고를 수 있고 D-day 대신 날짜만 보여 준다(메모리 리셋처럼 과거 날짜를 정할 때). */
+    fun calendar(context: Context, initial: LocalDate, today: LocalDate, allowPast: Boolean = false, onPick: (LocalDate) -> Unit) {
         var month = java.time.YearMonth.from(initial)
         var picked = initial
         val box = context.vbox()
@@ -228,7 +234,8 @@ object Dialogs {
 
         fun draw() {
             title.text = "${month.year}년 ${month.monthValue}월"
-            footer.text = "${picked.year}.%02d.%02d · ${Dates.dText(Dates.daysBetween(today, picked))}".format(picked.monthValue, picked.dayOfMonth)
+            footer.text = if (allowPast) "${picked.year}.%02d.%02d".format(picked.monthValue, picked.dayOfMonth)
+                else "${picked.year}.%02d.%02d · ${Dates.dText(Dates.daysBetween(today, picked))}".format(picked.monthValue, picked.dayOfMonth)
             grid.removeAllViews()
             val names = listOf("일", "월", "화", "수", "목", "금", "토")
             val wd = context.hbox()
@@ -247,7 +254,7 @@ object Dialogs {
                         continue
                     }
                     val date = month.atDay(num)
-                    val past = date.isBefore(today)
+                    val past = !allowPast && date.isBefore(today)
                     val on = date == picked
                     val cell = TextView(context).apply {
                         text = num.toString()
@@ -272,7 +279,7 @@ object Dialogs {
         head.add(context.button("▶") { month = month.plusMonths(1); draw() }.apply { contentDescription = "다음 달" })
         box.add(head)
         box.add(grid, t = 8)
-        box.add(context.label("점선 칸은 오늘이에요. 지난 날짜는 고를 수 없어요.", 12f), t = 8)
+        box.add(context.label(if (allowPast) "굵은 칸은 오늘이에요. 고른 날짜까지(그날 포함)가 대상이에요." else "점선 칸은 오늘이에요. 지난 날짜는 고를 수 없어요.", 12f), t = 8)
         box.add(footer, t = 8)
         d = modal(context, "날짜 고르기", box, "이 날짜로 정하기", "취소") { onPick(picked); true }
         draw()

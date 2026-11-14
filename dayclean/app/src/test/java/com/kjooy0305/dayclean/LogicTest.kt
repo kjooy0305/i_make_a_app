@@ -490,4 +490,18 @@ class LogicTest {
         val r = store.process()
         assertEquals(1, r.itemAlerts.size)
     }
+
+    @Test fun memoryResetPlanCountsAndResetKeepsLaterDays() {
+        val d = { day: Int -> LocalDate.of(2026, 10, day) }
+        val s = AppState(archive = listOf(
+            DayArchive(d(25), memos = listOf(MemoRec("10:00", "a"))),
+            DayArchive(d(24), memos = listOf(MemoRec("10:00", "b")), late = listOf(LateRec("11:00", "c"))),
+            DayArchive(d(20), goals = listOf(GoalRec(28, "목표")), goalDone = listOf(GoalDoneRec(1, "x", "w", "r", "1일")))))
+        val plan = Ops.memoryResetPlan(s, d(24))
+        assertEquals(2, plan.days); assertEquals(4, plan.entries)
+        assertEquals(listOf(d(25)), Ops.resetMemoryUpTo(s, d(24)).archive.map { it.date })
+        assertEquals(3, Ops.resetMemoryUpTo(s, d(19)).archive.size)       // 아무것도 해당 없으면 그대로
+        assertTrue(Ops.resetMemoryUpTo(s, d(30)).archive.isEmpty())        // 전부
+        assertEquals(0, Ops.memoryResetPlan(s, d(19)).days)
+    }
 }

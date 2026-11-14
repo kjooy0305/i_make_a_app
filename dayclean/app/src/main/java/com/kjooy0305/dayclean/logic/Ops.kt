@@ -111,6 +111,22 @@ object Ops {
         )
     }
 
+    /** 메모리 리셋으로 지워질 것: [upTo] 날짜까지(그날 포함)의 날짜별 기록. */
+    data class MemoryResetPlan(val days: Int, val entries: Int)
+
+    fun memoryResetPlan(s: AppState, upTo: LocalDate): MemoryResetPlan {
+        val targets = s.archive.filter { !it.date.isAfter(upTo) }
+        val entries = targets.sumOf { it.late.size + it.memos.size + it.done.size + it.goals.size + it.goalDone.size }
+        return MemoryResetPlan(targets.size, entries)
+    }
+
+    /**
+     * 메모리만 리셋한다: [upTo] 날짜까지(그날 포함)의 날짜별 기록을 지운다.
+     * 기록장, 진행 중인 장기 목표, 오늘 해결한 목표, 설정은 건드리지 않는다.
+     */
+    fun resetMemoryUpTo(s: AppState, upTo: LocalDate): AppState =
+        s.copy(archive = s.archive.filter { it.date.isAfter(upTo) })
+
     /** 같은 날 해결한 목표를 되살린다(체크를 푼 경우). */
     fun unresolveGoal(s: AppState, id: Long): AppState {
         val r = s.resolvedGoals.firstOrNull { it.goal.id == id } ?: return s

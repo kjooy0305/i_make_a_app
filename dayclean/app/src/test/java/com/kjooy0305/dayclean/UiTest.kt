@@ -81,6 +81,17 @@ class UiTest {
         v.performClick()
     }
 
+    /** 가장 최근에 띄운 대화상자 안의 버튼 누르기. */
+    private fun latestDialog() = org.robolectric.shadows.ShadowDialog.getLatestDialog() ?: error("열린 대화상자가 없어요")
+
+    private fun dialogTexts(): List<String> = texts(latestDialog().window!!.decorView)
+
+    private fun dialogClick(text: String) {
+        val v = find(latestDialog().window!!.decorView, { it is TextView && it.text.toString() == text && it.isClickable }).firstOrNull()
+            ?: error("대화상자에 버튼 없음: $text / 있는 글자: ${dialogTexts()}")
+        v.performClick()
+    }
+
     private fun <T : android.app.Activity> start(c: Class<T>, intent: Intent? = null): ActivityController<T> =
         (if (intent != null) Robolectric.buildActivity(c, intent) else Robolectric.buildActivity(c)).setup()
 
@@ -236,6 +247,9 @@ class UiTest {
         assertTrue(texts(root(a)).contains("1주 목표"))
         assertTrue(texts(root(a)).contains("연장"))        // 지난 목표에만
         click(a, "달성")                                      // 첫 카드(가장 빠른 날짜)
+        assertTrue(dialogTexts().any { it.contains("정말 해결했나요?") })
+        assertEquals(3, store.state.goals.size)               // 확인 전에는 그대로
+        dialogClick("해결했어요")
         assertEquals(2, store.state.goals.size)
         click(a, "1달 점검으로 ▸")
         assertEquals(today, store.state.review.last1w)
@@ -245,7 +259,43 @@ class UiTest {
         assertTrue(a.isFinishing)
     }
 
+    @Test fun goalCheckResolveCanBeCancelled() {
+        val today = LocalDate.of(2026, 10, 26)
+        store.update { Ops.addGoal(it, "주 목표", Period.W1, today.plusDays(5), today) }
+        val a = start(GoalCheckActivity::class.java).get()
+        click(a, "달성")
+        assertTrue(dialogTexts().contains("취소") && dialogTexts().contains("해결했어요"))
+        dialogClick("취소")
+        assertFalse(latestDialog().isShowing)
+        assertEquals(1, store.state.goals.size)
+        assertTrue(store.state.resolvedGoals.isEmpty())
+    }
+
     // ---- 장기 목표 ----
+
+    @Test fun goalEditResolveAsksThenResolvesOrCancels() {
+        val today = LocalDate.of(2026, 10, 26)
+        store.update { Ops.addGoal(it, "이력서 끝내기", Period.M1, today.plusDays(20), today) }
+        val id = store.state.goals.single().id
+        val intent = Intent(context, GoalEditActivity::class.java).putExtra(GoalEditActivity.EXTRA_MODE, GoalEditActivity.EDIT).putExtra(GoalEditActivity.EXTRA_ID, id)
+        val a = start(GoalEditActivity::class.java, intent).get()
+        assertTrue(texts(root(a)).contains("이 목표 해결"))
+        click(a, "이 목표 해결")
+        assertTrue(dialogTexts().any { it.contains("이력서 끝내기") && it.contains("정말 해결했나요?") })
+        dialogClick("취소")                                       // 취소하면 아무 일도 없다
+        assertEquals(1, store.state.goals.size)
+        assertFalse(a.isFinishing)
+        click(a, "이 목표 해결")
+        dialogClick("해결했어요")
+        assertTrue(store.state.goals.isEmpty())
+        assertEquals("이력서 끝내기", store.state.resolvedGoals.single().goal.text)
+        assertTrue(a.isFinishing)
+    }
+
+    @Test fun newGoalScreenHasNoResolveButton() {
+        val a = start(GoalEditActivity::class.java, Intent(context, GoalEditActivity::class.java).putExtra(GoalEditActivity.EXTRA_MODE, GoalEditActivity.NEW)).get()
+        assertFalse(texts(root(a)).contains("이 목표 해결"))
+    }
 
     @Test fun goalsScreenListsSortsAndFilters() {
         val today = LocalDate.of(2026, 10, 26)
@@ -340,6 +390,43 @@ class UiTest {
         assertTrue(texts(root(a)).contains("검색 결과가 없어요"))
         val buttons = texts(root(a))
         assertTrue(buttons.contains("오늘\n불러오기") && buttons.contains("전체\n내보내기"))
+    }
+
+    @Test fun memoryResetDeletesOnlyUpToPickedDate() {
+        store.update { it.copy(archive = listOf(
+            DayArchive(LocalDate.of(2026, 10, 25), memos = listOf(MemoRec("15:12", "어제 메모"))),
+            DayArchive(LocalDate.of(2026, 10, 24), memos = listOf(MemoRec("15:12", "새 아이디어")), late = listOf(LateRec("21:50", "화분"))),
+            DayArchive(LocalDate.of(2026, 10, 22), late = listOf(LateRec("21:50", "화분 물 주기"))))) }
+        val a = start(MemoryActivity::class.java).get()
+        assertTrue(texts(root(a)).contains("메모리 리셋 (날짜까지 지우기)"))
+        click(a, "메모리 리셋 (날짜까지 지우기)")
+        assertTrue(dialogTexts().contains("날짜 고르기"))
+        // 기본 선택은 어제(10.25). 24일로 바꾼다.
+        val day24 = find(latestDialog().window!!.decorView, { it is TextView && it.contentDescription?.toString() == "10월 24일" }).single()
+        day24.performClick()
+        dialogClick("이 날짜로 정하기")
+        val ask = dialogTexts().first { it.contains("지울까요?") }
+        assertTrue(ask.contains("2026.10.24까지") && ask.contains("2일") && ask.contains("3건"))
+        assertTrue(ask.contains("기록장") && ask.contains("장기 목표") && ask.contains("설정"))
+        dialogClick("취소")
+        assertEquals(3, store.state.archive.size)                 // 취소하면 그대로
+        click(a, "메모리 리셋 (날짜까지 지우기)")
+        find(latestDialog().window!!.decorView, { it is TextView && it.contentDescription?.toString() == "10월 24일" }).single().performClick()
+        dialogClick("이 날짜로 정하기")
+        dialogClick("지우기")
+        assertEquals(listOf(LocalDate.of(2026, 10, 25)), store.state.archive.map { it.date })   // 25일만 남는다
+    }
+
+    @Test fun memoryResetKeepsGoalsItemsAndSettings() {
+        val today = LocalDate.of(2026, 10, 26)
+        store.update {
+            var s = Ops.addGoal(it, "진행 중 목표", Period.M1, today.plusDays(20), today)
+            s = s.copy(archive = listOf(DayArchive(LocalDate.of(2026, 10, 20), memos = listOf(MemoRec("09:00", "옛 메모")))))
+            Ops.resetMemoryUpTo(s, LocalDate.of(2026, 10, 25))
+        }
+        assertTrue(store.state.archive.isEmpty())
+        assertEquals("진행 중 목표", store.state.goals.single().text)
+        assertTrue(store.state.onboarded)
     }
 
     @Test fun memoryShowsGoalRecordsInThreeLines() {

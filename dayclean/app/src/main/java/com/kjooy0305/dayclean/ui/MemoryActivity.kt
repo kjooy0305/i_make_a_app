@@ -19,6 +19,7 @@ import com.kjooy0305.dayclean.logic.Dates
 import com.kjooy0305.dayclean.logic.DoneOrder
 import com.kjooy0305.dayclean.logic.MemorySearch
 import com.kjooy0305.dayclean.logic.MemoryText
+import com.kjooy0305.dayclean.logic.Ops
 import com.kjooy0305.dayclean.platform.AlarmScheduler
 
 /** 메모리: 지난 기록을 날짜별로 보고, 검색하고, txt로 내보내거나 불러온다. */
@@ -67,7 +68,8 @@ class MemoryActivity : BaseActivity() {
         b("전체\n불러오기", { importToday = false; openFile.launch(arrayOf("text/plain", "*/*")) })
         b("오늘\n내보내기", { export(true) })
         b("전체\n내보내기", { export(false) }, last = true)
-        sticky.head.add(buttons, MATCH, WRAP, 0f, 0, 0, 0, 10)
+        sticky.head.add(buttons, MATCH, WRAP, 0f, 0, 0, 0, 8)
+        sticky.head.add(button("메모리 리셋 (날짜까지 지우기)", small = true) { resetMemory() }, MATCH, WRAP, 0f, 0, 0, 0, 10)
         sticky.head.add(label("오늘 기록은 00:00에 이 목록으로 옮겨져요. 그 전에는 기록장에서만 볼 수 있어요.\n장기 목표는 한 달 넘게 남았을 땐 한 달마다, 한 달 이내엔 1주일마다, 목표일이 지나면 매일 D-n으로 기록돼요. 해결하면 작성·해결 날짜와 시간이 3줄로 남아요.", 12f).apply {
             background = shape(strokeDp = 1.5f, radiusDp = 10f)
             setPadding(dp(12), dp(8), dp(12), dp(8))
@@ -120,6 +122,24 @@ class MemoryActivity : BaseActivity() {
         search.setText(text)
         search.setSelection(text.length)
         redraw()
+    }
+
+    /** 메모리만 지운다: 고른 날짜까지(그날 포함)의 날짜별 기록. 기록장·장기 목표·설정은 그대로. */
+    private fun resetMemory() {
+        val t = today()
+        Dialogs.calendar(this, t.minusDays(1), t, allowPast = true) { upTo -> confirmReset(upTo) }
+    }
+
+    private fun confirmReset(upTo: java.time.LocalDate) {
+        val label = "${upTo.year}.%02d.%02d".format(upTo.monthValue, upTo.dayOfMonth)
+        val plan = Ops.memoryResetPlan(state, upTo)
+        if (plan.days == 0) { Dialogs.message(this, "${label}까지의 기록이 없어요."); return }
+        Dialogs.confirm(this,
+            "${label}까지(그날 포함)의 메모리 ${plan.days}일 · ${plan.entries}건을 지울까요?\n되돌릴 수 없어요. 남기고 싶다면 먼저 ‘전체 내보내기’로 백업하세요.\n기록장 · 진행 중인 장기 목표 · 설정은 그대로예요.",
+            "지우기") {
+            mutate { Ops.resetMemoryUpTo(it, upTo) }
+            redraw()
+        }
     }
 
     private fun export(todayOnly: Boolean) {

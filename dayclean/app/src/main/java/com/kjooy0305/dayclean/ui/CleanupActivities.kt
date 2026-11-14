@@ -322,7 +322,9 @@ class GoalCheckActivity : BaseActivity() {
             card.add(head)
             if (late) card.add(label("목표 날짜(${g.target})가 지났어요", 12f), t = 4)
             val acts = hbox()
-            acts.add(button("달성", small = true) { mutate { Ops.resolveGoal(it, g.id, store.now()) }; redraw() }, 0, WRAP, 1f, 0, 0, 6, 0)
+            acts.add(button("달성", small = true) {
+                Dialogs.confirmGoalResolved(this, g.text) { mutate { Ops.resolveGoal(it, g.id, store.now()) }; redraw() }
+            }, 0, WRAP, 1f, 0, 0, 6, 0)
             if (late) acts.add(button("연장", small = true) {
                 startActivity(Intent(this, GoalEditActivity::class.java).putExtra(GoalEditActivity.EXTRA_MODE, GoalEditActivity.EXTEND).putExtra(GoalEditActivity.EXTRA_ID, g.id))
             }, 0, WRAP, 1f, 0, 0, 6, 0)
