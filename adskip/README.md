@@ -20,7 +20,7 @@ adskip/
 2. 유튜브 화면이 바뀔 때마다 `rootInActiveWindow` 에서 아이디(`com.google.android.youtube:id/skip_ad_button` 등) → 글자(“광고 건너뛰기”, “Skip ads” …) 순으로 버튼을 찾는다.
 3. 클릭 가능한 조상까지 올라가 `performAction(ACTION_CLICK)`, 거절되면 `dispatchGesture` 로 버튼 가운데를 탭. 0.8초 안에 같은 버튼을 다시 누르지 않고, 이벤트 뒤 0.35초·1초에 한 번씩 더 본다.
 
-브라우저: 플레이어의 `ad-showing` 클래스를 신호로, 건너뛰기 버튼 클릭 → 없으면 광고 `<video>` 를 `currentTime = duration` 으로 끝내기 → 광고 중 음소거 후 원복, 배너 칸 CSS 숨김.
+브라우저: 플레이어의 `ad-showing` 클래스를 신호로, 건너뛰기 버튼 클릭 → 없으면 광고 `<video>` 를 `currentTime = duration` 으로 끝내기 → 광고 중 음소거 후 원복, 배너 칸 CSS 숨김, "동영상이 일시중지되었습니다. 이어서 시청하시겠어요?" 창(yt-confirm-dialog)의 [예] 자동 클릭 + 재생 재개.
 
 ## 빌드·검증
 

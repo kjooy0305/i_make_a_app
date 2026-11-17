@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         광고 건너뛰기 (AdSkip)
 // @namespace    https://kjooy0305.github.io/i_make_a_app/adskip/
-// @version      1.0.0
-// @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘깁니다.
+// @version      1.1.0
+// @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다.
 // @author       kjooy0305
 // @match        *://www.youtube.com/*
 // @match        *://m.youtube.com/*
@@ -25,6 +25,7 @@
  *                 (b) 버튼이 아직 없으면 광고 <video>의 재생 위치를 끝으로 보내 광고를 바로 끝낸다.
  *  3. 광고가 끝나면 소리 설정을 원래대로 되돌린다.
  *  4. 배너·추천 광고 칸은 CSS 로 숨긴다(선택).
+ *  5. "동영상이 일시중지되었습니다. 이어서 시청하시겠어요?" 확인 창이 뜨면 [예]를 눌러 주고 멈춘 영상을 다시 재생한다.
  * 화면 안에서만 동작하고 어디에도 데이터를 보내지 않는다.
  */
 (function () {
@@ -32,7 +33,7 @@
   if (window.__adskipLoaded) return;
   window.__adskipLoaded = true;
 
-  var DEFAULTS = { enabled: true, fastForward: true, hideBanners: true, badge: true };
+  var DEFAULTS = { enabled: true, fastForward: true, hideBanners: true, badge: true, autoResume: true };
   var cfg = Object.assign({}, DEFAULTS);
   var stats = { count: 0 };
 
@@ -158,10 +159,45 @@
     badgeTimer = setTimeout(function () { b.style.opacity = '0'; }, 1600);
   }
 
+  /* ---------- "이어서 시청하시겠어요?" 창 자동 확인 ----------
+   * 유튜브는 한참 조작이 없으면 영상을 멈추고 확인 창(yt-confirm-dialog)을 띄운다.
+   * 창의 글자가 '일시중지/이어서 시청/paused/continue watching' 이면 [예] 버튼을 누르고, 영상이 멈춰 있으면 play(). */
+  var DIALOG_SEL = 'yt-confirm-dialog-renderer, tp-yt-paper-dialog, ytd-popup-container, .ytp-pause-overlay, dialog, [role="dialog"], ytm-confirm-dialog-renderer, .dialog-container';
+  var PAUSE_TEXT = /(일시\s*중지|이어서\s*시청|계속\s*시청|video paused|continue watching|still watching)/i;
+  var YES_TEXT = /^(예|네|확인|이어서 시청|계속 시청|계속|yes|ok|continue|continue watching)$/i;
+  var lastResumeAt = 0;
+  function autoResume() {
+    if (!cfg.autoResume) return false;
+    var now = Date.now();
+    if (now - lastResumeAt < 1500) return false;
+    var dialogs = document.querySelectorAll(DIALOG_SEL);
+    for (var i = 0; i < dialogs.length; i++) {
+      var d = dialogs[i];
+      if (!visible(d) || !PAUSE_TEXT.test(d.textContent || '')) continue;
+      // 진짜 <button> 을 먼저 보고(유튜브는 #confirm-button 안에 button 이 있다), 없으면 role=button/링크.
+      var btns = d.querySelectorAll('#confirm-button button, button, [role="button"], a.yt-simple-endpoint, #confirm-button');
+      for (var j = 0; j < btns.length; j++) {
+        var b = btns[j];
+        var label = ((b.textContent || '').trim() || b.getAttribute('aria-label') || '').trim();
+        if (YES_TEXT.test(label) && visible(b)) {
+          var inner = b.tagName !== 'BUTTON' ? b.querySelector('button') : null;
+          (inner || b).click();
+          lastResumeAt = now;
+          var v = document.querySelector('#movie_player video, .html5-video-player video, video');
+          setTimeout(function () { try { if (v && v.paused && !v.ended) v.play(); } catch (e) {} }, 300);
+          showBadge('멈춘 영상 이어서 재생');
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /* ---------- 한 번의 점검 ---------- */
   var inAd = false, acted = false, lastClickAt = 0;
   function tick() {
     if (!cfg.enabled) return;
+    autoResume();
     var p = player();
     if (!p) return;
     var ad = isAd(p);

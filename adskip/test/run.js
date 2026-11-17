@@ -58,6 +58,18 @@ function assert(c, m) { if (!c) { console.error('FAIL: ' + m); process.exitCode 
   stats = await page.evaluate(() => window.__adskip.getStats());
   assert(stats.count === 2, '건너뛴 횟수 2 (실제 ' + stats.count + ')');
 
+  // 2b) '이어서 시청하시겠어요?' 창 → [예] 누르고 재생 재개
+  await page.evaluate(() => { window.events.length = 0; });
+  await page.evaluate(() => window.showPauseDialog());
+  await page.waitForFunction(() => window.events.includes('pause-dialog-yes'), null, { timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(600);
+  ev = await page.evaluate(() => window.events);
+  console.log('   events:', ev.join(' | '));
+  assert(ev.includes('pause-dialog-yes') && !ev.includes('pause-dialog-no'), '일시중지 확인 창에서 [예]를 누름');
+  const playing = await page.evaluate(() => { const v = document.getElementById('v'); return !v.paused; });
+  assert(playing, '멈춘 영상이 다시 재생됨');
+  await page.evaluate(() => { const v = document.getElementById('v'); v.pause(); v.removeAttribute('src'); v.load(); });
+
   // 3) 꺼짐 상태에서는 아무것도 안 함
   await page.evaluate(() => { window.events.length = 0; window.__adskip.setConfig({ enabled: false }); });
   await page.evaluate(() => window.startAd(500));

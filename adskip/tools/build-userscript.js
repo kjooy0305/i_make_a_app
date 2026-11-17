@@ -9,7 +9,7 @@ const header = `// ==UserScript==
 // @name         광고 건너뛰기 (AdSkip)
 // @namespace    https://kjooy0305.github.io/i_make_a_app/adskip/
 // @version      ${manifest.version}
-// @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘깁니다.
+// @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다.
 // @author       kjooy0305
 // @match        *://www.youtube.com/*
 // @match        *://m.youtube.com/*

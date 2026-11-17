@@ -73,7 +73,7 @@ jobs:
             Tampermonkey/Violentmonkey 설치 후 파일 열기(또는 https://kjooy0305.github.io/i_make_a_app/adskip/userscript/adskip.user.js)
 
             ### 원리
-            접근성 서비스가 유튜브 화면의 버튼·글자 트리를 읽어 `skip_ad_button` / ‘광고 건너뛰기’ 버튼을 찾아 클릭(ACTION_CLICK), 안 되면 좌표 탭. 브라우저는 플레이어의 `ad-showing` 신호로 버튼 클릭 + 광고 영상을 끝으로 보내기 + 배너 숨김. 데이터는 어디에도 보내지 않습니다.
+            접근성 서비스가 유튜브 화면의 버튼·글자 트리를 읽어 `skip_ad_button` / ‘광고 건너뛰기’ 버튼을 찾아 클릭(ACTION_CLICK), 안 되면 좌표 탭. 브라우저는 플레이어의 `ad-showing` 신호로 버튼 클릭 + 광고 영상을 끝으로 보내기 + 배너 숨김 + “이어서 시청하시겠어요?” 창 자동 확인(1.1.0). 데이터는 어디에도 보내지 않습니다.
           files: |
             dist/AdSkip-*.apk
             dist/AdSkip-extension-*.zip

@@ -1,4 +1,4 @@
-var DEFAULTS = { enabled: true, fastForward: true, hideBanners: true, badge: true };
+var DEFAULTS = { enabled: true, fastForward: true, hideBanners: true, badge: true, autoResume: true };
 var keys = Object.keys(DEFAULTS);
 function render(cfg, stats) {
   keys.forEach(function (k) { document.getElementById(k).checked = cfg[k] !== false; });
