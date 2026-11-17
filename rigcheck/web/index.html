@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>관절 확인기</title>
+<script src="three.min.js"></script>
+<style>
+:root{--bg:#17191e;--panel:#23262d;--panel2:#2c3039;--line:#3a3f4a;--text:#eceff4;--sub:#9aa3b2;--acc:#ffd23f;--acc-ink:#1c1600;--bad:#ff6b6b;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 -apple-system,"Noto Sans KR","Malgun Gothic",sans-serif;overflow:hidden;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh;padding-top:env(safe-area-inset-top)}
+#vp{flex:1;min-height:0;position:relative;touch-action:none;user-select:none;-webkit-user-select:none}
+#vp canvas{display:block;width:100%;height:100%}
+#tag{position:absolute;left:10px;top:10px;background:rgba(35,38,45,.85);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;pointer-events:none}
+#hint{position:absolute;left:10px;bottom:8px;color:var(--sub);font-size:11px;pointer-events:none}
+#tools{position:absolute;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}
+button,select,input{font:inherit;color:var(--text)}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:38px;cursor:pointer}
+button[aria-pressed=true],button.on{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+button.pri{background:var(--acc);border-color:var(--acc);color:var(--acc-ink);font-weight:700}
+button.dng{border-color:var(--bad);color:var(--bad)}
+#tools button{padding:6px 10px;min-height:34px;font-size:12px;background:rgba(44,48,57,.9)}
+#panel{flex:none;background:var(--panel);border-top:1px solid var(--line);max-height:44vh;max-height:44dvh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+#tabs{display:flex;flex:none}
+#tabs button{flex:1;border:0;border-radius:0;background:var(--panel);border-bottom:3px solid transparent;color:var(--sub);min-height:42px}
+#tabs button.on{color:var(--text);border-bottom-color:var(--acc);background:var(--panel2)}
+#body{overflow-y:auto;padding:10px 12px;flex:1;min-height:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.sl{display:grid;grid-template-columns:44px 1fr 56px;gap:8px;align-items:center;margin:6px 0}
+.sl label{color:var(--sub);font-size:12px}
+.sl input[type=range]{width:100%;height:28px}
+.sl output{font-variant-numeric:tabular-nums;text-align:right;font-size:12px}
+select{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px;min-height:38px;max-width:100%}
+.sub{color:var(--sub);font-size:12px}
+.pt{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.pt.on{background:rgba(255,210,63,.12)}
+.pt b{width:30px;color:var(--sub);font-weight:400;font-size:12px}
+.pt select{flex:1}
+.sw{width:12px;height:12px;border-radius:50%;flex:none}
+.warn{color:var(--bad)}
+#toast{position:fixed;left:50%;bottom:calc(46vh + 14px);transform:translateX(-50%);background:var(--text);color:var(--bg);border-radius:999px;padding:7px 14px;font-size:13px;z-index:9;display:none}
+#load{position:absolute;inset:0;display:grid;place-items:center;background:var(--bg);z-index:5}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="vp">
+    <div id="load">모델을 불러오는 중…</div>
+    <div id="tag">관절을 눌러 고르세요</div>
+    <div id="tools">
+      <button id="bSkel" aria-pressed="true">뼈대</button>
+      <button id="bCol" aria-pressed="false">색 구분</button>
+      <button id="bWire" aria-pressed="false">반투명</button>
+      <button id="bFront">정면</button>
+      <button id="bSide">옆면</button>
+    </div>
+    <div id="hint">끌기: 돌리기 · 두 손가락: 확대·이동</div>
+  </div>
+  <div id="panel">
+    <div id="tabs"><button data-t="pose" class="on">포즈 확인</button><button data-t="joint">관절 위치</button><button data-t="part">조각 묶음</button><button data-t="file">저장·불러오기</button></div>
+    <div id="body"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+(async function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var D2R = Math.PI / 180;
+  var GN = { torso: '몸통', head: '머리·머리카락', legL: '왼다리', legR: '오른다리', footL: '왼쪽 신발', footR: '오른쪽 신발', armL: '왼팔·손', armR: '오른팔·손' };
+  var GC = { torso: 0xc9b8a8, head: 0x6aa6ff, legL: 0x7bd88f, legR: 0xf2a65a, footL: 0x2fb36d, footR: 0xd9772b, armL: 0xb08cff, armR: 0xff7aa8 };
+  var KO = { Hips: '골반', Spine: '허리', Chest: '가슴', Neck: '목', Head: '머리', HeadEnd: '머리 끝', Shoulder: '어깨뼈', Arm: '위팔', ForeArm: '아래팔', Hand: '손', HandEnd: '손끝', UpLeg: '허벅지', Leg: '종아리', Foot: '발', Toe: '발가락', ToeEnd: '발끝' };
+  function jko(n) { var m = /^(Left|Right)(.+)$/.exec(n); return m ? (m[1] === 'Left' ? '왼 ' : '오른 ') + (KO[m[2]] || m[2]) : (KO[n] || n); }
+  function toast(t) { var e = $('#toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(function () { e.style.display = 'none'; }, 2200); }
+
+  var meta, buf;
+  try {
+    meta = await (await fetch('data/parts.json')).json(); buf = await (await fetch('data/parts.bin')).arrayBuffer();
+  } catch (e) { $('#load').textContent = '데이터를 못 읽었어요: ' + e.message; return; }
+  var NV = meta.nv, NI = meta.ni, H = meta.H;
+  var POS = new Float32Array(buf, 0, NV * 3), NOR = new Float32Array(buf, NV * 12, NV * 3), IDX = new Uint32Array(buf, NV * 24, NI);
+  var ORIG = JSON.parse(JSON.stringify({ joints: meta.joints, groups: meta.parts.map(function (p) { return p.group; }) }));
+  var JN = Object.keys(meta.joints);            // 모든 관절 (뼈 머리 + 끝)
+  var BN = meta.bones.map(function (b) { return b.name; });
+  var BI = {}; BN.forEach(function (n, i) { BI[n] = i; });
+  var jt = {}; JN.forEach(function (n) { jt[n] = new THREE.Vector3().fromArray(meta.joints[n]); });
+  var grp = meta.parts.map(function (p) { return p.group; });
+  var rot = {}; BN.forEach(function (n) { rot[n] = [0, 0, 0]; });
+  var S = { tab: 'pose', sel: null, sym: true, selPart: -1, colorBy: false, ghost: false, skel: true };
+
+  /* ---------- 장면 ---------- */
+  var vp = $('#vp'), renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); vp.insertBefore(renderer.domElement, vp.firstChild);
+  var scene = new THREE.Scene(); scene.background = new THREE.Color(0x232833);
+  var camera = new THREE.PerspectiveCamera(36, 1, 0.05, 40);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.85)); var dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(2, 4, 3); scene.add(dl);
+  var floor = new THREE.GridHelper(6, 24, 0x56607a, 0x3a4152); scene.add(floor);
+  var CAM = { az: 0, el: 0.1, dist: 3.6, target: new THREE.Vector3(0, 0.88, 0) };
+
+  /* ---------- 뼈대 + 스킨 메쓰 ---------- */
+  var bones = [], root = null;
+  meta.bones.forEach(function (b) { var o = new THREE.Bone(); o.name = b.name; bones.push(o); });
+  meta.bones.forEach(function (b, i) { if (b.parent) bones[BI[b.parent]].add(bones[i]); else root = bones[i]; });
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(POS, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(NOR, 3));
+  geo.setIndex(new THREE.BufferAttribute(IDX, 1));
+  var SI = new Uint16Array(NV * 4), SW = new Float32Array(NV * 4);
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(SI, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(SW, 4));
+  var COL = new Float32Array(NV * 3); geo.setAttribute('color', new THREE.BufferAttribute(COL, 3));
+  var mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.02, side: THREE.DoubleSide });
+  var mesh = new THREE.SkinnedMesh(geo, mat); mesh.frustumCulled = false; mesh.add(root);
+  var skeleton = new THREE.Skeleton(bones); mesh.skeleton = skeleton; scene.add(mesh);
+  var partOfVert = new Uint8Array(NV); meta.parts.forEach(function (p, i) { for (var v = p.v0; v < p.v0 + p.vn; v++) partOfVert[v] = i; });
+
+  function placeBones() {       // 관절 위치 → 뼈의 위치(부모 기준 차이). 휴식 자세에서 뼈 방향은 모두 그대로(회전 없음)
+    meta.bones.forEach(function (b, i) { var w = jt[b.head], p = b.parent ? jt[meta.bones[BI[b.parent]].head] : null; bones[i].position.copy(p ? w.clone().sub(p) : w); });
+  }
+  function bindRest() {         // 지금 관절 위치를 새 '기본 자세'로 묶는다
+    var saved = bones.map(function (b) { return b.quaternion.clone(); }); bones.forEach(function (b) { b.quaternion.identity(); });
+    mesh.updateMatrixWorld(true); skeleton.calculateInverses(); mesh.bind(skeleton, new THREE.Matrix4());
+    bones.forEach(function (b, i) { b.quaternion.copy(saved[i]); });
+  }
+  function segDist(p, a, b, out) {
+    var abx = b.x - a.x, aby = b.y - a.y, abz = b.z - a.z, ab2 = abx * abx + aby * aby + abz * abz || 1e-9;
+    var t = ((p[0] - a.x) * abx + (p[1] - a.y) * aby + (p[2] - a.z) * abz) / ab2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    var dx = p[0] - (a.x + t * abx), dy = p[1] - (a.y + t * aby), dz = p[2] - (a.z + t * abz); return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+  function computeWeights() {   // 조각 묶음에 속한 뼈들과의 거리로 가중치를 만든다 (rig_tripo.py 와 같은 방식)
+    var sig = meta.sigma, p = [0, 0, 0];
+    meta.parts.forEach(function (pt, pi) {
+      var cs = meta.cand[grp[pi]], segs = cs.map(function (c) { var b = meta.bones[BI[c]]; return [BI[c], jt[b.head], jt[b.tail]]; });
+      var d = new Float32Array(segs.length), w = new Float32Array(segs.length), ord = new Array(segs.length);
+      for (var v = pt.v0; v < pt.v0 + pt.vn; v++) {
+        p[0] = POS[v * 3]; p[1] = POS[v * 3 + 1]; p[2] = POS[v * 3 + 2]; var mn = 1e9, k;
+        for (k = 0; k < segs.length; k++) { d[k] = segDist(p, segs[k][1], segs[k][2]); if (d[k] < mn) mn = d[k]; }
+        for (k = 0; k < segs.length; k++) { w[k] = Math.exp(-(d[k] - mn) / sig); ord[k] = k; }
+        ord.sort(function (a, b) { return w[b] - w[a]; }); var sum = 0, n = Math.min(4, segs.length);
+        for (k = 0; k < n; k++) sum += w[ord[k]];
+        for (k = 0; k < 4; k++) { SI[v * 4 + k] = k < n ? segs[ord[k]][0] : 0; SW[v * 4 + k] = k < n ? w[ord[k]] / sum : 0; }
+      }
+    });
+    geo.attributes.skinIndex.needsUpdate = true; geo.attributes.skinWeight.needsUpdate = true;
+  }
+  function paintColors() {
+    var base = new THREE.Color(0xd9c9bb), c = new THREE.Color();
+    for (var v = 0; v < NV; v++) {
+      var pi = partOfVert[v]; c.copy(S.colorBy ? new THREE.Color(GC[grp[pi]]) : base); if (pi === S.selPart) c.lerp(new THREE.Color(0xffffff), 0.45).multiplyScalar(1.15);
+      COL[v * 3] = c.r; COL[v * 3 + 1] = c.g; COL[v * 3 + 2] = c.b;
+    }
+    geo.attributes.color.needsUpdate = true;
+  }
+  function applyPose() { BN.forEach(function (n, i) { var r = rot[n]; bones[i].quaternion.setFromEuler(new THREE.Euler(r[0] * D2R, r[1] * D2R, r[2] * D2R, 'XYZ')); }); }
+
+  /* ---------- 관절 표시(점 + 선) ---------- */
+  var markers = {}, dotGeo = new THREE.SphereGeometry(0.022, 12, 10);
+  JN.forEach(function (n) {
+    var m = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: 0xffd23f, depthTest: false, transparent: true, opacity: 0.9 })); m.renderOrder = 10; m.userData.joint = n; markers[n] = m;
+    var bi = BI[n]; if (bi !== undefined) bones[bi].add(m); else { var par = meta.bones.filter(function (b) { return b.tail === n; })[0]; bones[BI[par.name]].add(m); }
+  });
+  function placeMarkers() {
+    JN.forEach(function (n) { var bi = BI[n], m = markers[n]; if (bi !== undefined) m.position.set(0, 0, 0); else { var par = meta.bones.filter(function (b) { return b.tail === n; })[0]; m.position.copy(jt[n]).sub(jt[par.head]); } });
+  }
+  var lineGeo = new THREE.BufferGeometry(), linePos = new Float32Array(meta.bones.length * 6); lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+  var lines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.8 })); lines.renderOrder = 9; lines.frustumCulled = false; scene.add(lines);
+  var tmp = new THREE.Vector3();
+  function updateLines() {
+    meta.bones.forEach(function (b, i) { var h = markers[b.head], t = markers[b.tail]; h.getWorldPosition(tmp); linePos.set([tmp.x, tmp.y, tmp.z], i * 6); t.getWorldPosition(tmp); linePos.set([tmp.x, tmp.y, tmp.z], i * 6 + 3); });
+    lineGeo.attributes.position.needsUpdate = true;
+  }
+  function markSel() { JN.forEach(function (n) { var on = n === S.sel; markers[n].material.color.set(on ? 0xff5a36 : 0xffd23f); markers[n].scale.setScalar(on ? 1.6 : 1); markers[n].visible = S.skel; }); lines.visible = S.skel; $('#tag').textContent = S.tab === 'part' ? (S.selPart >= 0 ? '조각 ' + S.selPart + ' · ' + GN[grp[S.selPart]] : '조각을 눌러 고르세요') : (S.sel ? jko(S.sel) : '관절을 눌러 고르세요'); }
+
+  /* ---------- 카메라/터치 ---------- */
+  function resize() { var w = vp.clientWidth, h = vp.clientHeight; if (!w || !h) return; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize', resize); new ResizeObserver(resize).observe(vp);
+  var ray = new THREE.Raycaster();
+  function pickJoint(e) {
+    var r = vp.getBoundingClientRect(); ray.setFromCamera({ x: (e.clientX - r.left) / r.width * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 }, camera);
+    ray.params.Points = {}; var best = null, bd = 1e9;
+    JN.forEach(function (n) { markers[n].getWorldPosition(tmp); var d = ray.ray.distanceToPoint(tmp), cd = tmp.distanceTo(camera.position); var tol = (matchMedia('(pointer: coarse)').matches ? 0.055 : 0.035) * (cd / 3.6); if (d < tol && d < bd) { bd = d; best = n; } });
+    return best;
+  }
+  function pickPart(e) {
+    var r = vp.getBoundingClientRect(); ray.setFromCamera({ x: (e.clientX - r.left) / r.width * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1 }, camera);
+    var h = ray.intersectObject(mesh, false)[0]; if (!h) return -1; return partOfVert[h.face.a];
+  }
+  var ptrs = {}, drag = null, pinch = null;
+  function two() { var k = Object.keys(ptrs); return k.length === 2 ? [ptrs[k[0]], ptrs[k[1]]] : null; }
+  vp.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('#tools')) return;
+    try { vp.setPointerCapture(e.pointerId); } catch (er) { /* 무시 */ } ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var t = two(); if (t) { drag = null; pinch = { d: Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y), cx: (t[0].x + t[1].x) / 2, cy: (t[0].y + t[1].y) / 2, dist: CAM.dist }; return; }
+    drag = { x: e.clientX, y: e.clientY, moved: 0, ev: { clientX: e.clientX, clientY: e.clientY } };
+  });
+  vp.addEventListener('pointermove', function (e) {
+    if (ptrs[e.pointerId]) { ptrs[e.pointerId].x = e.clientX; ptrs[e.pointerId].y = e.clientY; }
+    var t = two();
+    if (t && pinch) {
+      var d = Math.hypot(t[0].x - t[1].x, t[0].y - t[1].y), cx = (t[0].x + t[1].x) / 2, cy = (t[0].y + t[1].y) / 2;
+      CAM.dist = Math.max(0.6, Math.min(10, pinch.dist * pinch.d / Math.max(10, d)));
+      var k = 0.0016 * CAM.dist, dx = cx - pinch.cx, dy = cy - pinch.cy;
+      CAM.target.x -= Math.cos(CAM.az) * dx * k; CAM.target.z += Math.sin(CAM.az) * dx * k; CAM.target.y = Math.max(0, Math.min(2.5, CAM.target.y + dy * k)); pinch.cx = cx; pinch.cy = cy; return;
+    }
+    if (!drag) return; var dx2 = e.clientX - drag.x, dy2 = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx2) + Math.abs(dy2);
+    if (drag.moved < 6) return; CAM.az -= dx2 * 0.008; CAM.el = Math.max(-0.5, Math.min(1.4, CAM.el + dy2 * 0.006));
+  });
+  function up(e) {
+    delete ptrs[e.pointerId]; if (pinch) { if (Object.keys(ptrs).length < 2) pinch = null; drag = null; return; } if (!drag) return;
+    if (drag.moved < 6) {
+      if (S.tab === 'part') { var p = pickPart(drag.ev); S.selPart = p; paintColors(); markSel(); render(); }
+      else { var j = pickJoint(drag.ev); if (j) { S.sel = j; markSel(); render(); } }
+    }
+    drag = null;
+  }
+  vp.addEventListener('pointerup', up); vp.addEventListener('pointercancel', up);
+  vp.addEventListener('wheel', function (e) { e.preventDefault(); CAM.dist = Math.max(0.6, Math.min(10, CAM.dist + e.deltaY * 0.004)); }, { passive: false });
+  (function loop() {
+    var cp = CAM.target.clone().add(new THREE.Vector3(Math.sin(CAM.az) * Math.cos(CAM.el), Math.sin(CAM.el), Math.cos(CAM.az) * Math.cos(CAM.el)).multiplyScalar(CAM.dist));
+    camera.position.copy(cp); camera.lookAt(CAM.target); mesh.updateMatrixWorld(true); updateLines(); renderer.render(scene, camera); requestAnimationFrame(loop);
+  })();
+
+  /* ---------- 패널 ---------- */
+  var MIR = function (n) { return /^Left/.test(n) ? n.replace('Left', 'Right') : /^Right/.test(n) ? n.replace('Right', 'Left') : null; };
+  function slider(label, key, val, min, max, step, unit) { return '<div class="sl"><label>' + label + '</label><input type="range" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '" data-k="' + key + '"><output>' + (+val).toFixed(step < 1 ? 3 : 0) + unit + '</output></div>'; }
+  function jointSelect(list) { return '<select id="jsel"><option value="">' + (list === BN ? '뼈' : '관절') + ' 고르기</option>' + list.map(function (n) { return '<option value="' + n + '"' + (S.sel === n ? ' selected' : '') + '>' + esc(jko(n)) + ' (' + n + ')</option>'; }).join('') + '</select>'; }
+  var TESTS = [['왼팔 옆으로', { LeftArm: [0, 0, -90] }], ['오른팔 옆으로', { RightArm: [0, 0, 90] }], ['팔꿈치 굽히기', { LeftForeArm: [-90, 0, 0], RightForeArm: [-90, 0, 0] }], ['왼다리 앞으로', { LeftUpLeg: [-70, 0, 0], LeftLeg: [80, 0, 0] }], ['오른다리 앞으로', { RightUpLeg: [-70, 0, 0], RightLeg: [80, 0, 0] }], ['허리 숙이기', { Spine: [30, 0, 0], Chest: [25, 0, 0], Head: [-15, 0, 0] }], ['고개 돌리기', { Neck: [0, 40, 0], Head: [0, 25, 0] }], ['양팔 위로', { LeftArm: [0, 0, -165], RightArm: [0, 0, 165] }]];
+  function render() {
+    var b = $('#body'), h = '';
+    if (S.tab === 'pose') {
+      h += '<div class="row">' + jointSelect(BN) + '<button id="bsym" aria-pressed="' + S.sym + '">좌우 대칭</button><button id="bresetpose">자세 초기화</button></div>';
+      if (S.sel && BI[S.sel] !== undefined) { var r = rot[S.sel]; h += slider('X', 'rx', r[0], -180, 180, 1, '°') + slider('Y', 'ry', r[1], -180, 180, 1, '°') + slider('Z', 'rz', r[2], -180, 180, 1, '°'); }
+      else h += '<p class="sub">' + (S.sel ? '이 점은 뼈가 아니라 끝 위치예요. 위쪽 뼈를 고르세요.' : '모델의 노란 점을 누르거나 위에서 뼈를 고르세요.') + '</p>';
+      h += '<div class="sub" style="margin-top:8px">빠른 확인 (누르면 그 자세가 되고, 다시 누르면 풀려요)</div><div class="row">' + TESTS.map(function (t, i) { return '<button data-test="' + i + '">' + t[0] + '</button>'; }).join('') + '</div>';
+    } else if (S.tab === 'joint') {
+      h += '<div class="row">' + jointSelect(JN) + '<button id="bsym" aria-pressed="' + S.sym + '">좌우 대칭</button><button id="bresetj">이 관절 원래대로</button></div>';
+      if (S.sel) { var p = jt[S.sel]; h += slider('X', 'px', p.x, (ORIG.joints[S.sel][0] - 0.3).toFixed(3), (ORIG.joints[S.sel][0] + 0.3).toFixed(3), 0.002, '') + slider('Y', 'py', p.y, (ORIG.joints[S.sel][1] - 0.3).toFixed(3), (ORIG.joints[S.sel][1] + 0.3).toFixed(3), 0.002, '') + slider('Z', 'pz', p.z, (ORIG.joints[S.sel][2] - 0.3).toFixed(3), (ORIG.joints[S.sel][2] + 0.3).toFixed(3), 0.002, ''); h += '<div class="sub">단위는 미터예요. 왼쪽은 +X, 위는 +Y, 앞은 +Z. 위치를 바꾸면 그 관절에 붙는 부분의 가중치가 바로 다시 계산돼요.</div>'; }
+      else h += '<p class="sub">관절(노란 점)을 눌러 고른 뒤 위치를 옮겨 보세요. 포즈는 위치를 옮기는 동안 초기화돼요.</p>';
+    } else if (S.tab === 'part') {
+      h += '<div class="sub">모델의 조각을 눌러 고른 뒤 어느 부위에 속하는지 바꾸세요. (잘못 붙은 조각이 팔이나 다리를 따라 움직일 때)</div>';
+      if (S.selPart >= 0) h += '<div class="row"><b>조각 ' + S.selPart + '</b><select id="gsel">' + Object.keys(GN).map(function (g) { return '<option value="' + g + '"' + (grp[S.selPart] === g ? ' selected' : '') + '>' + GN[g] + '</option>'; }).join('') + '</select></div>';
+      h += '<div style="margin-top:6px">' + meta.parts.map(function (pt, i) { return '<div class="pt' + (i === S.selPart ? ' on' : '') + '" data-pi="' + i + '"><span class="sw" style="background:#' + GC[grp[i]].toString(16).padStart(6, '0') + '"></span><b>' + i + '</b><span class="grow">' + GN[grp[i]] + (grp[i] !== ORIG.groups[i] ? ' <span class="warn">(바꿈)</span>' : '') + '</span><span class="sub">' + (pt.vn).toLocaleString() + '점</span></div>'; }).join('') + '</div>';
+    } else {
+      h += '<div class="row"><button class="pri" id="bglb">⬇ 수정한 모델(GLB) 저장</button><button id="bjson">⬇ 관절·묶음(JSON) 저장</button></div>' +
+        '<div class="row"><button id="bimp">JSON 불러오기</button><input type="file" id="fimp" accept=".json,application/json" hidden><button class="dng" id="breset">모두 처음 상태로</button></div>' +
+        '<p class="sub">GLB는 지금 관절 위치와 조각 묶음으로 가중치를 다시 계산한 완성 파일이에요(뼈대 21개 포함). 저장한 GLB 또는 JSON 파일을 그대로 올려 주세요.</p>' +
+        '<p class="sub">바뀐 곳: 관절 ' + changedJoints().length + '개, 조각 ' + changedParts().length + '개</p>';
+    }
+    b.innerHTML = h;
+  }
+  function changedJoints() { return JN.filter(function (n) { return jt[n].distanceTo(new THREE.Vector3().fromArray(ORIG.joints[n])) > 1e-4; }); }
+  function changedParts() { return grp.map(function (g, i) { return g !== ORIG.groups[i] ? i : -1; }).filter(function (i) { return i >= 0; }); }
+  var wt = 0;
+  function rebuild(now) { clearTimeout(wt); wt = setTimeout(function () { placeBones(); placeMarkers(); computeWeights(); bindRest(); applyPose(); }, now ? 0 : 60); }
+
+  $('#body').addEventListener('input', function (e) {
+    var t = e.target, k = t.dataset.k; if (!k) return; var v = parseFloat(t.value); t.nextElementSibling.textContent = k[0] === 'r' ? v + '°' : v.toFixed(3);
+    if (k[0] === 'r') {
+      var ax = 'xyz'.indexOf(k[1]); rot[S.sel][ax] = v; var m = S.sym && MIR(S.sel); if (m && rot[m]) rot[m][ax] = ax === 0 ? v : -v; applyPose();
+    } else {
+      var a = 'xyz'.indexOf(k[1]); jt[S.sel].setComponent(a, v); var m2 = S.sym && MIR(S.sel);
+      if (m2 && jt[m2]) { jt[m2].setComponent(a, a === 0 ? -v : v); }
+      BN.forEach(function (n) { rot[n] = [0, 0, 0]; }); applyPose(); placeBones(); placeMarkers(); rebuild();
+    }
+  });
+  $('#body').addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'jsel') { S.sel = t.value || null; markSel(); render(); }
+    else if (t.id === 'gsel') { grp[S.selPart] = t.value; computeWeights(); paintColors(); render(); }
+    else if (t.id === 'fimp' && t.files[0]) { t.files[0].text().then(function (s) { importJson(JSON.parse(s)); }).catch(function (er) { toast('못 읽었어요: ' + er.message); }); }
+  });
+  $('#body').addEventListener('click', function (e) {
+    var b = e.target.closest('button,.pt'); if (!b) return;
+    if (b.dataset.test !== undefined) {
+      var T = TESTS[+b.dataset.test][1], on = Object.keys(T).every(function (n) { return rot[n].some(function (x, i) { return x === T[n][i] && x !== 0; }); });
+      Object.keys(T).forEach(function (n) { rot[n] = on ? [0, 0, 0] : T[n].slice(); }); applyPose(); return;
+    }
+    if (b.dataset.pi !== undefined) { S.selPart = +b.dataset.pi; paintColors(); markSel(); render(); return; }
+    switch (b.id) {
+      case 'bsym': S.sym = !S.sym; render(); break;
+      case 'bresetpose': BN.forEach(function (n) { rot[n] = [0, 0, 0]; }); applyPose(); render(); break;
+      case 'bresetj': if (S.sel) { jt[S.sel].fromArray(ORIG.joints[S.sel]); var m = MIR(S.sel); if (S.sym && m) jt[m].fromArray(ORIG.joints[m]); rebuild(true); render(); } break;
+      case 'bglb': exportGlb(); break;
+      case 'bjson': exportJson(); break;
+      case 'bimp': $('#fimp').click(); break;
+      case 'breset': JN.forEach(function (n) { jt[n].fromArray(ORIG.joints[n]); }); grp = ORIG.groups.slice(); BN.forEach(function (n) { rot[n] = [0, 0, 0]; }); rebuild(true); paintColors(); render(); toast('처음 상태로 돌렸어요'); break;
+    }
+  });
+  $('#tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return; S.tab = b.dataset.t; [].forEach.call($('#tabs').children, function (x) { x.classList.toggle('on', x === b); });
+    if (S.tab !== 'pose') { BN.forEach(function (n) { rot[n] = [0, 0, 0]; }); applyPose(); }    // 위치·조각을 만지는 동안은 기본 자세
+    markSel(); render();
+  });
+  $('#bSkel').onclick = function () { S.skel = !S.skel; this.setAttribute('aria-pressed', S.skel); markSel(); };
+  $('#bCol').onclick = function () { S.colorBy = !S.colorBy; this.setAttribute('aria-pressed', S.colorBy); paintColors(); };
+  $('#bWire').onclick = function () { S.ghost = !S.ghost; this.setAttribute('aria-pressed', S.ghost); mat.transparent = S.ghost; mat.opacity = S.ghost ? 0.4 : 1; mat.depthWrite = !S.ghost; mat.needsUpdate = true; };
+  $('#bFront').onclick = function () { CAM.az = 0; CAM.el = 0.1; };
+  $('#bSide').onclick = function () { CAM.az = Math.PI / 2; CAM.el = 0.1; };
+
+  /* ---------- 저장 / 불러오기 ---------- */
+  function download(name, blob) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); }
+  function state() { var J = {}; JN.forEach(function (n) { J[n] = jt[n].toArray().map(function (x) { return +x.toFixed(5); }); }); return { rigcheck: 1, joints: J, groups: grp.slice() }; }
+  function exportJson() { download('tripo_rig_fix.json', new Blob([JSON.stringify(state(), null, 1)], { type: 'application/json' })); toast('JSON 저장'); }
+  function importJson(o) {
+    if (!o || !o.joints || !o.groups) throw new Error('이 도구의 JSON이 아니에요');
+    JN.forEach(function (n) { if (o.joints[n]) jt[n].fromArray(o.joints[n]); }); grp = o.groups.slice(0, grp.length); BN.forEach(function (n) { rot[n] = [0, 0, 0]; });
+    rebuild(true); paintColors(); render(); toast('불러왔어요');
+  }
+  function exportGlb() {
+    computeWeights();
+    var nb = bones.length, parts = [];
+    function add(arr) { parts.push(arr); }
+    var posB = new Uint8Array(POS.buffer, POS.byteOffset, POS.byteLength), norB = new Uint8Array(NOR.buffer, NOR.byteOffset, NOR.byteLength);
+    var jB = new Uint8Array(SI.buffer.slice(0)), wB = new Uint8Array(SW.buffer.slice(0)), iB = new Uint8Array(IDX.buffer, IDX.byteOffset, IDX.byteLength);
+    var ibm = new Float32Array(nb * 16); meta.bones.forEach(function (b, i) { var w = jt[b.head]; ibm.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -w.x, -w.y, -w.z, 1], i * 16); });
+    var chunks = [posB, norB, jB, wB, iB, new Uint8Array(ibm.buffer)], offs = [], total = 0;
+    chunks.forEach(function (c) { offs.push(total); total += c.byteLength; total = (total + 3) & ~3; });
+    var bin = new Uint8Array(total); chunks.forEach(function (c, i) { bin.set(c, offs[i]); });
+    var mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9]; for (var v = 0; v < NV; v++) for (var a = 0; a < 3; a++) { var x = POS[v * 3 + a]; if (x < mn[a]) mn[a] = x; if (x > mx[a]) mx[a] = x; }
+    var nodes = meta.bones.map(function (b, i) { var p = bones[i].position; return { name: b.name, translation: [p.x, p.y, p.z] }; });
+    meta.bones.forEach(function (b, i) { if (b.parent) { var pn = nodes[BI[b.parent]]; (pn.children = pn.children || []).push(i); } });
+    nodes.push({ name: 'Tripo_girl', mesh: 0, skin: 0 });
+    var gl = {
+      asset: { version: '2.0', generator: 'rigcheck', extras: { rigcheck: state() } }, scene: 0, scenes: [{ nodes: [BI['Hips'], nb] }], nodes: nodes,
+      meshes: [{ name: 'Tripo_girl', primitives: [{ attributes: { POSITION: 0, NORMAL: 1, JOINTS_0: 2, WEIGHTS_0: 3 }, indices: 4, material: 0 }] }],
+      skins: [{ joints: meta.bones.map(function (b, i) { return i; }), inverseBindMatrices: 5, skeleton: BI['Hips'] }],
+      materials: [{ name: 'material', pbrMetallicRoughness: { baseColorFactor: [0.85, 0.78, 0.72, 1], metallicFactor: 0, roughnessFactor: 0.8 }, doubleSided: true }],
+      accessors: [{ bufferView: 0, componentType: 5126, count: NV, type: 'VEC3', min: mn, max: mx }, { bufferView: 1, componentType: 5126, count: NV, type: 'VEC3' }, { bufferView: 2, componentType: 5123, count: NV, type: 'VEC4' }, { bufferView: 3, componentType: 5126, count: NV, type: 'VEC4' }, { bufferView: 4, componentType: 5125, count: NI, type: 'SCALAR' }, { bufferView: 5, componentType: 5126, count: nb, type: 'MAT4' }],
+      bufferViews: chunks.map(function (c, i) { return { buffer: 0, byteOffset: offs[i], byteLength: c.byteLength, target: i < 4 ? 34962 : i === 4 ? 34963 : undefined }; }),
+      buffers: [{ byteLength: total }]
+    };
+    var js = new TextEncoder().encode(JSON.stringify(gl)), jp = (4 - js.length % 4) % 4, jpad = new Uint8Array(js.length + jp).fill(0x20); jpad.set(js);
+    var out = new Uint8Array(12 + 8 + jpad.length + 8 + total), dv = new DataView(out.buffer);
+    dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, out.length, true); dv.setUint32(12, jpad.length, true); dv.setUint32(16, 0x4E4F534A, true); out.set(jpad, 20);
+    var o = 20 + jpad.length; dv.setUint32(o, total, true); dv.setUint32(o + 4, 0x004E4942, true); out.set(bin, o + 8);
+    download('tripo_rig_fixed.glb', new Blob([out], { type: 'model/gltf-binary' })); toast('GLB 저장 (' + (out.length / 1e6).toFixed(1) + 'MB)');
+  }
+
+  /* ---------- 시작 ---------- */
+  placeBones(); placeMarkers(); computeWeights(); bindRest(); paintColors(); markSel(); render(); resize();
+  $('#load').style.display = 'none';
+  window.__rig = { S: S, jt: jt, grp: function () { return grp; }, rot: rot, applyPose: applyPose, CAM: CAM, exportState: state, mesh: mesh, bones: bones, computeWeights: computeWeights, SI: SI, SW: SW };
+})();
+</script>
+</body>
+</html>

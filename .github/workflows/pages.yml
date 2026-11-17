@@ -13,6 +13,7 @@ on:
       - 'mp3player/**'
       - 'uswsync/**'
       - 'vibelink/**'
+      - 'rigcheck/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
