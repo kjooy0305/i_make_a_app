@@ -23,6 +23,7 @@ i_make_a_app/
 ├── apkextractor/   ← 네이티브 Android 앱 (APK 추출기)
 ├── stickfighter/   ← 네이티브 Android 앱 (스틱맨 애니메이션)
 ├── dayclean/       ← 네이티브 Android 앱 (하루 정리: 기록·정리·회고·장기 목표)
+├── adskip/         ← 유튜브 광고 건너뛰기 (android/ 접근성 앱 + extension/ 브라우저 확장 + userscript/)
 ├── storyeditor/
 │   ├── web/        ← 분기형 이야기 에디터 (웹, 오프라인)
 │   └── test/       ← 엔진 단위 테스트 (node --test test/engine.test.js)
@@ -49,6 +50,7 @@ i_make_a_app/
 | 📦 APK 추출기 | Android | .apk | [다운로드](../../releases?q=apkextractor) |
 | 🥋 Stick Fighter | Android | .apk | [다운로드](../../releases?q=stickfighter) |
 | 📝 하루 정리 | Android | .apk | [다운로드](../../releases?q=dayclean) |
+| ⏭ 광고 건너뛰기 | Android · PC 브라우저 | .apk / 확장 .zip / .user.js | [다운로드](../../releases?q=adskip) · [설명](https://kjooy0305.github.io/i_make_a_app/adskip/) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---

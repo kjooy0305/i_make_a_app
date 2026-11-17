@@ -1,0 +1,82 @@
+name: "[광고 건너뛰기] Build & Release"
+
+on:
+  push:
+    tags:
+      - 'adskip-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $RUNNER_TEMP/release.p12
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x adskip/android/gradlew
+
+      - name: Unit tests + Build Release APK
+        working-directory: adskip/android
+        env:
+          SIGNING_KEY_PATH: ${{ runner.temp }}/release.p12
+          SIGNING_STORE_PASS: ${{ secrets.SIGNING_STORE_PASS }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
+        run: ./gradlew testDebugUnitTest assembleRelease
+
+      - name: Package extension + userscript
+        run: |
+          TAG=${{ github.ref_name }}
+          VER=${TAG#adskip-}
+          mkdir -p dist
+          mv adskip/android/app/build/outputs/apk/release/app-release.apk dist/AdSkip-${VER}.apk
+          node adskip/tools/build-userscript.js
+          cp adskip/userscript/adskip.user.js dist/AdSkip-${VER}.user.js
+          (cd adskip/extension && zip -r ../../dist/AdSkip-extension-${VER}.zip . -x '*.DS_Store')
+          ls -la dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "⏭ 광고 건너뛰기 ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## ⏭ 광고 건너뛰기 (AdSkip)
+
+            유튜브 광고가 뜨면 ‘광고 건너뛰기’ 버튼을 대신 눌러 줍니다. 원리와 자세한 설치법: https://kjooy0305.github.io/i_make_a_app/adskip/
+
+            ### 📱 폰 (Android 8.0 이상) — `AdSkip-*.apk`
+            1. APK 내려받아 설치 (설정 > 보안 > 알 수 없는 앱 허용)
+            2. 앱 열기 → **[접근성 설정 열기]** → **‘광고 건너뛰기 (자동 클릭)’** 켜기
+            3. 안드로이드 13+ 에서 “제한된 설정”이면: 설정 › 애플리케이션 › 광고 건너뛰기 › ⋮ › **제한된 설정 허용** 후 다시 켜기
+            4. 유튜브 앱을 열면 끝
+
+            ### 💻 컴퓨터 (크롬·엣지·웨일·브레이브) — `AdSkip-extension-*.zip`
+            1. zip 압축 풀기
+            2. `chrome://extensions` → 개발자 모드 켜기 → **압축해제된 확장 프로그램을 로드합니다** → 폴더 선택
+
+            ### 🐒 유저스크립트 (파이어폭스·폰 파이어폭스·Tampermonkey) — `AdSkip-*.user.js`
+            Tampermonkey/Violentmonkey 설치 후 파일 열기(또는 https://kjooy0305.github.io/i_make_a_app/adskip/userscript/adskip.user.js)
+
+            ### 원리
+            접근성 서비스가 유튜브 화면의 버튼·글자 트리를 읽어 `skip_ad_button` / ‘광고 건너뛰기’ 버튼을 찾아 클릭(ACTION_CLICK), 안 되면 좌표 탭. 브라우저는 플레이어의 `ad-showing` 신호로 버튼 클릭 + 광고 영상을 끝으로 보내기 + 배너 숨김. 데이터는 어디에도 보내지 않습니다.
+          files: |
+            dist/AdSkip-*.apk
+            dist/AdSkip-extension-*.zip
+            dist/AdSkip-*.user.js
+          draft: false
+          prerelease: false

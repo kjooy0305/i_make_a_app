@@ -14,6 +14,7 @@ on:
       - 'uswsync/**'
       - 'vibelink/**'
       - 'rigcheck/**'
+      - 'adskip/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  어떤 화면 변화를 받아볼지(eventTypes), 화면 내용을 읽고(canRetrieveWindowContent)
+  탭 제스처를 보낼 수 있는지(canPerformGestures)를 시스템에 알리는 설정.
+  packageNames 는 비워 두고 서비스가 켜질 때 사용자 설정에 맞춰 코드에서 넣는다.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewScrolled|typeWindowsChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/service_description"
+    android:notificationTimeout="50"
+    android:settingsActivity="com.kjooy0305.adskip.MainActivity" />

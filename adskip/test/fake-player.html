@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- 유튜브 플레이어 흉내: 광고 중이면 #movie_player 에 ad-showing, 1.5초 뒤 '광고 건너뛰기' 버튼이 뜬다.
+     버튼이 눌리거나 광고 영상이 끝나면 광고가 끝나고 ad-showing 이 빠진다. content.js 검증용. -->
+<html lang="ko"><head><meta charset="utf-8"><title>fake player</title>
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  #movie_player { position: relative; width: 320px; height: 180px; background: #000; }
+  video { width: 320px; height: 180px; }
+  .ytp-ad-skip-button-slot { position: absolute; right: 8px; bottom: 8px; display: none; }
+  .ad-showing .ytp-ad-skip-button-slot.ready { display: block; }
+  .ytp-ad-overlay-close-button { display: none; }
+  ytd-ad-slot-renderer { display: block; background: #fc0; padding: 6px; margin-top: 10px; }
+  #log { white-space: pre; font-size: 12px; margin-top: 10px; }
+</style></head>
+<body>
+<div id="movie_player" class="html5-video-player">
+  <video id="v" muted playsinline></video>
+  <div class="ytp-ad-skip-button-slot"><button class="ytp-skip-ad-button" id="skipbtn"><span>광고 건너뛰기</span></button></div>
+</div>
+<ytd-ad-slot-renderer>배너 광고</ytd-ad-slot-renderer>
+<div id="log"></div>
+<script>
+  var p = document.getElementById('movie_player'), v = document.getElementById('v');
+  var slot = document.querySelector('.ytp-ad-skip-button-slot'), logEl = document.getElementById('log');
+  window.events = [];
+  function log(s) { events.push(s); logEl.textContent += s + '\n'; }
+  var skipTimer = null;
+  function endAd(reason) {
+    if (!p.classList.contains('ad-showing')) return;
+    clearTimeout(skipTimer);
+    slot.classList.remove('ready');
+    p.classList.remove('ad-showing');
+    log('ad-ended:' + reason + ':t=' + v.currentTime.toFixed(1));
+    v.removeAttribute('src'); v.load();
+  }
+  // 광고 시작: 영상 로드, 재생, buttonDelay 뒤 버튼 활성화. buttonDelay=0 이면 버튼 없는 광고.
+  window.startAd = function (buttonDelay) {
+    v.src = 'ad.webm'; v.muted = false; v.currentTime = 0; v.play().catch(function () {});
+    p.classList.add('ad-showing');
+    log('ad-started');
+    if (buttonDelay > 0) skipTimer = setTimeout(function () { slot.classList.add('ready'); log('skip-button-shown'); }, buttonDelay);
+  };
+  document.getElementById('skipbtn').addEventListener('click', function () { log('skip-clicked'); endAd('click'); });
+  v.addEventListener('ended', function () { endAd('ended'); });
+  v.addEventListener('seeked', function () { if (p.classList.contains('ad-showing') && v.duration && v.currentTime >= v.duration - 0.05) endAd('seek-to-end'); });
+</script>
+</body></html>
