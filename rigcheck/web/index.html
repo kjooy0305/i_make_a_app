@@ -109,7 +109,7 @@ select{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
   var SI = new Uint16Array(NV * 4), SW = new Float32Array(NV * 4);
   geo.setAttribute('skinIndex', new THREE.BufferAttribute(SI, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(SW, 4));
   var COL = new Float32Array(NV * 3); geo.setAttribute('color', new THREE.BufferAttribute(COL, 3));
-  var mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.02, side: THREE.DoubleSide });
+  var mat = new THREE.MeshStandardMaterial({ skinning: true, vertexColors: true, roughness: 0.7, metalness: 0.02, side: THREE.DoubleSide });
   var mesh = new THREE.SkinnedMesh(geo, mat); mesh.frustumCulled = false; mesh.add(root);
   var skeleton = new THREE.Skeleton(bones); mesh.skeleton = skeleton; scene.add(mesh);
   var partOfVert = new Uint8Array(NV); meta.parts.forEach(function (p, i) { for (var v = p.v0; v < p.v0 + p.vn; v++) partOfVert[v] = i; });
