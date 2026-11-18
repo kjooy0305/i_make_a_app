@@ -54,6 +54,7 @@
     editing: null,
     filter: { q: '', upper: new Set(), mode: 'or', noDislike: false, sort: 'new' },
     open: new Set(),
+    detail: (function () { try { return localStorage.getItem('ks.detail') === 'full' ? 'full' : 'simple'; } catch (e) { return 'simple'; } })(),
     queue: [],
     running: false,
   };
@@ -140,7 +141,7 @@
     return list.map((k) => {
       const r = (novel.results || {})[k.id];
       const count = r ? r.count : 0;
-      return { kw: k, name: k.name, count, status: E.statusOf(count, k.threshold), segs: r ? r.segs : [], density: E.densityPer10k(count, novel.totalChars) };
+      return { kw: k, name: k.name, count, status: E.statusOf(count, k.threshold), segs: r ? r.segs : [], density: E.densityPer10k(count, novel.totalChars), terms: r ? r.terms : null };
     });
   }
 
@@ -186,7 +187,7 @@
     const matcher = E.buildMatcher(kws);
     const r = await E.scanText(text, matcher, { yieldFn: yieldFor(item) });
     const results = {};
-    kws.forEach((k, i) => { results[k.id] = { count: r.counts[i], segs: r.segs[i], sig: E.termsSignature(k) }; });
+    kws.forEach((k, i) => { results[k.id] = { count: r.counts[i], segs: r.segs[i], terms: r.terms[i], sig: E.termsSignature(k) }; });
     return { totalChars: r.totalChars, results };
   }
   async function processNew(item) {
@@ -360,6 +361,18 @@
     const mx = Math.max.apply(null, segs.concat([1]));
     return '<span class="dist">' + segs.map((v) => '<i class="' + (v ? '' : 'z') + '" style="height:' + Math.max(8, Math.round((v / mx) * 100)) + '%"></i>').join('') + '</span>';
   };
+  // 상세 보기: 상위 키워드 아래에 하위 키워드(이름·유의어)별 등장 횟수
+  function subRows(n, x) {
+    if (!(x.kw.synonyms || []).length) return '';
+    const labels = E.termLabels(x.kw);
+    if (!x.terms || x.terms.length !== labels.length) {
+      return '<tr><td colspan="5" class="dk" style="padding:4px 4px 8px 14px">하위 키워드별 횟수는 재분석하면 볼 수 있어요</td></tr>';
+    }
+    const rows = labels.map((label, i) => ({ label, c: x.terms[i], i }));
+    rows.sort((a, b) => (b.c - a.c) || (a.i - b.i));
+    const mx = Math.max.apply(null, rows.map((r) => r.c).concat([1]));
+    return rows.map((r) => '<tr class="sub' + (r.c ? '' : ' zero') + '"><th scope="row">↳ ' + esc(r.label) + (r.i === 0 ? ' <span class="dk">(이름)</span>' : '') + '</th><td class="num">' + r.c + '회</td><td class="num">' + E.densityPer10k(r.c, n.totalChars).toFixed(2) + '</td><td colspan="2"><div class="bar" style="margin:0"><i style="width:' + Math.round((r.c / mx) * 100) + '%"></i></div></td></tr>').join('');
+  }
   function novelCard(n) {
     const hits = hitsOf(n, S.keywords).filter((h) => h.count > 0);
     const open = S.open.has(n.id);
@@ -376,13 +389,14 @@
     if (isStale(n)) h += '<div class="muted" style="margin-top:6px">⚠️ 키워드가 바뀌어 재분석이 필요해요</div>';
     if (open) {
       h += '<h4>상세</h4>';
+      h += '<div class="seg"><button data-act="detail" data-mode="simple" class="' + (S.detail === 'simple' ? 'on' : '') + '">간단 보기</button><button data-act="detail" data-mode="full" class="' + (S.detail === 'full' ? 'on' : '') + '">상세 보기</button></div>';
       if (hits.length) {
         h += '<div class="dtw"><table class="dt"><colgroup><col style="width:33%"><col style="width:13%"><col style="width:16%"><col style="width:11%"><col style="width:27%"></colgroup><thead><tr><th>키워드</th><th class="num">횟수</th><th class="num">1만자당</th><th class="num">임계</th><th>분포</th></tr></thead><tbody>';
         h += hits.map((x) => {
           const d = E.distributionOf(x.segs);
-          return '<tr><th scope="row">' + esc(x.name) + (x.status ? ' <span class="st ' + x.kw.tone + '">' + x.status + '</span>' : '') + '</th><td class="num">' + x.count + '회</td><td class="num">' + x.density.toFixed(2) + '</td><td class="num">' + x.kw.threshold + '</td><td>' + distHtml(x.segs) + '<div class="dk">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div></td></tr>';
+          return '<tr><th scope="row">' + esc(x.name) + (x.status ? ' <span class="st ' + x.kw.tone + '">' + x.status + '</span>' : '') + '</th><td class="num">' + x.count + '회</td><td class="num">' + x.density.toFixed(2) + '</td><td class="num">' + x.kw.threshold + '</td><td>' + distHtml(x.segs) + '<div class="dk">' + d.kind + (d.kind === '집중' ? ' ' + (d.peak * 10) + '~' + (d.peak * 10 + 10) + '%' : '') + '</div></td></tr>' + (S.detail === 'full' ? subRows(n, x) : '');
         }).join('');
-        h += '</tbody></table></div><div class="muted" style="font-size:11px;margin-top:6px">분포는 소설을 앞에서부터 10칸으로 나눈 구간별 등장 횟수예요. 1만자당은 글자 1만 개당 평균 횟수예요.</div>';
+        h += '</tbody></table></div><div class="muted" style="font-size:11px;margin-top:6px">분포는 소설을 앞에서부터 10칸으로 나눈 구간별 등장 횟수예요. 1만자당은 글자 1만 개당 평균 횟수예요.' + (S.detail === 'full' ? '<br>하위 키워드는 각각 따로 센 값이라, 서로 겹치는 말(예: 회귀 / 회귀했)은 합이 위 횟수보다 클 수 있어요.' : '') + '</div>';
       } else h += '<div class="muted">발견된 키워드가 없어요</div>';
       h += '<div class="row" style="margin-top:10px"><button class="btn sm" data-act="copyname" data-id="' + n.id + '">이름 복사</button><button class="btn sm sec" data-act="rescan" data-id="' + n.id + '">재분석</button><button class="btn sm dng" data-act="del" data-id="' + n.id + '">삭제</button></div>';
     }
@@ -395,7 +409,7 @@
     let h = '<div class="row"><input type="text" class="grow" id="q" placeholder="제목 검색" value="' + esc(f.q) + '"><select id="sort" style="width:auto"><option value="new"' + (f.sort === 'new' ? ' selected' : '') + '>최근순</option><option value="title"' + (f.sort === 'title' ? ' selected' : '') + '>제목순</option></select></div>';
     h += '<div style="margin-top:8px">' + (ups.length ? ups.map((u) => '<span class="chip ' + u.tone + (f.upper.has(u.id) ? ' sel' : '') + '" data-act="fup" data-id="' + u.id + '">' + esc(u.name) + '</span>').join('') : '<span class="muted">키워드 탭에서 키워드를 추가하세요</span>') + '</div>';
     h += '<div class="row" style="margin-top:4px"><label class="ck"><input type="radio" name="mode" value="or"' + (f.mode === 'or' ? ' checked' : '') + '> 하나라도</label><label class="ck"><input type="radio" name="mode" value="and"' + (f.mode === 'and' ? ' checked' : '') + '> 모두 포함</label><label class="ck"><input type="checkbox" id="nod"' + (f.noDislike ? ' checked' : '') + '> 불호 키워드(!) 제외</label></div>';
-    h += '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">이름 복사</button><button class="btn sm" data-act="exporttxt">📄 목록 txt 추출</button>' : '') + '</div>';
+    h += '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">이름 복사</button><button class="btn sm" data-act="exporttxt">📄 목록 txt 추출</button>' : '') + (S.novels.length ? '<button class="btn sm dng" data-act="resetlib">라이브러리 초기화</button>' : '') + '</div>';
     h += list.length ? list.map(novelCard).join('') : '<div class="card muted" style="text-align:center">' + (S.novels.length ? '조건에 맞는 소설이 없어요' : '업로드 탭에서 TXT·ePub 파일을 추가하세요') + '</div>';
     $('#main').innerHTML = h;
   }
@@ -476,6 +490,16 @@
     switch (a.dataset.act) {
       case 'toggle': S.open.has(id) ? S.open.delete(id) : S.open.add(id); renderLib(); break;
       case 'fup': S.filter.upper.has(id) ? S.filter.upper.delete(id) : S.filter.upper.add(id); renderLib(); break;
+      case 'detail': S.detail = a.dataset.mode === 'full' ? 'full' : 'simple'; try { localStorage.setItem('ks.detail', S.detail); } catch (err) { /* 무시 */ } renderLib(); break;
+      case 'resetlib': {
+        if (!S.novels.length) break;
+        const q = S.queue.filter((x) => x.status === '대기' || x.status === '진행').length;
+        if (await ask('라이브러리의 소설 ' + S.novels.length + '개와 분석 결과를 모두 삭제할까요? 키워드는 그대로 남아요. 되돌릴 수 없어요.' + (q ? ' 대기 중인 파일 ' + q + '개는 계속 처리돼요.' : ''), '모두 삭제')) {
+          for (const n of S.novels) { await DB.del('novels', n.id); await DB.del('texts', n.id); }
+          S.novels = []; S.open.clear(); render(); toast('라이브러리를 초기화했어요');
+        }
+        break;
+      }
       case 'copyname': { const n = S.novels.find((x) => x.id === id); if (n) copyText(n.title); break; }
       case 'exporttxt': exportListTxt(); break;
       case 'copyall': copyText(filteredNovels().map((n) => n.title).join('\n')); break;

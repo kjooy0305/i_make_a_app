@@ -20,6 +20,16 @@
     });
     return out;
   }
+  // termsOf 와 같은 순서의 화면 표시용 이름 (이름, 유의어...). 하위 키워드별 횟수를 보여줄 때 쓴다.
+  function termLabels(kw) {
+    const out = [];
+    const seen = new Set();
+    [kw.name].concat(kw.synonyms || []).forEach((t) => {
+      const n = normalizeTerm(t);
+      if (n && !seen.has(n)) { seen.add(n); out.push(String(t).trim()); }
+    });
+    return out;
+  }
   function normalizeTerm(t) {
     return String(t || '').toLowerCase().replace(/[\s 　​﻿]+/g, '');
   }
@@ -32,7 +42,7 @@
     const nodes = [{ next: new Map(), fail: 0, out: null }];
     const ids = keywords.map((k) => k.id);
     keywords.forEach((kw, idx) => {
-      termsOf(kw).forEach((term) => {
+      termsOf(kw).forEach((term, ti) => {
         let cur = 0;
         for (let i = 0; i < term.length; i++) {
           const ch = term[i];
@@ -44,7 +54,7 @@
           }
           cur = nx;
         }
-        (nodes[cur].out || (nodes[cur].out = [])).push([idx, term.length]);
+        (nodes[cur].out || (nodes[cur].out = [])).push([idx, term.length, ti]);
       });
     });
     // fail 링크 (BFS) + 출력 병합(긴 것 우선)
@@ -66,7 +76,7 @@
         nodes[cur].out = merged;
       }
     }
-    return { nodes, ids, size: keywords.length };
+    return { nodes, ids, size: keywords.length, termLens: keywords.map((k) => termsOf(k).length) };
   }
 
   /* ---------- 본문 스캔 (1회 통과, 줄 단위, 공백 무시, 대소문자 무시) ---------- */
@@ -77,6 +87,9 @@
     const segs = [];
     for (let i = 0; i < n; i++) segs.push(new Array(SEGMENTS).fill(0));
     const lastEnd = new Array(n).fill(-1);
+    // 하위 키워드(이름·유의어)별 횟수: 각 말을 따로 센다 (키워드 합계와 달리 서로 겹쳐도 각각 센다)
+    const termCounts = matcher.termLens.map((len) => new Array(len).fill(0));
+    const termEnd = matcher.termLens.map((len) => new Array(len).fill(-1));
     const lines = text.split(/\r\n|\r|\n/);
 
     let total = 0;
@@ -84,7 +97,7 @@
       const s = lines[li];
       for (let i = 0; i < s.length; i++) if (!isSpace(s.charCodeAt(i))) total++;
     }
-    if (!total) return { totalChars: 0, ids: matcher.ids, counts, segs };
+    if (!total) return { totalChars: 0, ids: matcher.ids, counts, segs, terms: termCounts };
 
     const nodes = matcher.nodes;
     let pos = 0;
@@ -105,6 +118,8 @@
           for (let k = 0; k < out.length; k++) {
             const idx = out[k][0];
             const start = pos - out[k][1];
+            const ti = out[k][2];
+            if (start >= termEnd[idx][ti]) { termEnd[idx][ti] = pos; termCounts[idx][ti]++; }
             if (start >= lastEnd[idx]) { // 같은 키워드의 동의어끼리 겹치면 1회만 센다
               lastEnd[idx] = pos;
               counts[idx]++;
@@ -120,7 +135,7 @@
         }
       }
     }
-    return { totalChars: total, ids: matcher.ids, counts, segs };
+    return { totalChars: total, ids: matcher.ids, counts, segs, terms: termCounts };
   }
 
   /* ---------- 결과 해석: 임계값 → (!)/(?) ---------- */
@@ -339,7 +354,7 @@
   }
 
   return {
-    SEGMENTS, termsOf, termsSignature, buildMatcher, scanText,
+    SEGMENTS, termsOf, termLabels, termsSignature, buildMatcher, scanText,
     statusOf, densityPer10k, distributionOf, tagFileName,
     baseTitle, normalizeTitle, titleSimilarity, findSimilar,
     decodeText, htmlToText, epubToText, fileToText,
