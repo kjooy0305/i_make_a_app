@@ -81,6 +81,20 @@ function assert(c, m) { if (!c) { console.error('FAIL: ' + m); process.exitCode 
   assert(playing, '멈춘 영상이 다시 재생됨');
   await page.evaluate(() => { const v = document.getElementById('v'); v.pause(); v.removeAttribute('src'); v.load(); });
 
+  // 2c) 뒤에 있는 탭 흉내: 타이머를 전부 얼려도(setTimeout/setInterval 무력화) 창이 뜨는 DOM 변화만으로 [예]가 눌려야 한다
+  await page.waitForTimeout(1700); // 같은 창을 1.5초 안에 두 번 누르지 않는 보호 간격이 지나도록
+  await page.evaluate(() => { window.events.length = 0; window.__origST = window.setTimeout; window.setTimeout = function () { return 0; }; });
+  await page.evaluate(() => { const v = document.getElementById('v'); v.src = 'ad.webm'; v.play().catch(function(){}); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { const v = document.getElementById('v'); v.pause(); document.getElementById('pausedlg').style.display = 'block'; window.events.push('pause-dialog-shown'); });
+  await page.waitForTimeout(300);
+  ev = await page.evaluate(() => window.events);
+  console.log('   events:', ev.join(' | '));
+  assert(ev.includes('pause-dialog-yes'), '타이머가 잠든 탭에서도 DOM 변화만으로 [예]가 눌림');
+  const playing2 = await page.evaluate(() => !document.getElementById('v').paused);
+  assert(playing2, '타이머 없이도 바로 재생 재개');
+  await page.evaluate(() => { window.setTimeout = window.__origST; const v = document.getElementById('v'); v.pause(); v.removeAttribute('src'); v.load(); });
+
   // 3) 꺼짐 상태에서는 아무것도 안 함
   await page.evaluate(() => { window.events.length = 0; window.__adskip.setConfig({ enabled: false }); });
   await page.evaluate(() => window.startAd(500));

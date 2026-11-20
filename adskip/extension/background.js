@@ -59,3 +59,15 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     .catch(function (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); });
   return true;
 });
+
+/* 보험: 30초마다 모든 탭에 '한 번 살펴봐' 신호. 유튜브가 아닌 탭은 받을 사람이 없어 오류가 나지만 무시한다.
+ * (뒤에 있는 탭은 setInterval 이 1분까지 늦어질 수 있어, 타이머가 아닌 메시지로 깨운다.) */
+chrome.alarms.create('adskip-poke', { periodInMinutes: 0.5 });
+chrome.alarms.onAlarm.addListener(function (a) {
+  if (a.name !== 'adskip-poke') return;
+  chrome.tabs.query({}, function (tabs) {
+    (tabs || []).forEach(function (t) {
+      try { chrome.tabs.sendMessage(t.id, { type: 'poke' }, function () { void chrome.runtime.lastError; }); } catch (e) {}
+    });
+  });
+});

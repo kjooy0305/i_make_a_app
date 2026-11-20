@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         광고 건너뛰기 (AdSkip)
 // @namespace    https://kjooy0305.github.io/i_make_a_app/adskip/
-// @version      1.3.1
+// @version      1.4.0
 // @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다.
 // @author       kjooy0305
 // @match        *://www.youtube.com/*
@@ -221,6 +221,8 @@
           (inner || b).click();
           lastResumeAt = now;
           var v = document.querySelector('#movie_player video, .html5-video-player video, video');
+          // 뒤에 있는 탭은 타이머가 1초~1분까지 늦어지므로 바로 한 번, 그리고 잠시 뒤 한 번 더 재생을 건다
+          try { if (v && v.paused && !v.ended) v.play(); } catch (e) {}
           setTimeout(function () { try { if (v && v.paused && !v.ended) v.play(); } catch (e) {} }, 300);
           showBadge('멈춘 영상 이어서 재생');
           return true;
@@ -269,18 +271,30 @@
     applyCss();
     // 점검은 아무리 바빠도 100ms 에 한 번. (예전엔 DOM 이 바뀔 때마다 rAF 로 돌려서 탭이 앞에 있으면
     // 유튜브가 버벅이고 광고 타이머까지 멈췄다. 뒤에 있으면 rAF 가 안 돌아 오히려 잘 됐던 이유.)
-    var tickTimer = null, lastTick = 0;
+    var tickTimer = null, lastTick = 0, inTick = false;
+    function runTick() {
+      if (inTick) return;
+      inTick = true; lastTick = Date.now();
+      try { tick(); } finally { inTick = false; }
+    }
     function requestTick() {
+      // 100ms 이상 지났으면 타이머 없이 지금 바로 돈다. 뒤에 있는 탭은 타이머가 1초~1분까지 늦어지지만
+      // MutationObserver 는 바로 불리므로, "이어서 시청하시겠어요?" 창이 뜨는 그 변화에서 곧장 눌린다.
+      if (Date.now() - lastTick >= 100) { if (tickTimer) { clearTimeout(tickTimer); tickTimer = null; } runTick(); return; }
       if (tickTimer) return;
-      var wait = Math.max(0, 100 - (Date.now() - lastTick));
-      tickTimer = setTimeout(function () { tickTimer = null; lastTick = Date.now(); tick(); }, wait);
+      tickTimer = setTimeout(function () { tickTimer = null; runTick(); }, 100 - (Date.now() - lastTick));
     }
     var mo = new MutationObserver(requestTick);
+    // 확장의 배경 워커가 30초마다 찔러 주는 보험 (타이머가 완전히 잠든 탭 대비)
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage && chrome.runtime.id) {
+      try { chrome.runtime.onMessage.addListener(function (msg) { if (msg && msg.type === 'poke') runTick(); }); } catch (e) {}
+    }
     function observe() {
       if (document.documentElement) mo.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class', 'style'], childList: true });
     }
     observe();
     setInterval(requestTick, 300);
+    document.addEventListener('visibilitychange', requestTick);
     document.addEventListener('yt-navigate-finish', function () { setTimeout(requestTick, 100); });
     // 유저스크립트 / 테스트용 공개 API (설정 바꾸기, 상태 보기)
     window.__adskip = {
