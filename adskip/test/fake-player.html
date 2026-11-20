@@ -16,8 +16,9 @@
 <div id="movie_player" class="html5-video-player">
   <video id="v" muted playsinline></video>
   <div class="ytp-ad-skip-button-slot"><button class="ytp-skip-ad-button" id="skipbtn"><span>광고 건너뛰기</span></button></div>
+  <!-- 실제 유튜브처럼 종료 화면 버튼도 플레이어 안에 있다 -->
+  <div class="ytp-ad-module"><div id="endcard" style="display:none;position:absolute;left:8px;top:8px;color:#fff">광고 종료 화면 <button class="ytp-skip-ad-button" id="endskip"><div class="ytp-skip-ad-button__text">건너뛰기</div></button></div></div>
 </div>
-<div id="endcard" style="display:none;border:1px solid #000;padding:8px;margin-top:6px">광고 종료 화면 <button class="ytp-skip-ad-button" id="endskip"><div class="ytp-skip-ad-button__text">건너뛰기</div></button></div>
 <ytd-ad-slot-renderer>배너 광고</ytd-ad-slot-renderer>
 <tp-yt-paper-dialog id="pausedlg" style="display:none;position:fixed;top:40px;left:40px;background:#fff;border:1px solid #000;padding:12px">
   <yt-confirm-dialog-renderer>

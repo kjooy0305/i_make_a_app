@@ -24,23 +24,37 @@ function detach(target) {
   return new Promise(function (resolve) { chrome.debugger.detach(target, function () { void chrome.runtime.lastError; resolve(); }); });
 }
 
-async function trustedClick(tabId, x, y) {
+var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+/* 콘텐츠 스크립트가 표식을 붙여 둔 버튼의 '지금' 화면 위치. 디버거가 붙으면 위에 띠가 생겨 화면이 내려오므로 붙은 뒤에 잰다. */
+var POS_EXPR = "(function(){var e=document.querySelector('[data-adskip-target]');if(!e)return null;" +
+  "var r=e.getBoundingClientRect();var cs=getComputedStyle(e);" +
+  "if(r.width===0||r.height===0||cs.display==='none'||cs.visibility==='hidden')return null;" +
+  "return {x:r.left+r.width/2,y:r.top+r.height/2};})()";
+
+async function trustedClick(tabId) {
   var target = { tabId: tabId };
   await attach(target);
   try {
-    await send(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: x, y: y });
-    await send(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: x, y: y, button: 'left', clickCount: 1 });
-    await send(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: x, y: y, button: 'left', clickCount: 1 });
+    await sleep(60);
+    for (var attempt = 0; attempt < 3; attempt++) {
+      var res = await send(target, 'Runtime.evaluate', { expression: POS_EXPR, returnByValue: true });
+      var pos = res && res.result && res.result.value;
+      if (!pos) return attempt > 0; // 버튼이 사라졌으면 (앞선 클릭이 먹었으면) 끝
+      await send(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: pos.x, y: pos.y });
+      await send(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
+      await send(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
+      await sleep(150); // 띠가 뜨며 화면이 밀렸으면 다음 번엔 새 좌표로
+    }
+    return true;
   } finally {
     await detach(target);
   }
-  return true;
 }
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (!msg || msg.type !== 'trustedClick' || !sender.tab) return;
   var tabId = sender.tab.id;
-  queue = queue.then(function () { return trustedClick(tabId, msg.x, msg.y); })
+  queue = queue.then(function () { return trustedClick(tabId); })
     .then(function () { sendResponse({ ok: true }); })
     .catch(function (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); });
   return true;

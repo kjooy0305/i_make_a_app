@@ -70,15 +70,21 @@
    * 그래서 확장(크롬 계열)에서는 배경 워커에 부탁해 디버거 API 로 '진짜' 마우스 클릭을 버튼 가운데 좌표에 보낸다.
    * 파이어폭스·유저스크립트에는 그런 길이 없어 element.click() 만 하고(안 먹을 수 있음), 대신 빨리감기로 끝낸다. */
   var canTrusted = typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function' && !!chrome.runtime.id && window.top === window;
+  var trustedBusy = false;
   function pressButton(el) {
     try { el.click(); } catch (e) {}
-    if (!canTrusted) return;
-    var r = el.getBoundingClientRect();
-    var x = r.left + r.width / 2, y = r.top + r.height / 2;
-    if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return;
+    if (!canTrusted || trustedBusy) return;
+    // 좌표는 여기서 재지 않는다. 디버거가 붙는 순간 크롬 위에 "디버깅 중" 띠가 생기며 화면이 아래로 밀리므로,
+    // 배경 워커가 붙은 뒤에 이 표식(data-adskip-target)을 가진 요소의 위치를 다시 재서 누른다.
+    var old = document.querySelectorAll('[data-adskip-target]');
+    for (var i = 0; i < old.length; i++) old[i].removeAttribute('data-adskip-target');
+    el.setAttribute('data-adskip-target', '1');
+    trustedBusy = true;
+    var done = function () { trustedBusy = false; try { el.removeAttribute('data-adskip-target'); } catch (e) {} };
+    var guard = setTimeout(done, 3000);
     try {
-      chrome.runtime.sendMessage({ type: 'trustedClick', x: x, y: y }, function (res) { void chrome.runtime.lastError; });
-    } catch (e) {}
+      chrome.runtime.sendMessage({ type: 'trustedClick' }, function (res) { void chrome.runtime.lastError; clearTimeout(guard); done(); });
+    } catch (e) { clearTimeout(guard); done(); }
   }
 
   /* 건너뛰기 버튼을 셀렉터 → 글자 순서로 찾아 클릭. (접근성 서비스의 아이디 → 글자 순서와 같다) */
@@ -93,8 +99,9 @@
       var a = b.getAttribute('aria-label') || '';
       if ((SKIP_TEXT.test(t) || SKIP_TEXT.test(a)) && visible(b)) { pressButton(b); return 'text'; }
     }
-    // 글자만 있고 button 이 아닌 요소(div/span)면 가장 가까운 클릭 가능한 조상을 누른다
-    var all = scope.querySelectorAll('div, span');
+    // 글자만 있고 button 이 아닌 요소(div/span)면 가장 가까운 클릭 가능한 조상을 누른다 (광고 UI 안쪽만 훑는다: 비용)
+    var adUi = scope.querySelector('.ytp-ad-module, .video-ads, .ytp-skip-ad, .ytp-ad-skip-button-slot');
+    var all = (adUi || (scope === document ? null : scope) || { querySelectorAll: function () { return []; } }).querySelectorAll('div, span');
     for (var k = 0; k < all.length; k++) {
       var el = all[k];
       if (el.childElementCount === 0 && SKIP_TEXT.test((el.textContent || '').trim()) && visible(el)) {
@@ -215,7 +222,7 @@
     // 건너뛰기 버튼은 광고 표시(ad-showing)가 빠진 종료 화면에도 남아 있을 수 있으니 상태와 상관없이 보이면 누른다.
     var now = Date.now();
     var how = null;
-    if (now - lastClickAt > 800) { how = clickSkip(p) || clickSkip(document); if (how) lastClickAt = now; }
+    if (now - lastClickAt > 800) { how = clickSkip(p); if (how) lastClickAt = now; }
     if (ad) {
       if (!inAd) { inAd = true; acted = false; }
       if (!how && cfg.fastForward) { if (fastForward(p)) how = 'seek'; }
@@ -241,18 +248,21 @@
     cfg = Object.assign({}, DEFAULTS, c || {});
     stats = Object.assign({ count: 0 }, s || {});
     applyCss();
-    var pending = false;
-    var mo = new MutationObserver(function () {
-      if (pending) return;
-      pending = true;
-      requestAnimationFrame(function () { pending = false; tick(); });
-    });
+    // 점검은 아무리 바빠도 100ms 에 한 번. (예전엔 DOM 이 바뀔 때마다 rAF 로 돌려서 탭이 앞에 있으면
+    // 유튜브가 버벅이고 광고 타이머까지 멈췄다. 뒤에 있으면 rAF 가 안 돌아 오히려 잘 됐던 이유.)
+    var tickTimer = null, lastTick = 0;
+    function requestTick() {
+      if (tickTimer) return;
+      var wait = Math.max(0, 100 - (Date.now() - lastTick));
+      tickTimer = setTimeout(function () { tickTimer = null; lastTick = Date.now(); tick(); }, wait);
+    }
+    var mo = new MutationObserver(requestTick);
     function observe() {
-      if (document.documentElement) mo.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true });
+      if (document.documentElement) mo.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['class', 'style'], childList: true });
     }
     observe();
-    setInterval(tick, 300);
-    document.addEventListener('yt-navigate-finish', function () { setTimeout(tick, 100); });
+    setInterval(requestTick, 300);
+    document.addEventListener('yt-navigate-finish', function () { setTimeout(requestTick, 100); });
     // 유저스크립트 / 테스트용 공개 API (설정 바꾸기, 상태 보기)
     window.__adskip = {
       tick: tick,
