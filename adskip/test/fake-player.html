@@ -17,6 +17,7 @@
   <video id="v" muted playsinline></video>
   <div class="ytp-ad-skip-button-slot"><button class="ytp-skip-ad-button" id="skipbtn"><span>광고 건너뛰기</span></button></div>
 </div>
+<div id="endcard" style="display:none;border:1px solid #000;padding:8px;margin-top:6px">광고 종료 화면 <button class="ytp-skip-ad-button" id="endskip"><div class="ytp-skip-ad-button__text">건너뛰기</div></button></div>
 <ytd-ad-slot-renderer>배너 광고</ytd-ad-slot-renderer>
 <tp-yt-paper-dialog id="pausedlg" style="display:none;position:fixed;top:40px;left:40px;background:#fff;border:1px solid #000;padding:12px">
   <yt-confirm-dialog-renderer>
@@ -38,6 +39,11 @@
     p.classList.remove('ad-showing');
     log('ad-ended:' + reason + ':t=' + v.currentTime.toFixed(1));
     v.removeAttribute('src'); v.load();
+    if (reason !== 'click' && window.endCardMode) {
+      // 유튜브처럼: 광고 표시는 빠졌지만 종료 화면에 '건너뛰기' 버튼이 2초간 남는다
+      endcard.style.display = 'block'; log('endcard-shown');
+      setTimeout(function () { if (endcard.style.display !== 'none') { endcard.style.display = 'none'; log('endcard-timeout'); } }, 2000);
+    }
   }
   // 광고 시작: 영상 로드, 재생, buttonDelay 뒤 버튼 활성화. buttonDelay=0 이면 버튼 없는 광고.
   window.startAd = function (buttonDelay) {
@@ -47,6 +53,8 @@
     if (buttonDelay > 0) skipTimer = setTimeout(function () { slot.classList.add('ready'); log('skip-button-shown'); }, buttonDelay);
   };
   // 일시중지 확인 창 흉내: 영상을 멈추고 창을 띄운다. [예] → 창 닫힘(영상은 그대로 멈춘 채; 유튜브처럼), [아니요] → 로그만
+  var endcard = document.getElementById('endcard');
+  document.getElementById('endskip').addEventListener('click', function () { endcard.style.display = 'none'; log('endcard-skip-clicked'); });
   var dlg = document.getElementById('pausedlg');
   window.showPauseDialog = function () { v.src = 'ad.webm'; v.play().catch(function(){}); setTimeout(function(){ v.pause(); dlg.style.display = 'block'; log('pause-dialog-shown'); }, 300); };
   dlg.querySelector('#confirm-button button').addEventListener('click', function () { dlg.style.display = 'none'; log('pause-dialog-yes'); });

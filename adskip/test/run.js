@@ -58,6 +58,17 @@ function assert(c, m) { if (!c) { console.error('FAIL: ' + m); process.exitCode 
   stats = await page.evaluate(() => window.__adskip.getStats());
   assert(stats.count === 2, '건너뛴 횟수 2 (실제 ' + stats.count + ')');
 
+
+  // 2a) 영상을 끝으로 보낸 뒤 뜨는 종료 화면의 '건너뛰기' 버튼(광고 표시 없음)도 누른다
+  await page.evaluate(() => { window.events.length = 0; window.endCardMode = true; });
+  await page.evaluate(() => window.startAd(0));
+  await page.waitForFunction(() => window.events.includes('endcard-skip-clicked') || window.events.includes('endcard-timeout'), null, { timeout: 8000 }).catch(() => {});
+  ev = await page.evaluate(() => window.events);
+  console.log('   events:', ev.join(' | '));
+  assert(ev.includes('endcard-shown') && ev.includes('endcard-skip-clicked') && !ev.includes('endcard-timeout'), '종료 화면의 건너뛰기 버튼을 자동으로 누름');
+  await page.evaluate(() => { window.endCardMode = false; });
+  await page.waitForTimeout(500);
+
   // 2b) '이어서 시청하시겠어요?' 창 → [예] 누르고 재생 재개
   await page.evaluate(() => { window.events.length = 0; });
   await page.evaluate(() => window.showPauseDialog());

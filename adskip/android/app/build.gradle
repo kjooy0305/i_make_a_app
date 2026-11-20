@@ -11,8 +11,8 @@ android {
         applicationId "com.kjooy0305.adskip"
         minSdk 26
         targetSdk 34
-        versionCode 110
-        versionName "1.1.0"
+        versionCode 120
+        versionName "1.2.0"
     }
 
     signingConfigs {

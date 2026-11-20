@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         광고 건너뛰기 (AdSkip)
 // @namespace    https://kjooy0305.github.io/i_make_a_app/adskip/
-// @version      1.1.0
+// @version      1.2.0
 // @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다.
 // @author       kjooy0305
 // @match        *://www.youtube.com/*
@@ -72,13 +72,15 @@
     var r = el.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) return false;
     var cs = getComputedStyle(el);
-    return cs.visibility !== 'hidden' && cs.display !== 'none' && cs.pointerEvents !== 'none';
+    // pointer-events:none 이어도 JS click() 은 먹으므로 보지 않는다. 투명(opacity 0)은 아직 뜨는 중이라 다음 틱에 다시 본다.
+    return cs.visibility !== 'hidden' && cs.display !== 'none' && parseFloat(cs.opacity || '1') > 0.05;
   }
 
   var SKIP_SEL = [
     '.ytp-skip-ad-button', '.ytp-ad-skip-button', '.ytp-ad-skip-button-modern',
     '.ytp-ad-skip-button-slot button', '.ytp-ad-skip-button-container button',
-    '.videoAdUiSkipButton', 'button[id^="skip-button"]'
+    '.videoAdUiSkipButton', 'button[id^="skip-button"]',
+    'button[class*="skip-ad"]', 'button[class*="ad-skip"]', 'button[class*="skip_ad"]', '[class*="skip-button"] button'
   ].join(',');
   var SKIP_TEXT = /^(광고\s*건너뛰기|건너뛰기|skip\s*ads?|skip)$/i;
   var OVERLAY_SEL = '.ytp-ad-overlay-close-button, .ytp-ad-overlay-close-container, .ytp-ad-overlay-close-container button';
@@ -88,12 +90,22 @@
     var scope = p || document;
     var list = scope.querySelectorAll(SKIP_SEL);
     for (var i = 0; i < list.length; i++) if (visible(list[i])) { list[i].click(); return 'button'; }
-    var btns = scope.querySelectorAll('button, [role="button"]');
+    var btns = scope.querySelectorAll('button, [role="button"], .ytp-button');
     for (var j = 0; j < btns.length; j++) {
       var b = btns[j];
       var t = (b.textContent || '').trim();
       var a = b.getAttribute('aria-label') || '';
       if ((SKIP_TEXT.test(t) || SKIP_TEXT.test(a)) && visible(b)) { b.click(); return 'text'; }
+    }
+    // 글자만 있고 button 이 아닌 요소(div/span)면 가장 가까운 클릭 가능한 조상을 누른다
+    var all = scope.querySelectorAll('div, span');
+    for (var k = 0; k < all.length; k++) {
+      var el = all[k];
+      if (el.childElementCount === 0 && SKIP_TEXT.test((el.textContent || '').trim()) && visible(el)) {
+        var target = el.closest('button, [role="button"], a, [onclick], .ytp-button') || el;
+        target.click();
+        return 'text';
+      }
     }
     return null;
   }
@@ -201,14 +213,16 @@
     var p = player();
     if (!p) return;
     var ad = isAd(p);
+    // 건너뛰기 버튼은 광고 표시(ad-showing)가 빠진 종료 화면에도 남아 있을 수 있으니 상태와 상관없이 보이면 누른다.
+    var now = Date.now();
+    var how = null;
+    if (now - lastClickAt > 800) { how = clickSkip(p) || clickSkip(document); if (how) lastClickAt = now; }
     if (ad) {
       if (!inAd) { inAd = true; acted = false; }
-      var now = Date.now();
-      var how = null;
-      if (now - lastClickAt > 800) { how = clickSkip(p); if (how) lastClickAt = now; }
       if (!how && cfg.fastForward) { if (fastForward(p)) how = 'seek'; }
       if (how) acted = true;
     } else {
+      if (how && !inAd) { stats.count = (stats.count || 0) + 1; store.saveStats(); showBadge('광고 건너뜀 · ' + stats.count + '회'); }
       if (inAd) {
         inAd = false;
         restoreAudio(p);
