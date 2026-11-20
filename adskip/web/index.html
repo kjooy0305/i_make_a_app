@@ -50,7 +50,7 @@
   </header>
 
   <div class="btns">
-    <a class="btn primary" href="https://github.com/kjooy0305/i_make_a_app/releases/tag/adskip-v1.2.0">📱 폰용 APK · 💻 확장 프로그램 내려받기</a>
+    <a class="btn primary" href="https://github.com/kjooy0305/i_make_a_app/releases/tag/adskip-v1.3.0">📱 폰용 APK · 💻 확장 프로그램 내려받기</a>
     <a class="btn" href="userscript/adskip.user.js">🐒 유저스크립트 (Tampermonkey용)</a>
   </div>
   <p class="sub">전부 화면 안에서만 동작하고 어디에도 데이터를 보내지 않습니다. 인터넷 권한도 없습니다. 개인용으로만 쓰세요.</p>
@@ -94,8 +94,9 @@
   <p>여기서 만든 폰 앱은 이 방식을 그대로 옮긴 것이고(캐시 적립·광고 SDK 없이 스킵 기능만), <b>컴퓨터용은 같은 생각을 웹에 옮긴 것</b>입니다. 브라우저에서는 접근성 트리 대신 HTML DOM 을 읽을 수 있어 더 많이 할 수 있어요.</p>
   <ul>
     <li>유튜브 플레이어는 광고 중에 <code>ad-showing</code> 클래스를 붙입니다. 그걸 신호로 삼습니다.</li>
-    <li>‘건너뛰기’ 버튼(<code>.ytp-skip-ad-button</code> 등)이 보이면 광고 중이든 종료 화면이든 바로 누릅니다.</li>
-    <li>버튼이 아직 없거나 건너뛸 수 없는 광고는 광고 <code>&lt;video&gt;</code>의 재생 위치를 끝으로 보내 바로 끝냅니다. 광고 중엔 잠깐 음소거했다가 되돌립니다.</li>
+    <li>‘건너뛰기’ 버튼(<code>.ytp-skip-ad-button</code>)이 보이면 바로 누릅니다. 단, 유튜브는 스크립트가 만든 클릭(<code>isTrusted=false</code>)을 이 버튼에서 무시하므로, 크롬 계열 확장은 배경 워커가 <b>디버거 API(<code>Input.dispatchMouseEvent</code>)로 진짜 마우스 클릭</b>을 버튼 좌표에 보냅니다. 그래서 누르는 순간 크롬 위에 “광고 건너뛰기가 이 브라우저를 디버깅하기 시작했습니다” 띠가 잠깐 보입니다. 정상입니다.</li>
+    <li>버튼이 아직 없거나 건너뛸 수 없는 광고는 광고 <code>&lt;video&gt;</code>를 16배속으로 돌리고 재생 위치를 <b>끝 직전</b>으로 보내 0.5~1.5초 안에 끝냅니다. (정확히 끝으로 보내면 유튜브가 빈 화면으로 광고 시간을 다 채울 때까지 붙잡아 둡니다. 1.2 까지의 증상이 이것.) 광고 중엔 잠깐 음소거했다가 되돌립니다.</li>
+    <li>파이어폭스·유저스크립트에는 진짜 클릭을 보낼 길이 없어 빨리감기로만 끝냅니다.</li>
     <li>배너·추천 광고 칸은 CSS 로 숨깁니다.</li>
     <li>한참 틀어 두면 뜨는 <b>“동영상이 일시중지되었습니다. 이어서 시청하시겠어요?”</b> 창(<code>yt-confirm-dialog</code>)도 같은 방법으로 [예]를 찾아 누르고, 멈춘 영상을 다시 재생합니다. (팝업 설정에서 끌 수 있음)</li>
   </ul>
@@ -104,7 +105,7 @@
   <div class="card">
     <h3>설치</h3>
     <ol>
-      <li><a href="https://github.com/kjooy0305/i_make_a_app/releases/tag/adskip-v1.2.0">릴리즈 페이지</a>에서 <code>AdSkip-v1.2.0.apk</code> 내려받아 설치 (알 수 없는 앱 허용 필요).</li>
+      <li><a href="https://github.com/kjooy0305/i_make_a_app/releases/tag/adskip-v1.3.0">릴리즈 페이지</a>에서 <code>AdSkip-v1.3.0.apk</code> 내려받아 설치 (알 수 없는 앱 허용 필요).</li>
       <li>앱을 열고 <b>[접근성 설정 열기]</b> → 목록에서 <b>‘광고 건너뛰기 (자동 클릭)’</b> 켜기.</li>
       <li>안드로이드 13 이상에서 “제한된 설정”이라며 못 켜게 하면: <b>설정 › 애플리케이션 › 광고 건너뛰기 › 오른쪽 위 ⋮ › 제한된 설정 허용</b> 을 누른 뒤 다시 켭니다. (앱 안의 [앱 정보 열기] 버튼으로 바로 갑니다.)</li>
       <li>유튜브 앱을 열면 끝. 광고 건너뛰기 버튼이 뜨는 순간 자동으로 눌립니다.</li>
@@ -122,7 +123,7 @@
   <div class="card">
     <h3>크롬 계열 (크롬·엣지·웨일·브레이브)</h3>
     <ol>
-      <li><a href="https://github.com/kjooy0305/i_make_a_app/releases/tag/adskip-v1.2.0">릴리즈 페이지</a>에서 <code>AdSkip-extension-v1.2.0.zip</code> 내려받아 압축 풀기.</li>
+      <li><a href="https://github.com/kjooy0305/i_make_a_app/releases/tag/adskip-v1.3.0">릴리즈 페이지</a>에서 <code>AdSkip-extension-v1.3.0.zip</code> 내려받아 압축 풀기.</li>
       <li>주소창에 <code>chrome://extensions</code> (엣지는 <code>edge://extensions</code>, 웨일은 <code>whale://extensions</code>) 입력.</li>
       <li>오른쪽 위 <b>개발자 모드</b> 켜기 → <b>압축해제된 확장 프로그램을 로드합니다</b> → 압축 푼 폴더 선택.</li>
       <li>유튜브를 열면 끝. 툴바 아이콘을 누르면 건너뛴 횟수와 설정이 나옵니다.</li>
@@ -149,7 +150,7 @@
   <h2>무엇이 어디서 되나</h2>
   <table>
     <tr><th></th><th>폰 앱 (접근성)</th><th>확장 / 유저스크립트</th></tr>
-    <tr><td>건너뛰기 버튼 자동 클릭</td><td>○</td><td>○</td></tr>
+    <tr><td>건너뛰기 버튼 자동 클릭</td><td>○</td><td>○ 크롬 계열 확장만 (진짜 클릭 필요)</td></tr>
     <tr><td>버튼 없는(건너뛸 수 없는) 광고</td><td>× 끝까지 봐야 함</td><td>○ 영상 끝으로 보냄</td></tr>
     <tr><td>배너·추천 광고 칸 숨김</td><td>×</td><td>○</td></tr>
     <tr><td>유튜브 앱</td><td>○</td><td>×</td></tr>

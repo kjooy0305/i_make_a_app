@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         광고 건너뛰기 (AdSkip)
 // @namespace    https://kjooy0305.github.io/i_make_a_app/adskip/
-// @version      1.2.0
+// @version      1.3.0
 // @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다.
 // @author       kjooy0305
 // @match        *://www.youtube.com/*
@@ -21,8 +21,8 @@
  *
  * 원리 (안드로이드 접근성 서비스와 같은 생각을 웹에 옮긴 것):
  *  1. 유튜브 플레이어(#movie_player)는 광고가 나올 때 'ad-showing' 클래스를 붙인다. 그걸 신호로 삼는다.
- *  2. 광고 중이면 (a) '광고 건너뛰기' 버튼을 찾아 눌러 주고
- *                 (b) 버튼이 아직 없으면 광고 <video>의 재생 위치를 끝으로 보내 광고를 바로 끝낸다.
+ *  2. 광고 중이면 (a) '광고 건너뛰기' 버튼을 찾아 눌러 주고 (크롬 계열은 디버거 API 로 진짜 클릭)
+ *                 (b) 버튼이 아직 없으면 광고 <video>를 16배속 + 끝 직전으로 보내 광고를 바로 끝낸다.
  *  3. 광고가 끝나면 소리 설정을 원래대로 되돌린다.
  *  4. 배너·추천 광고 칸은 CSS 로 숨긴다(선택).
  *  5. "동영상이 일시중지되었습니다. 이어서 시청하시겠어요?" 확인 창이 뜨면 [예]를 눌러 주고 멈춘 영상을 다시 재생한다.
@@ -85,17 +85,32 @@
   var SKIP_TEXT = /^(광고\s*건너뛰기|건너뛰기|skip\s*ads?|skip)$/i;
   var OVERLAY_SEL = '.ytp-ad-overlay-close-button, .ytp-ad-overlay-close-container, .ytp-ad-overlay-close-container button';
 
+  /* 유튜브는 스크립트가 만든 클릭(isTrusted=false)을 건너뛰기 버튼에서 무시한다(2025~).
+   * 그래서 확장(크롬 계열)에서는 배경 워커에 부탁해 디버거 API 로 '진짜' 마우스 클릭을 버튼 가운데 좌표에 보낸다.
+   * 파이어폭스·유저스크립트에는 그런 길이 없어 element.click() 만 하고(안 먹을 수 있음), 대신 빨리감기로 끝낸다. */
+  var canTrusted = typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function' && !!chrome.runtime.id && window.top === window;
+  function pressButton(el) {
+    try { el.click(); } catch (e) {}
+    if (!canTrusted) return;
+    var r = el.getBoundingClientRect();
+    var x = r.left + r.width / 2, y = r.top + r.height / 2;
+    if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) return;
+    try {
+      chrome.runtime.sendMessage({ type: 'trustedClick', x: x, y: y }, function (res) { void chrome.runtime.lastError; });
+    } catch (e) {}
+  }
+
   /* 건너뛰기 버튼을 셀렉터 → 글자 순서로 찾아 클릭. (접근성 서비스의 아이디 → 글자 순서와 같다) */
   function clickSkip(p) {
     var scope = p || document;
     var list = scope.querySelectorAll(SKIP_SEL);
-    for (var i = 0; i < list.length; i++) if (visible(list[i])) { list[i].click(); return 'button'; }
+    for (var i = 0; i < list.length; i++) if (visible(list[i])) { pressButton(list[i]); return 'button'; }
     var btns = scope.querySelectorAll('button, [role="button"], .ytp-button');
     for (var j = 0; j < btns.length; j++) {
       var b = btns[j];
       var t = (b.textContent || '').trim();
       var a = b.getAttribute('aria-label') || '';
-      if ((SKIP_TEXT.test(t) || SKIP_TEXT.test(a)) && visible(b)) { b.click(); return 'text'; }
+      if ((SKIP_TEXT.test(t) || SKIP_TEXT.test(a)) && visible(b)) { pressButton(b); return 'text'; }
     }
     // 글자만 있고 button 이 아닌 요소(div/span)면 가장 가까운 클릭 가능한 조상을 누른다
     var all = scope.querySelectorAll('div, span');
@@ -103,24 +118,27 @@
       var el = all[k];
       if (el.childElementCount === 0 && SKIP_TEXT.test((el.textContent || '').trim()) && visible(el)) {
         var target = el.closest('button, [role="button"], a, [onclick], .ytp-button') || el;
-        target.click();
+        pressButton(target);
         return 'text';
       }
     }
     return null;
   }
 
-  /* 광고 영상을 끝으로 보내기. 끝으로 가면 유튜브가 광고를 종료 처리한다. */
+  /* 광고 영상을 빨리 끝내기.
+   * 실제 유튜브로 재 본 결과(2026-11): 정확히 끝(duration)으로 보내면 유튜브가 광고를 끝내지 않고
+   * 빈 화면으로 광고 시간이 다 될 때까지 붙잡아 둔다. 끝 '직전'(duration-0.3)으로 보내고 16배속으로 남은 0.3초를
+   * 흘려보내면 0.5~1.5초 안에 광고가 끝난다. 광고 중엔 음소거했다가 끝나면 되돌린다. */
   var savedMuted = null;
   function fastForward(p) {
     var v = p.querySelector('video');
     if (!v) return false;
     if (savedMuted === null) { savedMuted = v.muted; v.muted = true; }
-    if (isFinite(v.duration) && v.duration > 0.5 && v.currentTime < v.duration - 0.2) {
-      try { v.currentTime = v.duration; } catch (e) {}
+    try { if (v.playbackRate < 16) v.playbackRate = 16; } catch (e) {}
+    if (isFinite(v.duration) && v.duration > 1 && v.currentTime < v.duration - 1) {
+      try { v.currentTime = v.duration - 0.3; } catch (e) {}
       return true;
     }
-    try { if (v.playbackRate < 16) v.playbackRate = 16; } catch (e) {}
     return false;
   }
   function restoreAudio(p) {

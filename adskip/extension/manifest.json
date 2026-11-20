@@ -1,24 +1,49 @@
 {
   "manifest_version": 3,
   "name": "광고 건너뛰기 (AdSkip)",
-  "version": "1.2.0",
-  "description": "유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다. 어디에도 데이터를 보내지 않습니다.",
-  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "version": "1.3.0",
+  "description": "유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 진짜 클릭처럼 눌러 주고, 버튼 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다. 어디에도 데이터를 보내지 않습니다.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" },
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    },
     "default_title": "광고 건너뛰기"
   },
-  "permissions": ["storage"],
+  "permissions": [
+    "storage",
+    "debugger"
+  ],
   "content_scripts": [
     {
-      "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*", "*://music.youtube.com/*", "*://youtube.com/*", "*://www.youtube-nocookie.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*",
+        "*://music.youtube.com/*",
+        "*://youtube.com/*",
+        "*://www.youtube-nocookie.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }
   ],
   "browser_specific_settings": {
-    "gecko": { "id": "adskip@kjooy0305.github.io", "strict_min_version": "109.0" }
+    "gecko": {
+      "id": "adskip@kjooy0305.github.io",
+      "strict_min_version": "109.0"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
   }
 }

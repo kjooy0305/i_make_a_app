@@ -61,6 +61,6 @@
   dlg.querySelector('#cancel-button button').addEventListener('click', function () { dlg.style.display = 'none'; log('pause-dialog-no'); });
   document.getElementById('skipbtn').addEventListener('click', function () { log('skip-clicked'); endAd('click'); });
   v.addEventListener('ended', function () { endAd('ended'); });
-  v.addEventListener('seeked', function () { if (p.classList.contains('ad-showing') && v.duration && v.currentTime >= v.duration - 0.05) endAd('seek-to-end'); });
+  v.addEventListener('seeked', function () { if (p.classList.contains('ad-showing') && v.duration && v.currentTime >= v.duration - 0.5) log('seeked-near-end:t=' + v.currentTime.toFixed(1) + ':rate=' + v.playbackRate); });
 </script>
 </body></html>

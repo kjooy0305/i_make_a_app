@@ -20,7 +20,7 @@ adskip/
 2. 유튜브 화면이 바뀔 때마다 `rootInActiveWindow` 에서 아이디(`com.google.android.youtube:id/skip_ad_button` 등) → 글자(“광고 건너뛰기”, “Skip ads” …) 순으로 버튼을 찾는다.
 3. 클릭 가능한 조상까지 올라가 `performAction(ACTION_CLICK)`, 거절되면 `dispatchGesture` 로 버튼 가운데를 탭. 0.8초 안에 같은 버튼을 다시 누르지 않고, 이벤트 뒤 0.35초·1초에 한 번씩 더 본다.
 
-브라우저: 플레이어의 `ad-showing` 클래스를 신호로, 건너뛰기 버튼 클릭 → 없으면 광고 `<video>` 를 `currentTime = duration` 으로 끝내기 → 광고 중 음소거 후 원복, 배너 칸 CSS 숨김, "동영상이 일시중지되었습니다. 이어서 시청하시겠어요?" 창(yt-confirm-dialog)의 [예] 자동 클릭 + 재생 재개.
+브라우저: 플레이어의 `ad-showing` 클래스를 신호로, 건너뛰기 버튼 클릭(유튜브가 isTrusted=false 클릭을 무시하므로 background.js 가 chrome.debugger `Input.dispatchMouseEvent` 로 진짜 클릭) → 없으면 광고 `<video>` 를 16배속 + `currentTime = duration - 0.3` 으로 끝내기(정확히 duration 으로 보내면 유튜브가 광고를 안 끝내고 붙잡아 둠) → 광고 중 음소거 후 원복, 배너 칸 CSS 숨김, "동영상이 일시중지되었습니다. 이어서 시청하시겠어요?" 창(yt-confirm-dialog)의 [예] 자동 클릭 + 재생 재개.
 
 ## 빌드·검증
 
@@ -29,6 +29,7 @@ cd adskip/android && ./gradlew testDebugUnitTest assembleDebug      # JUnit 6건
 node adskip/tools/build-userscript.js                                # content.js → userscript
 node adskip/test/run.js <playwright 모듈 경로>                        # 실제 Chromium 에 content.js 주입
 CHROMIUM=<chrome 경로> node adskip/test/run-ext.js <playwright 경로>  # 확장을 설치해 youtube.com(가짜 페이지로 라우팅)에서 확인
+CHROMIUM=<chrome 경로> node adskip/test/run-real.js <playwright 경로> 0|1  # 실제 유튜브 광고로 확인 (0=진짜 클릭만, 1=빨리감기)
 ```
 
 릴리즈: 태그 `adskip-vX.Y.Z` 푸시 → `release-adskip.yml` 이 APK · 확장 zip · 유저스크립트를 릴리즈에 올린다. 버전은 `android/app/build.gradle`(versionName) 과 `extension/manifest.json`(version) 두 곳.

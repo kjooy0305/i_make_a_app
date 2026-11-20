@@ -52,7 +52,7 @@ function assert(c, m) { if (!c) { console.error('FAIL: ' + m); process.exitCode 
   const dt = Date.now() - t0;
   ev = await page.evaluate(() => window.events);
   console.log('   events:', ev.join(' | '), ' (' + dt + 'ms)');
-  assert(ev.some(e => e.startsWith('ad-ended:seek-to-end') || e.startsWith('ad-ended:ended')), '버튼 없는 6초 광고를 끝으로 보내 종료');
+  assert(ev.some(e => e.startsWith('seeked-near-end')) && ev.some(e => e.startsWith('ad-ended:ended')), '버튼 없는 6초 광고를 끝 직전으로 보내고 16배속으로 끝냄');
   assert(dt < 4000, '6초 광고가 4초 안에 끝남 (' + dt + 'ms)');
   await page.waitForTimeout(400);
   stats = await page.evaluate(() => window.__adskip.getStats());
