@@ -7,7 +7,7 @@
   #movie_player { position: relative; width: 320px; height: 180px; background: #000; }
   video { width: 320px; height: 180px; }
   .ytp-ad-skip-button-slot { position: absolute; right: 8px; bottom: 8px; display: none; }
-  .ad-showing .ytp-ad-skip-button-slot.ready { display: block; }
+  .ad-showing .ytp-ad-skip-button-slot.ready, .ytp-ad-skip-button-slot.stale { display: block; }
   .ytp-ad-overlay-close-button { display: none; }
   ytd-ad-slot-renderer { display: block; background: #fc0; padding: 6px; margin-top: 10px; }
   #log { white-space: pre; font-size: 12px; margin-top: 10px; }
@@ -40,10 +40,12 @@
     p.classList.remove('ad-showing');
     log('ad-ended:' + reason + ':t=' + v.currentTime.toFixed(1));
     v.removeAttribute('src'); v.load();
-    if (reason !== 'click' && window.endCardMode) {
-      // 유튜브처럼: 광고 표시는 빠졌지만 종료 화면에 '건너뛰기' 버튼이 2초간 남는다
-      endcard.style.display = 'block'; log('endcard-shown');
-      setTimeout(function () { if (endcard.style.display !== 'none') { endcard.style.display = 'none'; log('endcard-timeout'); } }, 2000);
+    if (window.staleButtonMode) {
+      // 접힌 탭의 유튜브처럼: 광고는 끝났는데 건너뛰기 버튼이 화면에 그대로 남아 있고, 본영상이 재생 중이다.
+      // 이때 버튼을 또 누르면 본영상 위를 클릭한 것 = 일시정지.
+      slot.classList.add('ready'); slot.classList.add('stale');
+      v.src = 'ad.webm'; v.play().catch(function(){}); log('main-playing');
+      setTimeout(function () { slot.classList.remove('ready'); slot.classList.remove('stale'); log('stale-button-gone'); }, 2000);
     }
   }
   // 광고 시작: 영상 로드, 재생, buttonDelay 뒤 버튼 활성화. buttonDelay=0 이면 버튼 없는 광고.
@@ -60,7 +62,10 @@
   window.showPauseDialog = function () { v.src = 'ad.webm'; v.play().catch(function(){}); setTimeout(function(){ v.pause(); dlg.style.display = 'block'; log('pause-dialog-shown'); }, 300); };
   dlg.querySelector('#confirm-button button').addEventListener('click', function () { dlg.style.display = 'none'; log('pause-dialog-yes'); });
   dlg.querySelector('#cancel-button button').addEventListener('click', function () { dlg.style.display = 'none'; log('pause-dialog-no'); });
-  document.getElementById('skipbtn').addEventListener('click', function () { log('skip-clicked'); endAd('click'); });
+  document.getElementById('skipbtn').addEventListener('click', function () {
+    if (slot.classList.contains('stale')) { v.pause(); log('stale-clicked-paused'); return; }
+    log('skip-clicked'); endAd('click');
+  });
   v.addEventListener('ended', function () { endAd('ended'); });
   v.addEventListener('seeked', function () { if (p.classList.contains('ad-showing') && v.duration && v.currentTime >= v.duration - 0.5) log('seeked-near-end:t=' + v.currentTime.toFixed(1) + ':rate=' + v.playbackRate); });
 </script>

@@ -7,7 +7,7 @@ const os = require('os');
 const pwPath = process.argv[2] || 'playwright';
 const ff = process.argv[3] !== '0';
 const { chromium } = require(pwPath);
-const ext = path.join(__dirname, '..', 'extension');
+const ext = process.env.EXT_DIR ? path.resolve(process.env.EXT_DIR) : path.join(__dirname, '..', 'extension');
 function assert(c, m) { if (!c) { console.error('FAIL: ' + m); process.exitCode = 1; } else console.log('ok: ' + m); }
 (async () => {
   const userDir = fs.mkdtempSync(path.join(os.tmpdir(), 'adskip-real-'));
@@ -21,12 +21,12 @@ function assert(c, m) { if (!c) { console.error('FAIL: ' + m); process.exitCode 
   const diag = await ctx.newPage();
   await diag.goto('chrome://extensions/');
   const exts = await diag.evaluate(() => new Promise(r => chrome.management.getAll(r)));
-  const me = exts.find(e => /AdSkip/.test(e.name));
+  const me = exts.find(e => /광고 건너뛰기/.test(e.name));
   assert(!!me, '확장 설치됨: ' + (me && me.id));
   const popup = await ctx.newPage();
   await popup.goto('chrome-extension://' + me.id + '/popup.html');
-  await popup.evaluate((ff) => new Promise(r => chrome.storage.local.set({ cfg: { enabled: true, fastForward: ff, hideBanners: true, badge: true, autoResume: true }, stats: { count: 0 } }, r)), ff);
-  console.log('   config fastForward=' + ff);
+  if (process.env.EXT_DIR) console.log('   확장 폴더 기본 설정 그대로 검증: ' + process.env.EXT_DIR);
+  else { await popup.evaluate((ff) => new Promise(r => chrome.storage.local.set({ cfg: { enabled: true, fastForward: ff, hideBanners: true, badge: true, autoResume: true }, stats: { count: 0 } }, r)), ff); console.log('   config fastForward=' + ff); }
   await diag.close(); await popup.close();
 
   const page = await ctx.newPage();

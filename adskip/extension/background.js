@@ -35,16 +35,15 @@ async function trustedClick(tabId) {
   var target = { tabId: tabId };
   await attach(target);
   try {
-    await sleep(60);
-    for (var attempt = 0; attempt < 3; attempt++) {
-      var res = await send(target, 'Runtime.evaluate', { expression: POS_EXPR, returnByValue: true });
-      var pos = res && res.result && res.result.value;
-      if (!pos) return attempt > 0; // 버튼이 사라졌으면 (앞선 클릭이 먹었으면) 끝
-      await send(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: pos.x, y: pos.y });
-      await send(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
-      await send(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
-      await sleep(150); // 띠가 뜨며 화면이 밀렸으면 다음 번엔 새 좌표로
-    }
+    await sleep(120); // "디버깅 중" 띠가 뜨며 화면이 내려올 시간을 준 뒤 좌표를 잰다
+    var res = await send(target, 'Runtime.evaluate', { expression: POS_EXPR, returnByValue: true });
+    var pos = res && res.result && res.result.value;
+    if (!pos) return false;
+    // 딱 한 번만 누른다. 접힌 탭은 유튜브가 화면을 안 그려 광고가 끝난 뒤에도 버튼이 남아 보이므로,
+    // 두 번째 클릭은 본영상 위를 눌러 일시정지시킨다. 빗나갔으면 콘텐츠 스크립트가 0.8초 뒤 다시 부탁한다.
+    await send(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: pos.x, y: pos.y });
+    await send(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
+    await send(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
     return true;
   } finally {
     await detach(target);

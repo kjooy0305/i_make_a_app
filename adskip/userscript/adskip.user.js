@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         광고 건너뛰기 (AdSkip)
 // @namespace    https://kjooy0305.github.io/i_make_a_app/adskip/
-// @version      1.4.0
+// @version      1.5.0
 // @description  유튜브 영상 광고가 나오면 '건너뛰기' 버튼을 대신 누르고, 버튼이 없는 광고는 끝으로 넘기고, '이어서 시청하시겠어요?' 창도 자동으로 확인합니다.
 // @author       kjooy0305
 // @match        *://www.youtube.com/*
@@ -89,17 +89,26 @@
    * 그래서 확장(크롬 계열)에서는 배경 워커에 부탁해 디버거 API 로 '진짜' 마우스 클릭을 버튼 가운데 좌표에 보낸다.
    * 파이어폭스·유저스크립트에는 그런 길이 없어 element.click() 만 하고(안 먹을 수 있음), 대신 빨리감기로 끝낸다. */
   var canTrusted = typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.sendMessage === 'function' && !!chrome.runtime.id && window.top === window;
-  var trustedBusy = false;
+  var trustedBusy = false, lastTrustedAt = 0, wasPlayingBeforeClick = false;
+  /* 클릭이 광고가 아닌 플레이어에 떨어지면 일시정지가 된다(접힌 탭은 유튜브가 화면을 안 그려 버튼이 남아 보이는 때가 있음).
+   * 그래서 클릭 전 재생 중이었고, 광고가 아닌데 멈춰 있으면 다시 재생한다. */
+  function undoAccidentalPause() {
+    var p = player(); var v = p && p.querySelector('video');
+    if (v && wasPlayingBeforeClick && v.paused && !v.ended && !isAd(p)) { try { v.play(); } catch (e) {} }
+  }
   function pressButton(el) {
     try { el.click(); } catch (e) {}
     if (!canTrusted || trustedBusy) return;
+    var pv = player() && player().querySelector('video');
+    wasPlayingBeforeClick = !!(pv && !pv.paused);
+    lastTrustedAt = Date.now();
     // 좌표는 여기서 재지 않는다. 디버거가 붙는 순간 크롬 위에 "디버깅 중" 띠가 생기며 화면이 아래로 밀리므로,
     // 배경 워커가 붙은 뒤에 이 표식(data-adskip-target)을 가진 요소의 위치를 다시 재서 누른다.
     var old = document.querySelectorAll('[data-adskip-target]');
     for (var i = 0; i < old.length; i++) old[i].removeAttribute('data-adskip-target');
     el.setAttribute('data-adskip-target', '1');
     trustedBusy = true;
-    var done = function () { trustedBusy = false; try { el.removeAttribute('data-adskip-target'); } catch (e) {} };
+    var done = function () { trustedBusy = false; try { el.removeAttribute('data-adskip-target'); } catch (e) {} undoAccidentalPause(); };
     var guard = setTimeout(done, 3000);
     try {
       chrome.runtime.sendMessage({ type: 'trustedClick' }, function (res) { void chrome.runtime.lastError; clearTimeout(guard); done(); });
@@ -136,7 +145,19 @@
    * 실제 유튜브로 재 본 결과(2026-11): 정확히 끝(duration)으로 보내면 유튜브가 광고를 끝내지 않고
    * 빈 화면으로 광고 시간이 다 될 때까지 붙잡아 둔다. 끝 '직전'(duration-0.3)으로 보내고 16배속으로 남은 0.3초를
    * 흘려보내면 0.5~1.5초 안에 광고가 끝난다. 광고 중엔 음소거했다가 끝나면 되돌린다. */
-  var savedMuted = null;
+  /* 배속: 광고가 아닐 때 사용자가 쓰는 배속을 계속 기억해 둔다(knownRate). 광고 영상을 불러오면 브라우저가 배속을 1로
+   * 되돌리고(load 알고리즘), 유튜브가 본영상에 다시 적용하는 시점이 들쭉날쭉해서, 광고가 끝난 직후와 0.5초·1.5초 뒤에
+   * 기억해 둔 배속을 다시 건다. 광고 직후 2.5초 동안은 1로 리셋된 값을 '사용자 배속'으로 잘못 기억하지 않도록 기억을 멈춘다. */
+  var savedMuted = null, knownRate = 1, adEndedAt = 0;
+  function rememberRate(p) {
+    if (inAd || Date.now() - adEndedAt < 2500) return;
+    var v = p.querySelector('video');
+    if (v && v.playbackRate >= 0.25 && v.playbackRate <= 4) knownRate = v.playbackRate;
+  }
+  function applyKnownRate(p) {
+    var v = p && p.querySelector('video');
+    if (v && !isAd(p) && Math.abs(v.playbackRate - knownRate) > 0.01) { try { v.playbackRate = knownRate; } catch (e) {} }
+  }
   function fastForward(p) {
     var v = p.querySelector('video');
     if (!v) return false;
@@ -151,7 +172,7 @@
   function restoreAudio(p) {
     if (savedMuted === null) return;
     var v = p && p.querySelector('video');
-    if (v) { v.muted = savedMuted; try { v.playbackRate = 1; } catch (e) {} }
+    if (v) { v.muted = savedMuted; }
     savedMuted = null;
   }
 
@@ -240,10 +261,12 @@
     var p = player();
     if (!p) return;
     var ad = isAd(p);
-    // 건너뛰기 버튼은 광고 표시(ad-showing)가 빠진 종료 화면에도 남아 있을 수 있으니 상태와 상관없이 보이면 누른다.
+    // 건너뛰기 버튼은 광고 중(ad-showing)일 때만 누른다. 접힌 탭은 유튜브가 화면을 안 그려 광고가 끝난 뒤에도
+    // 버튼이 남아 '보이는' 때가 있는데, 그걸 또 누르면 본영상 위를 클릭한 셈이 되어 일시정지된다.
     var now = Date.now();
     var how = null;
-    if (now - lastClickAt > 800) { how = clickSkip(p); if (how) lastClickAt = now; }
+    if (ad && now - lastClickAt > 800) { how = clickSkip(p); if (how) lastClickAt = now; }
+    if (!ad && lastTrustedAt && now - lastTrustedAt < 4000) undoAccidentalPause();
     if (ad) {
       if (!inAd) { inAd = true; acted = false; }
       if (!how && cfg.fastForward) { if (fastForward(p)) how = 'seek'; }
@@ -252,13 +275,18 @@
       if (how && !inAd) { stats.count = (stats.count || 0) + 1; store.saveStats(); showBadge('광고 건너뜀 · ' + stats.count + '회'); }
       if (inAd) {
         inAd = false;
+        adEndedAt = Date.now();
         restoreAudio(p);
+        applyKnownRate(p);
+        setTimeout(function () { applyKnownRate(player()); }, 500);
+        setTimeout(function () { applyKnownRate(player()); }, 1500);
         if (acted) {
           stats.count = (stats.count || 0) + 1;
           store.saveStats();
           showBadge('광고 건너뜀 · ' + stats.count + '회');
         }
       }
+      rememberRate(p);
       // 광고 중이 아니어도 걸려 있는 오버레이 배너는 닫는다
       if (Date.now() - lastClickAt > 800 && closeOverlays(p)) lastClickAt = Date.now();
     }
