@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.kjooy0305.padmacro.MacroRunnerTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-21T10:23:32" hostname="6b34bed7622b" time="8.416">
+  <properties/>
+  <testcase name="countdown reports each second then zero" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="1.656"/>
+  <testcase name="runs steps in order with gap and repeats" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.252"/>
+  <testcase name="wait text without stop continues" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.514"/>
+  <testcase name="empty macro" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.011"/>
+  <testcase name="describe is readable" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="5.716"/>
+  <testcase name="click text retries until it appears" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.074"/>
+  <testcase name="step and macro json roundtrip" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.114"/>
+  <testcase name="stop during wait ends with STOPPED" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.002"/>
+  <testcase name="click text timeout fails macro with message" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.027"/>
+  <testcase name="unknown step type is skipped" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.0"/>
+  <testcase name="infinite repeat runs until stopped" classname="com.kjooy0305.padmacro.MacroRunnerTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

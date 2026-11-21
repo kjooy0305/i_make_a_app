@@ -1,0 +1,19 @@
+<lint-module
+    format="1"
+    dir="/home/jovyan/work/i_make_a_app/padmacro/android/app"
+    name=":app"
+    type="APP"
+    maven="PadMacro:app:"
+    agpVersion="8.2.2"
+    buildFolder="build"
+    bootClassPath="/tmp/claude-1001/-home-jovyan-work/546fa58a-1b64-476f-b5df-88cb35c12b14/scratchpad/sdk/platforms/android-34/android.jar:/tmp/claude-1001/-home-jovyan-work/546fa58a-1b64-476f-b5df-88cb35c12b14/scratchpad/sdk/build-tools/34.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-34"
+    neverShrinking="true">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

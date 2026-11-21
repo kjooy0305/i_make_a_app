@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">패드 매크로</string>
+    <string name="service_label">패드 매크로 (자동 터치)</string>
+    <string name="service_description">내가 만든 매크로대로 화면을 대신 터치·스와이프하고, 글자를 찾아 누르고, 화면을 캡쳐합니다. 화면 내용은 어디에도 보내지 않습니다.</string>
+</resources>

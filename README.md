@@ -24,6 +24,7 @@ i_make_a_app/
 ├── stickfighter/   ← 네이티브 Android 앱 (스틱맨 애니메이션)
 ├── dayclean/       ← 네이티브 Android 앱 (하루 정리: 기록·정리·회고·장기 목표)
 ├── adskip/         ← 유튜브 광고 건너뛰기 (android/ 접근성 앱 + extension/ 브라우저 확장 + userscript/)
+├── padmacro/       ← 패드 매크로 (android/ 접근성 자동 터치·캡쳐 매크로)
 ├── storyeditor/
 │   ├── web/        ← 분기형 이야기 에디터 (웹, 오프라인)
 │   └── test/       ← 엔진 단위 테스트 (node --test test/engine.test.js)
@@ -51,6 +52,7 @@ i_make_a_app/
 | 🥋 Stick Fighter | Android | .apk | [다운로드](../../releases?q=stickfighter) |
 | 📝 하루 정리 | Android | .apk | [다운로드](../../releases?q=dayclean) |
 | ⏭ 광고 건너뛰기 | Android · PC 브라우저 | .apk / 확장 .zip / .user.js | [다운로드](../../releases?q=adskip) · [설명](https://kjooy0305.github.io/i_make_a_app/adskip/) |
+| 🎯 패드 매크로 | Android | .apk | [다운로드](../../releases?q=padmacro) |
 | ⌨️ ShortKey | Windows PC | .exe | [다운로드](../../releases?q=shortkey) |
 
 ---
@@ -317,3 +319,19 @@ git tag shortkey-v1.0.1 && git push origin shortkey-v1.0.1
 2. 같은 파일의 `FEATURES` 에 그 기능을 감지하는 함수를 추가한다. (튜토리얼에서 빠지면 테스트가 실패)
 3. `VERSION` 을 1 올린다. (저장돼 있던 튜토리얼이 새 내용으로 교체됨)
 4. `node --test storyeditor/test/engine.test.js storyeditor/test/tutorial.test.js` 로 확인한다. 튜토리얼 테스트는 구조·검사·기능 포함 여부·수료까지의 진행·무작위 마구 누르기(막다른 길 없음)를 확인한다.
+
+---
+
+## 🎯 패드 매크로 (padmacro)
+
+> **설치 가능 기기:** Android 패드·스마트폰 (Android 8.0 이상, 화면 캡쳐는 11 이상)
+
+터치를 대신 해 주는 매크로(오토 마우스) 앱. 접근성 서비스가 제스처를 주입하고 화면을 읽고 캡쳐합니다.
+
+- **단계 종류:** 탭(여러 번) · 길게 누르기 · 스와이프 · 대기 · 화면 캡쳐(Pictures/패드매크로) · 글자 찾아 누르기 · 글자 기다리기 · 앱 실행 · 시스템 동작(뒤로/홈/최근 앱/알림창/빠른 설정/잠금/전원) · URL 열기 · 진동
+- **실행 설정:** 반복 횟수(0 = 무한) · 단계 사이 대기 · 시작 전 대기 · 반복 사이 대기 · 끝나면 진동
+- **좌표 입력:** 숫자로 직접, 또는 ‘화면에서 찍기’(원하는 앱 위에 투명 오버레이를 띄워 누른 자리 기록)
+- **녹화:** 실제 터치·드래그를 그대로 기록하면서 아래 앱에도 전달. 터치 사이 시간은 ‘대기’ 단계로 남김
+- **조작:** 어느 앱 위에나 떠 있는 플로팅 패널(▶/■/● 녹화, 끌어서 이동) · 볼륨 아래 두 번으로 시작/중지
+- 코드: `padmacro/android/` (Kotlin, 순수 실행 엔진 `MacroRunner` 는 단위 테스트 `./gradlew testDebugUnitTest`)
+- 릴리즈: 태그 `padmacro-vX.Y.Z` 푸시 → `release-padmacro.yml`
