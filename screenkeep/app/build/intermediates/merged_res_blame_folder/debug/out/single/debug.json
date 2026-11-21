@@ -1,0 +1,30 @@
+[
+    {
+        "merged": "com.kjooy0305.screenkeep.app-merged_res-8:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "com.kjooy0305.screenkeep.app-main-10:/mipmap-xxxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.kjooy0305.screenkeep.app-merged_res-8:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "com.kjooy0305.screenkeep.app-main-10:/mipmap-xhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.kjooy0305.screenkeep.app-merged_res-8:/drawable_ic_tile.xml.flat",
+        "source": "com.kjooy0305.screenkeep.app-main-10:/drawable/ic_tile.xml"
+    },
+    {
+        "merged": "com.kjooy0305.screenkeep.app-merged_res-8:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "com.kjooy0305.screenkeep.app-main-10:/mipmap-xxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.kjooy0305.screenkeep.app-merged_res-8:/drawable_ic_stat.xml.flat",
+        "source": "com.kjooy0305.screenkeep.app-main-10:/drawable/ic_stat.xml"
+    },
+    {
+        "merged": "com.kjooy0305.screenkeep.app-merged_res-8:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "com.kjooy0305.screenkeep.app-main-10:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.kjooy0305.screenkeep.app-merged_res-8:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "com.kjooy0305.screenkeep.app-main-10:/mipmap-mdpi/ic_launcher.png"
+    }
+]

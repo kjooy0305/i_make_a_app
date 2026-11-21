@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.kjooy0305.screenkeep.ScreenshotTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-21T10:49:59" hostname="6b34bed7622b" time="9.405">
+  <properties/>
+  <testcase name="shots" classname="com.kjooy0305.screenkeep.ScreenshotTest" time="9.405"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

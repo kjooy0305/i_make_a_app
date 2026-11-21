@@ -1,0 +1,73 @@
+name: "[화면 유지] Build & Release APK"
+
+on:
+  push:
+    tags:
+      - 'screenkeep-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEY_BASE64 }}" | base64 -d > $RUNNER_TEMP/release.p12
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x screenkeep/gradlew
+
+      - name: Build Release APK
+        working-directory: screenkeep
+        env:
+          SIGNING_KEY_PATH: ${{ runner.temp }}/release.p12
+          SIGNING_STORE_PASS: ${{ secrets.SIGNING_STORE_PASS }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASS: ${{ secrets.SIGNING_KEY_PASS }}
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK
+        run: |
+          TAG=${{ github.ref_name }}
+          VER=${TAG#screenkeep-}
+          mv screenkeep/app/build/outputs/apk/release/app-release.apk \
+             screenkeep/app/build/outputs/apk/release/ScreenKeep-${VER}.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "📱 화면 유지 ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## 📱 화면 유지
+
+            > **설치 기기:** Android 8.0(API 26) 이상 스마트폰·태블릿
+
+            ### 설치 방법
+            1. 아래 `.apk` 파일 다운로드
+            2. 안드로이드 → **설정 > 보안 > 알 수 없는 앱 허용** 활성화
+            3. APK 파일 실행 후 설치
+            4. 앱을 열어 **다른 앱 위에 표시**를 허용하고 **켜기**
+
+            ### 주요 기능
+            - 전원 버튼을 누르기 전에는 화면이 저절로 꺼지지 않게 유지 (다른 앱을 쓰는 중에도)
+            - 유지 시간 정하기(계속 / 15분 / 30분 / 1시간 / 2시간 / 4시간 / 직접 입력), 끝나면 자동으로 해제
+            - 기기 기본 화면 꺼짐 시간 바꾸기
+            - 빠른 설정 패널 칸과 알림의 끄기 버튼
+            - 화면 꺼짐 기록(배터리·절전 상태·앱이 정리됐는지)으로 이유 없이 꺼지는 원인 찾기
+            - 휴대폰을 켜면 자동 시작
+          files: screenkeep/app/build/outputs/apk/release/ScreenKeep-*.apk
+          draft: false
+          prerelease: false
