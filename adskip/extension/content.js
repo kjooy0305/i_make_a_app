@@ -77,9 +77,29 @@
     var p = player(); var v = p && p.querySelector('video');
     if (v && wasPlayingBeforeClick && v.paused && !v.ended && !isAd(p)) { try { v.play(); } catch (e) {} }
   }
+  /* 전체화면 안전장치: 우리가 건너뛰기를 누르거나 광고를 넘긴 직후 몇 초 동안은 의도치 않은 전체화면 전환을 막는다.
+   * 진짜 클릭은 페이지에 '사용자가 조작했다'는 기록을 남겨서, 유튜브가 보류해 둔 전체화면 요청이 그제야 통과하거나
+   * 클릭이 빗나가 더블클릭처럼 보이는 일이 있을 수 있다. 이미 전체화면이었다면 건드리지 않는다. */
+  var fsGuardUntil = 0, fsBefore = false;
+  function armFsGuard(ms) {
+    var now = Date.now();
+    if (now > fsGuardUntil) fsBefore = !!document.fullscreenElement;
+    fsGuardUntil = Math.max(fsGuardUntil, now + ms);
+  }
+  document.addEventListener('fullscreenchange', function () {
+    if (!fsBefore && document.fullscreenElement && Date.now() < fsGuardUntil) {
+      try { var r = document.exitFullscreen(); if (r && r.catch) r.catch(function () {}); } catch (e) {}
+      showBadge('원치 않는 전체화면을 취소했어요');
+    }
+  }, true);
+  window.addEventListener('dblclick', function (e) {
+    if (!fsBefore && Date.now() < fsGuardUntil) { e.stopImmediatePropagation(); e.preventDefault(); }
+  }, true);
+
   function pressButton(el) {
-    try { el.click(); } catch (e) {}
-    if (!canTrusted || trustedBusy) return;
+    armFsGuard(6000);
+    if (!canTrusted) { try { el.click(); } catch (e) {} return; } // 파이어폭스·유저스크립트: 가짜 클릭밖에 방법이 없다
+    if (trustedBusy) return; // 진짜 클릭이 진행 중. 여기에 가짜 클릭을 더하면 플레이어에 클릭이 두 번 들어간다
     var pv = player() && player().querySelector('video');
     wasPlayingBeforeClick = !!(pv && !pv.paused);
     lastTrustedAt = Date.now();
@@ -89,11 +109,15 @@
     for (var i = 0; i < old.length; i++) old[i].removeAttribute('data-adskip-target');
     el.setAttribute('data-adskip-target', '1');
     trustedBusy = true;
-    var done = function () { trustedBusy = false; try { el.removeAttribute('data-adskip-target'); } catch (e) {} undoAccidentalPause(); };
+    var done = function () { trustedBusy = false; try { el.removeAttribute('data-adskip-target'); } catch (e) {} undoAccidentalPause(); armFsGuard(3000); };
     var guard = setTimeout(done, 3000);
     try {
-      chrome.runtime.sendMessage({ type: 'trustedClick' }, function (res) { void chrome.runtime.lastError; clearTimeout(guard); done(); });
-    } catch (e) { clearTimeout(guard); done(); }
+      chrome.runtime.sendMessage({ type: 'trustedClick' }, function (res) {
+        var failed = !!chrome.runtime.lastError || !res || !res.ok; // 진짜 클릭 자체를 못 보냈을 때(예: 개발자 도구가 이미 붙어 있음)만 가짜 클릭으로 대신한다
+        clearTimeout(guard); done();
+        if (failed) { try { el.click(); } catch (e) {} }
+      });
+    } catch (e) { clearTimeout(guard); done(); try { el.click(); } catch (e2) {} }
   }
 
   /* 건너뛰기 버튼을 셀렉터 → 글자 순서로 찾아 클릭. (접근성 서비스의 아이디 → 글자 순서와 같다) */
@@ -251,12 +275,13 @@
     if (ad) {
       if (!inAd) { inAd = true; acted = false; }
       if (!how && cfg.fastForward) { if (fastForward(p)) how = 'seek'; }
-      if (how) acted = true;
+      if (how) { acted = true; armFsGuard(3500); }
     } else {
       if (how && !inAd) { stats.count = (stats.count || 0) + 1; store.saveStats(); showBadge('광고 건너뜀 · ' + stats.count + '회'); }
       if (inAd) {
         inAd = false;
         adEndedAt = Date.now();
+        armFsGuard(3000);
         restoreAudio(p);
         applyKnownRate(p);
         setTimeout(function () { applyKnownRate(player()); }, 500);

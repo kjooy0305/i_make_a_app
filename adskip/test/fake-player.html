@@ -11,10 +11,16 @@
   .ytp-ad-overlay-close-button { display: none; }
   ytd-ad-slot-renderer { display: block; background: #fc0; padding: 6px; margin-top: 10px; }
   #log { white-space: pre; font-size: 12px; margin-top: 10px; }
+  /* 유튜브 흉내: 마우스가 플레이어 위에서 움직이면 아래 컨트롤 바가 나타나고, 그 위로 건너뛰기 버튼이 밀려 올라간다.
+     컨트롤 바 맨 오른쪽(= 건너뛰기 버튼이 원래 있던 자리 아래)에는 전체화면 버튼이 있다. */
+  #movie_player.controls .ytp-ad-skip-button-slot { bottom: 52px; }
+  #fsbtn { display: none; position: absolute; right: 8px; bottom: 8px; }
+  #movie_player.controls #fsbtn { display: block; }
 </style></head>
 <body>
 <div id="movie_player" class="html5-video-player">
   <video id="v" muted playsinline></video>
+  <button id="fsbtn" type="button">전체화면</button>
   <div class="ytp-ad-skip-button-slot"><button class="ytp-skip-ad-button" id="skipbtn"><span>광고 건너뛰기</span></button></div>
   <!-- 실제 유튜브처럼 종료 화면 버튼도 플레이어 안에 있다 -->
   <div class="ytp-ad-module"><div id="endcard" style="display:none;position:absolute;left:8px;top:8px;color:#fff">광고 종료 화면 <button class="ytp-skip-ad-button" id="endskip"><div class="ytp-skip-ad-button__text">건너뛰기</div></button></div></div>
@@ -62,10 +68,22 @@
   window.showPauseDialog = function () { v.src = 'ad.webm'; v.play().catch(function(){}); setTimeout(function(){ v.pause(); dlg.style.display = 'block'; log('pause-dialog-shown'); }, 300); };
   dlg.querySelector('#confirm-button button').addEventListener('click', function () { dlg.style.display = 'none'; log('pause-dialog-yes'); });
   dlg.querySelector('#cancel-button button').addEventListener('click', function () { dlg.style.display = 'none'; log('pause-dialog-no'); });
-  document.getElementById('skipbtn').addEventListener('click', function () {
+  window.controlsOnMove = false; // true 면 사용자(진짜) 마우스 이동 때 컨트롤 바가 나타나 버튼이 밀린다
+  p.addEventListener('mousemove', function (e) { if (window.controlsOnMove && e.isTrusted) p.classList.add('controls'); });
+  window.requireTrusted = false; // true 면 유튜브처럼 스크립트가 만든 클릭(isTrusted=false)은 무시
+  document.getElementById('skipbtn').addEventListener('click', function (e) {
+    if (window.requireTrusted && !e.isTrusted) { log('untrusted-click-ignored'); return; }
     if (slot.classList.contains('stale')) { v.pause(); log('stale-clicked-paused'); return; }
     log('skip-clicked'); endAd('click');
+    if (window.fsAfterSkip) setTimeout(function () { document.documentElement.requestFullscreen().catch(function (e) { log('fs-request-failed:' + e.name); }); }, 700);
   });
+  // 영상 위를 눌렀는지(빗나간 클릭), 전체화면 버튼을 눌렀는지 기록. 건너뛰기 버튼 클릭은 위 핸들러가 따로 기록한다.
+  p.addEventListener('click', function (e) { if (!e.target.closest('.ytp-ad-skip-button-slot, #fsbtn, #endcard')) log('stray-click:' + e.target.tagName); });
+  document.getElementById('fsbtn').addEventListener('click', function () { log('fullscreen-button-clicked'); document.documentElement.requestFullscreen().catch(function () {}); });
+  // 유튜브 흉내: 건너뛰기 직후 (사용자 조작 기록이 생긴 틈에) 전체화면을 요청하는 경우, 영상 더블클릭 → 전체화면
+  window.fsAfterSkip = false;
+  p.addEventListener('dblclick', function () { log('dblclick-on-player'); document.documentElement.requestFullscreen().catch(function () {}); });
+  document.addEventListener('fullscreenchange', function () { log(document.fullscreenElement ? 'fullscreen-entered' : 'fullscreen-exited'); });
   v.addEventListener('ended', function () { endAd('ended'); });
   v.addEventListener('seeked', function () { if (p.classList.contains('ad-showing') && v.duration && v.currentTime >= v.duration - 0.5) log('seeked-near-end:t=' + v.currentTime.toFixed(1) + ':rate=' + v.playbackRate); });
 </script>

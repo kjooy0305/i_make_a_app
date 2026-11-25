@@ -31,17 +31,42 @@ var POS_EXPR = "(function(){var e=document.querySelector('[data-adskip-target]')
   "if(r.width===0||r.height===0||cs.display==='none'||cs.visibility==='hidden')return null;" +
   "return {x:r.left+r.width/2,y:r.top+r.height/2};})()";
 
+async function measure(target) {
+  var res = await send(target, 'Runtime.evaluate', { expression: POS_EXPR, returnByValue: true });
+  return (res && res.result && res.result.value) || null;
+}
+/* 누르려는 좌표에 정말 그 건너뛰기 버튼(또는 그 안쪽)이 있는지. 아니면 누르지 않는다. */
+function hitExpr(x, y) {
+  return "(function(x,y){var e=document.querySelector('[data-adskip-target]');if(!e)return false;" +
+    "var h=document.elementFromPoint(x,y);return !!h&&(h===e||e.contains(h));})(" + x + "," + y + ")";
+}
+
 async function trustedClick(tabId) {
   var target = { tabId: tabId };
   await attach(target);
   try {
     await sleep(120); // "디버깅 중" 띠가 뜨며 화면이 내려올 시간을 준 뒤 좌표를 잰다
-    var res = await send(target, 'Runtime.evaluate', { expression: POS_EXPR, returnByValue: true });
-    var pos = res && res.result && res.result.value;
+    var pos = await measure(target);
     if (!pos) return false;
+    // 마우스를 먼저 버튼 위로 옮기고, 위치가 가만히 있는지 다시 잰다.
+    // 유튜브는 마우스가 플레이어 위에서 움직이면 아래쪽 컨트롤 바를 띄우면서 건너뛰기 버튼을 위로 밀어 올린다.
+    // 그러면 원래 버튼 자리가 컨트롤 바 맨 오른쪽, 즉 '전체화면' 버튼 자리가 된다.
+    // (예전엔 옮기자마자 처음 잰 좌표를 눌러서, 광고를 몇 초 보다 건너뛸 때 전체화면이 되곤 했다.)
+    var steady = false;
+    for (var i = 0; i < 8 && !steady; i++) {
+      await send(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: pos.x, y: pos.y });
+      await sleep(120);
+      var next = await measure(target);
+      if (!next) return false;
+      steady = Math.abs(next.x - pos.x) < 1 && Math.abs(next.y - pos.y) < 1;
+      pos = next;
+    }
+    if (!steady) return false;
+    // 누르기 직전 마지막 확인: 그 자리에 건너뛰기 버튼이 없으면 누르지 않는다(콘텐츠 스크립트가 0.8초 뒤 다시 부탁한다).
+    var hit = await send(target, 'Runtime.evaluate', { expression: hitExpr(pos.x, pos.y), returnByValue: true });
+    if (!(hit && hit.result && hit.result.value)) return false;
     // 딱 한 번만 누른다. 접힌 탭은 유튜브가 화면을 안 그려 광고가 끝난 뒤에도 버튼이 남아 보이므로,
-    // 두 번째 클릭은 본영상 위를 눌러 일시정지시킨다. 빗나갔으면 콘텐츠 스크립트가 0.8초 뒤 다시 부탁한다.
-    await send(target, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: pos.x, y: pos.y });
+    // 두 번째 클릭은 본영상 위를 눌러 일시정지시킨다.
     await send(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
     await send(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: pos.x, y: pos.y, button: 'left', clickCount: 1 });
     return true;
@@ -54,7 +79,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
   if (!msg || msg.type !== 'trustedClick' || !sender.tab) return;
   var tabId = sender.tab.id;
   queue = queue.then(function () { return trustedClick(tabId); })
-    .then(function () { sendResponse({ ok: true }); })
+    .then(function (clicked) { sendResponse({ ok: true, clicked: !!clicked }); })
     .catch(function (e) { sendResponse({ ok: false, error: String(e && e.message || e) }); });
   return true;
 });

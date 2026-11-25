@@ -29,7 +29,12 @@ cd adskip/android && ./gradlew testDebugUnitTest assembleDebug      # JUnit 6건
 node adskip/tools/build-userscript.js                                # content.js → userscript
 node adskip/test/run.js <playwright 모듈 경로>                        # 실제 Chromium 에 content.js 주입
 CHROMIUM=<chrome 경로> node adskip/test/run-ext.js <playwright 경로>  # 확장을 설치해 youtube.com(가짜 페이지로 라우팅)에서 확인
+CHROMIUM=<chrome 경로> node adskip/test/run-fs.js <playwright 경로>    # 전체화면 버그 재현·방지 (컨트롤 바가 버튼을 밀 때, 건너뛴 직후 전체화면 요청·더블클릭)
 CHROMIUM=<chrome 경로> node adskip/test/run-real.js <playwright 경로> 0|1  # 실제 유튜브 광고로 확인 (0=진짜 클릭만, 1=빨리감기)
 ```
 
 릴리즈: 태그 `adskip-vX.Y.Z` 푸시 → `release-adskip.yml` 이 APK · 확장 zip · 유저스크립트를 릴리즈에 올린다. 버전은 `android/app/build.gradle`(versionName) 과 `extension/manifest.json`(version) 두 곳.
+
+## 알려진 문제와 해결
+
+- **광고를 몇 초 보다 자동으로 넘기면 전체화면이 되던 문제 (1.5.1, 컴퓨터)**: 유튜브는 마우스가 플레이어 위에서 움직이면 아래쪽 컨트롤 바를 띄우면서 건너뛰기 버튼을 위로 밀어 올린다. 확장은 처음 잰 좌표로 마우스를 옮긴 뒤 바로 눌렀기 때문에, 버튼이 밀려난 자리(컨트롤 바 맨 오른쪽 = 전체화면 버튼)를 누르는 경우가 있었다. 이제 마우스를 옮긴 뒤 버튼 위치가 안정될 때까지 다시 재어 따라가고, 누르기 직전 그 자리에 버튼이 있는지 확인한다(없으면 누르지 않고 다시 시도). 또 진짜 클릭 앞에 보내던 가짜 클릭을 없앴고, 건너뛴 직후 몇 초 동안은 의도치 않은 전체화면 전환(요청·더블클릭)을 취소한다. 그 시간 안에 사용자가 직접 하는 더블클릭 전체화면은 막힌다.
