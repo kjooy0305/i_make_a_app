@@ -402,15 +402,25 @@
     }
     return h + '</div>';
   }
+  /* 개수 줄과 소설 카드 목록. 검색창에 글자를 칠 때는 이 부분만 다시 그린다.
+   * (검색창까지 다시 그리면 한글처럼 글자를 조합하는 입력이 중간에 끊겨 'ㅇㅏㄴㄴㅕㅇ' 처럼 깨진다.) */
+  function libBodyHtml() {
+    const list = filteredNovels();
+    let h = '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">이름 복사</button><button class="btn sm" data-act="exporttxt">📄 목록 txt 추출</button>' : '') + (S.novels.length ? '<button class="btn sm dng" data-act="resetlib">라이브러리 초기화</button>' : '') + '</div>';
+    h += list.length ? list.map(novelCard).join('') : '<div class="card muted" style="text-align:center">' + (S.novels.length ? '조건에 맞는 소설이 없어요' : '업로드 탭에서 TXT·ePub 파일을 추가하세요') + '</div>';
+    return h;
+  }
+  function renderLibBody() {
+    const el = $('#libBody');
+    if (el) el.innerHTML = libBodyHtml(); else renderLib();
+  }
   function renderLib() {
     const f = S.filter;
-    const list = filteredNovels();
     const ups = S.keywords;
     let h = '<div class="row"><input type="text" class="grow" id="q" placeholder="제목 검색" value="' + esc(f.q) + '"><select id="sort" style="width:auto"><option value="new"' + (f.sort === 'new' ? ' selected' : '') + '>최근순</option><option value="title"' + (f.sort === 'title' ? ' selected' : '') + '>제목순</option></select></div>';
     h += '<div style="margin-top:8px">' + (ups.length ? ups.map((u) => '<span class="chip ' + u.tone + (f.upper.has(u.id) ? ' sel' : '') + '" data-act="fup" data-id="' + u.id + '">' + esc(u.name) + '</span>').join('') : '<span class="muted">키워드 탭에서 키워드를 추가하세요</span>') + '</div>';
     h += '<div class="row" style="margin-top:4px"><label class="ck"><input type="radio" name="mode" value="or"' + (f.mode === 'or' ? ' checked' : '') + '> 하나라도</label><label class="ck"><input type="radio" name="mode" value="and"' + (f.mode === 'and' ? ' checked' : '') + '> 모두 포함</label><label class="ck"><input type="checkbox" id="nod"' + (f.noDislike ? ' checked' : '') + '> 불호 키워드(!) 제외</label></div>';
-    h += '<div class="row" style="margin:8px 0"><span class="muted grow">' + list.length + '/' + S.novels.length + '개</span>' + (list.length ? '<button class="btn sm sec" data-act="copyall">이름 복사</button><button class="btn sm" data-act="exporttxt">📄 목록 txt 추출</button>' : '') + (S.novels.length ? '<button class="btn sm dng" data-act="resetlib">라이브러리 초기화</button>' : '') + '</div>';
-    h += list.length ? list.map(novelCard).join('') : '<div class="card muted" style="text-align:center">' + (S.novels.length ? '조건에 맞는 소설이 없어요' : '업로드 탭에서 TXT·ePub 파일을 추가하세요') + '</div>';
+    h += '<div id="libBody">' + libBodyHtml() + '</div>';
     $('#main').innerHTML = h;
   }
 
@@ -551,8 +561,7 @@
   });
   document.addEventListener('input', (e) => {
     if (e.target.id === 'q') {
-      S.filter.q = e.target.value; const pos = e.target.selectionStart; renderLib();
-      const q = $('#q'); q.focus(); q.setSelectionRange(pos, pos);
+      S.filter.q = e.target.value; renderLibBody();
     }
   });
   document.addEventListener('change', (e) => {

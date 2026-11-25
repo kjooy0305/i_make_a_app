@@ -33,8 +33,32 @@
   function normalizeTerm(t) {
     return String(t || '').toLowerCase().replace(/[\s 　​﻿]+/g, '');
   }
+  /* 검색어마다 '키워드 안에서 공백이 있던 자리'(공백 앞 글자의 번호)를 함께 돌려준다. termsOf 와 같은 순서.
+   * 본문을 비교할 때 공백은 무시하지만, 키워드에 공백이 없는데 본문의 글자 사이에 공백이 끼어 있으면(= 다른 낱말 사이)
+   * 맞은 것으로 치지 않는다. 예) 분만대 가 '한 분만 대외로' 에서 걸리면 안 된다. */
+  function termSpecs(kw) {
+    const out = [];
+    const byTerm = new Map();
+    [kw.name].concat(kw.synonyms || []).forEach((raw) => {
+      let term = '';
+      const gaps = [];
+      const low = String(raw || '').toLowerCase();
+      for (let i = 0; i < low.length; i++) {
+        if (isSpace(low.charCodeAt(i))) { if (term.length) gaps[term.length - 1] = true; } else term += low[i];
+      }
+      if (!term) return;
+      gaps.length = Math.max(0, term.length - 1); // 맨 끝의 공백은 의미 없다
+      const prev = byTerm.get(term);
+      if (prev) { gaps.forEach((g, i) => { if (g) prev.gaps[i] = true; }); return; } // 같은 말: 공백 허용 자리를 합친다
+      const spec = { term, gaps };
+      byTerm.set(term, spec); out.push(spec);
+    });
+    return out;
+  }
+  // 결과 형식이 바뀔 때 올린다: 올리면 저장된 분석 결과가 '재분석 필요'로 표시된다.
+  const MATCH_VERSION = 'm2';
   function termsSignature(kw) {
-    return termsOf(kw).slice().sort().join('|');
+    return MATCH_VERSION + ':' + termsOf(kw).slice().sort().join('|');
   }
 
   /* ---------- Aho-Corasick: 모든 키워드를 한 번에 비교 ---------- */
@@ -76,7 +100,8 @@
         nodes[cur].out = merged;
       }
     }
-    return { nodes, ids, size: keywords.length, termLens: keywords.map((k) => termsOf(k).length) };
+    const specs = keywords.map((k) => termSpecs(k));
+    return { nodes, ids, size: keywords.length, termLens: specs.map((sp) => sp.length), gaps: specs.map((sp) => sp.map((t) => t.gaps)) };
   }
 
   /* ---------- 본문 스캔 (1회 통과, 줄 단위, 공백 무시, 대소문자 무시) ---------- */
@@ -100,14 +125,19 @@
     if (!total) return { totalChars: 0, ids: matcher.ids, counts, segs, terms: termCounts };
 
     const nodes = matcher.nodes;
+    const gapsOf = matcher.gaps;
+    let origIdx = new Int32Array(1024); // 공백을 뺀 n번째 글자가 줄의 몇 번째 글자였는지
     let pos = 0;
     let budget = 0;
     const CHUNK = opts.chunk || 300000;
     for (let li = 0; li < lines.length; li++) {
       const s = lines[li].toLowerCase();
+      if (origIdx.length < s.length) origIdx = new Int32Array(Math.max(s.length, origIdx.length * 2));
+      let lp = 0; // 이 줄에서 공백을 뺀 글자 수
       let state = 0;
       for (let i = 0; i < s.length; i++) {
         if (isSpace(s.charCodeAt(i))) continue;
+        origIdx[lp++] = i;
         const ch = s[i];
         while (state && !nodes[state].next.has(ch)) state = nodes[state].fail;
         const nx = nodes[state].next.get(ch);
@@ -117,8 +147,18 @@
         if (out) {
           for (let k = 0; k < out.length; k++) {
             const idx = out[k][0];
-            const start = pos - out[k][1];
+            const len = out[k][1];
+            const start = pos - len;
             const ti = out[k][2];
+            // 맞은 구간의 글자 사이에 공백이 끼어 있으면, 키워드에도 그 자리에 공백이 있을 때만 인정한다
+            if (len > 1 && origIdx[lp - 1] - origIdx[lp - len] > len - 1) {
+              const g = gapsOf[idx][ti];
+              let bad = false;
+              for (let q = 0; q < len - 1; q++) {
+                if (origIdx[lp - len + q + 1] - origIdx[lp - len + q] > 1 && !g[q]) { bad = true; break; }
+              }
+              if (bad) continue;
+            }
             if (start >= termEnd[idx][ti]) { termEnd[idx][ti] = pos; termCounts[idx][ti]++; }
             if (start >= lastEnd[idx]) { // 같은 키워드의 동의어끼리 겹치면 1회만 센다
               lastEnd[idx] = pos;
